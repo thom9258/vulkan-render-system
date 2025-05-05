@@ -4,7 +4,7 @@
 #include <variant>
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "../thirdparty/tiny_obj_loader.hpp"
+#include "thirdparty/tiny_obj_loader.hpp"
 
 #include "VertexPosNormColor.hpp"
 #include "VertexPosNormColorUV.hpp"
