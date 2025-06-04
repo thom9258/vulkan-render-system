@@ -33,10 +33,21 @@ using GeneratedFrame = std::variant<Texture2D*,
 
 using FrameProducer = std::function<std::optional<Texture2D*>(CurrentFrameInfo)>;
 
+struct RenderingStartupConfig
+{
+	std::string window_name = "unnamed rendering window";
+	uint32_t window_width = 1200;
+	uint32_t window_height = 800;
+	int window_position_x = -1;
+	int window_position_y = -1;
+	uint32_t frames_in_flight = 2;
+	bool debug_print = false;
+};
+
 class PresentationContext 
 {
 public:
-    explicit PresentationContext(const uint32_t frames_in_flight);
+    explicit PresentationContext(RenderingStartupConfig const& config);
     ~PresentationContext(); 
 
 	vk::Extent2D get_window_extent() const noexcept;
@@ -81,7 +92,7 @@ public:
 	
 private:
 	void CreateContext();
-	void CreateWindow();
+	void CreateWindow(RenderingStartupConfig const& config);
 	void CreateInstance();
 	void CreateWindowSurface();
 	void CreateDebugMessenger();
@@ -122,11 +133,11 @@ PresentationContext::~PresentationContext()
 	SDL_Quit();
 }
 
-PresentationContext::PresentationContext(const uint32_t frames_in_flight)
-	: maxFramesInFlight_(frames_in_flight)
+PresentationContext::PresentationContext(RenderingStartupConfig const& config)
+	: maxFramesInFlight_(config.frames_in_flight)
 {
 	CreateContext();
-	CreateWindow();
+	CreateWindow(config);
 	CreateInstance();
 	CreateWindowSurface();
 	CreateDebugMessenger();
@@ -144,17 +155,26 @@ PresentationContext::PresentationContext(const uint32_t frames_in_flight)
 
 void PresentationContext::CreateContext()
 {
-    SDL_Init(SDL_INIT_EVERYTHING);
+    if (SDL_Init(SDL_INIT_EVERYTHING) == 0)
+		throw std::runtime_error("Could not init sdl!");
     SDL_Vulkan_LoadLibrary(nullptr);
 }
 
-void PresentationContext::CreateWindow()
+void PresentationContext::CreateWindow(RenderingStartupConfig const& config)
 {
-	window_ = SDL_CreateWindow("render window",
-							   SDL_WINDOWPOS_UNDEFINED,
-							   SDL_WINDOWPOS_UNDEFINED,
-							   1200,
-							   800,
+	const auto windowpos_x = (config.window_position_x < 0) 
+		? SDL_WINDOWPOS_UNDEFINED
+		: config.window_position_x;
+	const auto windowpos_y = (config.window_position_y < 0) 
+		? SDL_WINDOWPOS_UNDEFINED
+		: config.window_position_y;
+
+
+	window_ = SDL_CreateWindow(config.window_name.c_str(),
+							   windowpos_x,
+							   windowpos_y,
+							   config.window_width,
+							   config.window_height,
 							   0 | SDL_WINDOW_VULKAN);
 }
 

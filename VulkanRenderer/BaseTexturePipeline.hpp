@@ -420,6 +420,7 @@ create_base_texture_pipeline(vk::PhysicalDevice& physical_device,
 		| make_shader_readonly(physical_device,
 							   device,
 							   graphics_queue,
+							   InterpolationType::Point,
 							   command_pool);
 	
 	if (debug_print)
@@ -444,8 +445,10 @@ void draw_base_texture_renderables(BaseTexturePipeline& pipeline,
 {
 	// ensure base texture is available
 	if (!pipeline.texture_descriptor.sets.contains(&pipeline.base_texture)) {
-		std::cout << "texture does not exist, creating it with max frames "
-				  << max_frames_in_flight << std::endl;
+		std::cout << 
+			"texture descriptor sets does not exist in descriptor cache yet,"
+			" creating it.."
+				  << std::endl;
 		pipeline.texture_descriptor.sets.insert({
 				&pipeline.base_texture,
 				create_descriptorset_for_texture(device,

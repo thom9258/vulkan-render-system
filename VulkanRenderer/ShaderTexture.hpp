@@ -5,6 +5,11 @@
 #include "Texture.hpp"
 
 
+enum class InterpolationType {
+	Linear,
+	Point
+};
+
 struct TextureSamplerReadOnly
 {
 	explicit TextureSamplerReadOnly() = default;
@@ -62,6 +67,7 @@ make_shader_readonly(vk::PhysicalDevice physical_device,
 					 vk::Device device,
 					 vk::Queue queue,
 					 vk::CommandPool command_pool,
+					 InterpolationType interpolation,
 					 Texture2D&& texture)
 {
 	with_buffer_submit(device, command_pool, queue,
@@ -114,10 +120,15 @@ make_shader_readonly(vk::PhysicalDevice physical_device,
 	const auto max_anisotropy = has_anisotropy
 		? std::min(4.0f, properties.limits.maxSamplerAnisotropy)
 		: 1.0f;
+	
+	vk::Filter filter = vk::Filter::eLinear;
+	if (interpolation == InterpolationType::Point)
+		filter = vk::Filter::eNearest;
+
 	const auto sampler_info = vk::SamplerCreateInfo{}
 		//TODO Filter should be changeable!
-		.setMagFilter(vk::Filter::eLinear)
-		.setMinFilter(vk::Filter::eLinear)
+		.setMagFilter(filter)
+		.setMinFilter(filter)
 		.setAddressModeU(vk::SamplerAddressMode::eRepeat)
 		.setAddressModeV(vk::SamplerAddressMode::eRepeat)
 		.setAddressModeW(vk::SamplerAddressMode::eRepeat)
@@ -139,6 +150,7 @@ decltype(auto)
 make_shader_readonly(vk::PhysicalDevice physical_device,
 					 vk::Device device,
 					 vk::Queue queue,
+					 InterpolationType interpolation,
 					 vk::CommandPool command_pool)
 {
 	return [=] (Texture2D&& texture) {
@@ -146,6 +158,7 @@ make_shader_readonly(vk::PhysicalDevice physical_device,
 									device,
 									queue,
 									command_pool,
+									interpolation,
 									std::move(texture));
 	};
 }

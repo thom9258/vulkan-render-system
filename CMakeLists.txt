@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(VulkanRenderer
+project(vulkan-renderer
   VERSION 0.1.0
-  DESCRIPTION "VulkanRenderer is a piping library designed as an alternative to for-loops."
-  HOMEPAGE_URL "https://github.com/thom9258/VulkanRenderer/"
+  DESCRIPTION "vulkan-renderer is a piping library designed as an alternative to for-loops."
+  HOMEPAGE_URL "https://github.com/thom9258/vulkan-renderer/"
 )
 
 include(GNUInstallDirs)
@@ -12,7 +12,9 @@ add_library(${PROJECT_NAME} INTERFACE)
 # allows other projects add_subdirectory() this project
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME}) 
 
-set(VulkanRenderer_INCLUDE_DIR "VulkanRenderer")
+
+
+set(vulkan-renderer_INCLUDE_DIR "VulkanRenderer")
 
 target_include_directories(${PROJECT_NAME} 
   INTERFACE
@@ -30,14 +32,14 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file("VulkanRendererConfigVersion.cmake"
+write_basic_package_version_file("vulkan-rendererConfigVersion.cmake"
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY SameMajorVersion
 )
 
 configure_package_config_file(
-  "${PROJECT_SOURCE_DIR}/cmake/VulkanRendererConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}/VulkanRendererConfig.cmake"
+  "${PROJECT_SOURCE_DIR}/cmake/vulkan-rendererConfig.cmake.in"
+  "${PROJECT_BINARY_DIR}/vulkan-rendererConfig.cmake"
   INSTALL_DESTINATION
   "${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake"
 )
@@ -58,6 +60,6 @@ install(
 )
 
 install(
-  DIRECTORY ${PROJECT_SOURCE_DIR}/${VulkanRenderer_INCLUDE_DIR}
+  DIRECTORY ${PROJECT_SOURCE_DIR}/${vulkan-renderer_INCLUDE_DIR}
   DESTINATION include
 )
