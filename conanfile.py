@@ -4,7 +4,7 @@ from conan.tools.cmake import CMakeToolchain, CMake, cmake_layout, CMakeDeps
 
 class VulkanRendererRecipe(ConanFile):
     name = "vulkan-renderer"
-    version = "1.0"
+    version = "1.2"
 
     # Optional metadata
     license = "<Put the package license here>"
@@ -17,7 +17,7 @@ class VulkanRendererRecipe(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
-    exports_sources = "CMakeLists.txt", "VulkanRenderer/*", "cmake/*"
+    exports_sources = "CMakeLists.txt", "include/VulkanRenderer/*", "source/*", "cmake/*"
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -33,7 +33,7 @@ class VulkanRendererRecipe(ConanFile):
         tc.generate()
         
     def requirements(self):
-        self.requires("polymorph/1.0", transitive_headers=True)
+        self.requires("polymorph/1.1", transitive_headers=True)
         self.requires("simple-geometry/1.0", transitive_headers=True)
         self.requires("glm/1.0.1", transitive_headers=True)
         #self.requires("sdl/[~2.28]", transitive_headers=True)
@@ -49,5 +49,5 @@ class VulkanRendererRecipe(ConanFile):
         cmake = CMake(self)
         cmake.install()
 
-    #def package_info(self):
-        #self.cpp_info.libs = ["VulkanRenderer"]
+    def package_info(self):
+        self.cpp_info.libs = ["vulkan-renderer"]

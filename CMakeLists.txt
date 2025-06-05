@@ -1,65 +1,89 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(vulkan-renderer
-  VERSION 0.1.0
+  VERSION 1.2.0
   DESCRIPTION "vulkan-renderer is a piping library designed as an alternative to for-loops."
   HOMEPAGE_URL "https://github.com/thom9258/vulkan-renderer/"
 )
 
-include(GNUInstallDirs)
 
-add_library(${PROJECT_NAME} INTERFACE)
-# allows other projects add_subdirectory() this project
+add_library(${PROJECT_NAME} SHARED)
+
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME}) 
 
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
 
+find_package(polymorph)
+find_package(glm)
+find_package(Vulkan REQUIRED)
+find_package(SDL2 REQUIRED)
 
-set(vulkan-renderer_INCLUDE_DIR "VulkanRenderer")
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
 target_include_directories(${PROJECT_NAME} 
-  INTERFACE
-  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
-  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+  PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/VulkanRenderer/
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/
+  ${glm_INCLUDE_DIRS}
+  ${glm_SOURCE_DIR}
+  ${Vulkan_INCLUDE_DIR}
+  ${SDL2_INCLUDE_DIRS}
+)
+ 
+set(PUBLIC_HEADER_PATH /include/VulkanRenderer)
+
+set(PUBLIC_HEADERS
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/BaseTexturePipeline.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Bitmap.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Canvas.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/DebugMessenger.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Extent.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/GeometryPass.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/glm.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Mesh.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/NormRenderPipeline.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ShaderTexture.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/StrongType.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Texture.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Utils.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/VertexBuffer.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/VertexPosNormColor.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/VertexPosNormColorUV.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/VulkanRenderer.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/WireframePipeline.hpp
+
+  # TODO: THIRDPARTY TO BE HIDED AWAY
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/stb_image.h
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/tiny_obj_loader.hpp
 )
 
-target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
-
-install(TARGETS ${PROJECT_NAME}
-  EXPORT ${PROJECT_NAME}_Targets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+set(PRIVATE_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/VulkanRenderer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Utils.cpp
 )
 
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file("vulkan-rendererConfigVersion.cmake"
-  VERSION ${PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion
+target_sources(${PROJECT_NAME} PRIVATE ${PRIVATE_SOURCES})
+target_sources(${PROJECT_NAME} PRIVATE ${PUBLIC_HEADERS})
+
+set_property(TARGET ${PROJECT_NAME}
+  PROPERTY PUBLIC_HEADER 
+  ${PUBLIC_HEADERS}
 )
 
-configure_package_config_file(
-  "${PROJECT_SOURCE_DIR}/cmake/vulkan-rendererConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}/vulkan-rendererConfig.cmake"
-  INSTALL_DESTINATION
-  "${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake"
+target_link_libraries(${PROJECT_NAME} 
+  polymorph::polymorph 
+  glm::glm
+  ${Vulkan_LIBRARIES}
+  ${SDL2_LIBRARIES}
 )
 
-install(
-  EXPORT ${PROJECT_NAME}_Targets
-  FILE ${PROJECT_NAME}Targets.cmake
-  NAMESPACE ${PROJECT_NAME}::
-  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake"
-)
-
-install(
-  FILES
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-  DESTINATION
-  "${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake"
-)
-
-install(
-  DIRECTORY ${PROJECT_SOURCE_DIR}/${vulkan-renderer_INCLUDE_DIR}
-  DESTINATION include
+install (TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}${PUBLIC_HEADER_PATH}
 )
