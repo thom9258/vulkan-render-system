@@ -3,10 +3,9 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <VulkanRenderer/tiny_obj_loader.hpp>
 
-auto load_obj(const std::filesystem::path& path,
-			  const std::string& filename,
-			  vk::PhysicalDevice& physical_device,
-			  vk::Device& device)
+auto load_obj(PresentationContext& presentation_context,
+			  const std::filesystem::path& path,
+			  const std::string& filename)
 	-> LoadMeshResult
 {
     //attrib will contain the vertex arrays of the file
@@ -74,8 +73,7 @@ auto load_obj(const std::filesystem::path& path,
 	
 
 	Mesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(physical_device,
-											 device,
+	mesh.vertexbuffer = create_vertex_buffer(presentation_context,
 											 vertices);
 	
 	if (!warn.empty()) {
@@ -89,10 +87,9 @@ auto load_obj(const std::filesystem::path& path,
 }
 
 
-auto load_obj_with_texcoords(const std::filesystem::path& path,
-							 const std::string& filename,
-							 vk::PhysicalDevice& physical_device,
-							 vk::Device& device)
+auto load_obj_with_texcoords(PresentationContext& presentation_context,
+							 const std::filesystem::path& path,
+							 const std::string& filename)
 	-> LoadTexturedMeshResult
 {
     //attrib will contain the vertex arrays of the file
@@ -165,8 +162,7 @@ auto load_obj_with_texcoords(const std::filesystem::path& path,
 	
 
 	TexturedMesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(physical_device,
-											 device,
+	mesh.vertexbuffer = create_vertex_buffer(presentation_context,
 											 vertices);
 	
 	if (!warn.empty()) {

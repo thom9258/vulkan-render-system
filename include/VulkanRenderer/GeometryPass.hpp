@@ -1,6 +1,8 @@
 #pragma once
 
 #include "VulkanRenderer.hpp"
+#include "DescriptorPool.hpp"
+
 #include "NormRenderPipeline.hpp"
 #include "WireframePipeline.hpp"
 #include "BaseTexturePipeline.hpp"
@@ -31,18 +33,16 @@ struct WorldRenderInfo
 	glm::mat4 projection;
 };
 
-
 class Renderer
 {
 public:
 	Renderer(PresentationContext& presentation_context,
-			 vk::DescriptorPool& descriptor_pool,
+			 DescriptorPool& descriptor_pool,
 			 const std::filesystem::path shaders_root);
 
 	~Renderer();
 	
 	auto render(const uint32_t current_frame_in_flight,
-				const uint32_t max_frames_in_flight,
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables)

@@ -86,5 +86,41 @@ auto create_canvas(const Pixel8bitRGBA color,
 
 
 [[nodiscard]]
-auto as_canvas(LoadedBitmap2D&& bitmap)
+auto bitmap_as_canvas(LoadedBitmap2D&& bitmap)
 	-> Canvas8bitRGBA;
+
+
+[[nodiscard]]
+auto canvas_draw_rectangle(const Pixel8bitRGBA color,
+						   const CanvasOffset offset,
+						   const CanvasExtent extent,
+						   Canvas8bitRGBA&& canvas)
+	-> Canvas8bitRGBA;
+
+auto canvas_draw_rectangle(const Pixel8bitRGBA color,
+						   const CanvasOffset offset,
+						   const CanvasExtent extent)
+	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>;
+
+
+#if 0
+[[nodiscard]]
+auto canvas_draw_checkerboard(const Pixel8bitRGBA color,
+							  const CheckerSquareSize size,
+							  Canvas8bitRGBA&& canvas)
+	-> Canvas8bitRGBA;
+
+auto canvas_draw_checkerboard(const Pixel8bitRGBA color,
+							  const CheckerSquareSize size)
+	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>;
+
+[[nodiscard]]
+auto canvas_draw_coordinate_system(const CanvasExtent arrow,
+								   Canvas8bitRGBA&& canvas)
+	-> Canvas8bitRGBA;
+
+
+auto canvas_draw_coordinate_system(const CanvasExtent arrow)
+	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>;
+
+#endif

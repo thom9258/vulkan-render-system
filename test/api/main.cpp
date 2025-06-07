@@ -8,6 +8,9 @@
 
 #include <VulkanRenderer/VulkanRenderer.hpp>
 #include <VulkanRenderer/GeometryPass.hpp>
+#include <VulkanRenderer/DescriptorPool.hpp>
+
+
 #include <VulkanRenderer/Bitmap.hpp>
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/ShaderTexture.hpp>
@@ -21,8 +24,7 @@ const std::string assets_root = root + "assets/";
 
 
 TexturedMesh 
-textured_cube(vk::PhysicalDevice& physical_device,
-			  vk::Device& device)
+textured_cube(PresentationContext& presentation_context)
 {
 	sg_status status;
 	size_t vertices_length{0};
@@ -56,8 +58,7 @@ textured_cube(vk::PhysicalDevice& physical_device,
 	}
 	
 	TexturedMesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(physical_device,
-											 device,
+	mesh.vertexbuffer = create_vertex_buffer(presentation_context,
 											 vertices);
 	return mesh;
 }
@@ -88,62 +89,37 @@ int main()
 
 	WindowConfig window_config;
 	Logger logger;
-	PresentationContext context(window_config, logger);
+	PresentationContext presentation_context(window_config, logger);
 
-	const auto window = context.get_window_extent();
+	const auto window = presentation_context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
 	
 	WorldRenderInfo world_info{};
     world_info.view = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -4.f));
     world_info.projection = glm::perspective(glm::radians(70.f), aspect, 0.1f, 200.0f);
     world_info.projection[1][1] *= -1;
-	
-	GeometryPass pass = create_geometry_pass(context.physical_device,
-											 context.device.get(),
-											 context.command_pool(),
-											 context.graphics_queue(),
-											 context.get_window_extent(),
-											 2,
-											 true);
-	
-	std::array<vk::DescriptorPoolSize, 2> sizes{
-		vk::DescriptorPoolSize{}
-		.setType(vk::DescriptorType::eUniformBuffer)
-		.setDescriptorCount(100),
-		vk::DescriptorPoolSize{}
-		.setType(vk::DescriptorType::eCombinedImageSampler)
-		.setDescriptorCount(100),
-	};
-	
-	const auto pool_info = vk::DescriptorPoolCreateInfo{}
-		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-		.setMaxSets(200)
-		.setPoolSizes(sizes);
-	
-	auto descriptor_pool =
-		context.device.get().createDescriptorPoolUnique(pool_info, nullptr);
-	
-	Pipelines pipelines = create_pipelines(context,
-										   descriptor_pool.get(),
-										   pass.renderpass.get(),
-										   context.maxFramesInFlight_,
-										   context.get_window_extent(),
-										   shaders_root,
-										   true);
 
+	DescriptorPoolCreateInfo descriptor_pool_info;
+	descriptor_pool_info.uniform_buffer_count = 100;
+	descriptor_pool_info.combined_image_sampler_count = 100;
+
+	DescriptorPool descriptor_pool(descriptor_pool_info,
+								   presentation_context);
+
+	Renderer renderer(presentation_context,
+					  descriptor_pool,
+					  shaders_root);
+	
 	Mesh triangle_mesh{};
-	triangle_mesh.vertexbuffer = create_vertex_buffer(context.physical_device,
-													  context.device.get(),
+	triangle_mesh.vertexbuffer = create_vertex_buffer(presentation_context,
 													  triangle_vertices);
 	
 
-	TexturedMesh cube_mesh = 
-		textured_cube(context.physical_device, context.device.get());
+	TexturedMesh cube_mesh = textured_cube(presentation_context);
 
-	auto loaded_monkey_mesh = load_obj(assets_root,
-									   "models/monkey/monkey_flat.obj",
-									   context.physical_device,
-									   context.device.get());
+	auto loaded_monkey_mesh = load_obj(presentation_context,
+									   assets_root,
+									   "models/monkey/monkey_flat.obj");
 	
 	Mesh monkey_mesh{};
 	if (std::holds_alternative<Mesh>(loaded_monkey_mesh)) {
@@ -167,10 +143,9 @@ int main()
 	
 	//https://opengameart.org/art-search-advanced?keys=&field_art_type_tid%5B0%5D=10&sort_by=count&sort_order=DESC&page=3
 	std::cout << "loading chest model!" << std::endl;
-	auto loaded_chest = load_obj_with_texcoords(assets_root,
-												"models/ChestWowStyle/Chest.obj",
-												context.physical_device,
-												context.device.get());
+	auto loaded_chest = load_obj_with_texcoords(presentation_context,
+												assets_root,
+												"models/ChestWowStyle/Chest.obj");
 	TexturedMesh chest_mesh{};
 	if (auto p = std::get_if<TexturedMesh>(&loaded_chest)) {
 		chest_mesh = std::move(*p);
@@ -182,7 +157,8 @@ int main()
 	else if (auto p = std::get_if<MeshLoadError>(&loaded_chest)) {
 		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
 	}
-	
+
+#if 0	
 	std::cout << "loading chest texture!" << std::endl;
 	TextureSamplerReadOnly chest_texture;
 	auto loaded_chest_texture = 
@@ -272,6 +248,8 @@ int main()
 	else if (std::get_if<InvalidNativePixels>(&loaded_lulu)) {
 		std::cout << "Texture has invalid native pixels" << std::endl;
 	}
+#endif
+
 
 	std::cout << "STARTING DRAW LOOP" << std::endl;
 	/** ************************************************************************
@@ -305,7 +283,7 @@ int main()
 				switch (wev.event) {
 				case SDL_WINDOWEVENT_RESIZED:
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
-					context.window_resize_event_triggered();
+					presentation_context.window_resize_event_triggered();
 					//TODO: DO RESIZE
 					break;
 				case SDL_WINDOWEVENT_CLOSE:
@@ -326,7 +304,7 @@ int main()
 			
 				BaseTextureRenderable chest{};
 				chest.mesh = &chest_mesh;
-				chest.texture = &chest_texture;
+				//chest.texture = &chest_texture;
 				chest.model = glm::mat4(1.0f);
 				chest.model = glm::translate(chest.model, glm::vec3(0.0f, -1.0f, 0.0f));
 				chest.model = glm::scale(chest.model, glm::vec3(0.02f));
@@ -335,10 +313,9 @@ int main()
 										  glm::normalize(glm::vec3(0, 1, 0)));
 				renderables.push_back(chest);
 
-#if 1
 				BaseTextureRenderable t{};
 				t.mesh = &cube_mesh;
-				t.texture = &lulu;
+				//t.texture = &lulu;
 				t.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.0f));
 				t.model = glm::rotate(t.model,
 									  glm::radians(frameInfo.total_frame_count * 1.0f),
@@ -346,7 +323,7 @@ int main()
 				renderables.push_back(t);
 				
 				t.mesh = &cube_mesh;
-				t.texture = &statue;
+				//t.texture = &statue;
 				t.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.4f, 0.0f));
 				t.model = glm::rotate(t.model,
 									  glm::radians(frameInfo.total_frame_count * 1.0f),
@@ -369,27 +346,19 @@ int main()
 									   glm::radians(frameInfo.total_frame_count * 1.0f),
 									   glm::vec3(-0.7, 0.7, 0));
 				renderables.push_back(d3);
-#endif
 
-				auto* textureptr = render(pass,
-										  &pipelines,
-										  frameInfo.current_flight_frame_index,
-										  context.maxFramesInFlight_,
-										  frameInfo.total_frame_count,
-										  context.device.get(),
-										  descriptor_pool.get(),
-										  context.command_pool(),
-										  context.graphics_queue(),
-										  world_info,
-										  renderables);
-				
+				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
+												   frameInfo.total_frame_count,
+												   world_info,
+												   renderables);
+			
 				if (textureptr == nullptr)
 					return std::nullopt;
 				return textureptr;
 			};
 			
 		auto render_time = with_time_measurement([&] () {
-			context.with_presentation(frameGenerator);
+			presentation_context.with_presentation(frameGenerator);
 		});
 
 		if (slowframes) {
@@ -410,7 +379,6 @@ int main()
 		framecount++;
 	}
 	
-
-	context.device.get().waitIdle();
+	presentation_context.wait_until_idle();
 	return 0;
 }

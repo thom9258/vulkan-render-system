@@ -11,7 +11,8 @@
 
 struct Mesh
 {
-	VertexBuffer<VertexPosNormColor> vertexbuffer;
+	//VertexBuffer<VertexPosNormColor> vertexbuffer;
+	VertexBuffer vertexbuffer;
 	std::string warning{};
 };
 
@@ -23,7 +24,8 @@ struct MeshWithWarning
 
 struct TexturedMesh
 {
-	VertexBuffer<VertexPosNormColorUV> vertexbuffer;
+	//VertexBuffer<VertexPosNormColorUV> vertexbuffer;
+	VertexBuffer vertexbuffer;
 	std::string warning{};
 };
 
@@ -56,16 +58,14 @@ using LoadTexturedMeshResult = std::variant<
 	MeshLoadError,
 	MeshInvalidPath>;
 
-auto load_obj(const std::filesystem::path& path,
-			  const std::string& filename,
-			  vk::PhysicalDevice& physical_device,
-			  vk::Device& device)
+auto load_obj(PresentationContext& presentation_context,
+			  const std::filesystem::path& path,
+			  const std::string& filename)
 	-> LoadMeshResult;
 
-auto load_obj_with_texcoords(const std::filesystem::path& path,
-							 const std::string& filename,
-							 vk::PhysicalDevice& physical_device,
-							 vk::Device& device)
+auto load_obj_with_texcoords(PresentationContext& context,
+							 const std::filesystem::path& path,
+							 const std::string& filename)
 	-> LoadTexturedMeshResult;
 
 #endif //_VULKANRENDERER_MESH_
