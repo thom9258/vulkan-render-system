@@ -19,6 +19,7 @@ find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+target_compile_options(${PROJECT_NAME} PRIVATE "-Wno-terminate")
 
 target_include_directories(${PROJECT_NAME} 
   PUBLIC
@@ -59,11 +60,16 @@ set(PUBLIC_HEADERS
 )
 
 set(PRIVATE_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/VulkanRendererImpl.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/GeometryPassImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/source/VulkanRenderer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Utils.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Texture.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexPosNormColor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexPosNormColorUV.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/DebugMessenger.cpp
 )
 
 target_sources(${PROJECT_NAME} PRIVATE ${PRIVATE_SOURCES})

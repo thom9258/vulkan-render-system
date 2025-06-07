@@ -421,8 +421,8 @@ create_base_texture_pipeline(vk::PhysicalDevice& physical_device,
 		| make_shader_readonly(physical_device,
 							   device,
 							   graphics_queue,
-							   InterpolationType::Point,
-							   command_pool);
+							   command_pool,
+							   InterpolationType::Point);
 	
 	if (debug_print)
 		std::cout << "> created base texture!" << std::endl;

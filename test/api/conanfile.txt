@@ -1,0 +1,6 @@
+[requires]
+vulkan-renderer/1.2
+
+[generators]
+CMakeToolchain
+CMakeDeps

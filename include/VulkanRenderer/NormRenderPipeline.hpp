@@ -1,5 +1,6 @@
 #pragma once 
 
+#include <iostream>
 #include <filesystem>
 #include "VertexPosNormColor.hpp"
 #include "VertexBuffer.hpp"

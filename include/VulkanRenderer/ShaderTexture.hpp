@@ -150,8 +150,8 @@ decltype(auto)
 make_shader_readonly(vk::PhysicalDevice physical_device,
 					 vk::Device device,
 					 vk::Queue queue,
-					 InterpolationType interpolation,
-					 vk::CommandPool command_pool)
+					 vk::CommandPool command_pool,
+					 InterpolationType interpolation)
 {
 	return [=] (Texture2D&& texture) {
 		return make_shader_readonly(physical_device,
