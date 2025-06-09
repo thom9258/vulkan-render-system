@@ -40,12 +40,6 @@ struct NormColorRenderInfo
 	glm::mat4 proj;
 };
 
-struct NormColorRenderable
-{
-	Mesh* mesh;
-	glm::mat4 model;
-};
-
 /**
  * @brief descripe the descriptor layout of the norm color shader.
  * this will set up a layout for NormRenderPipeline::Camera

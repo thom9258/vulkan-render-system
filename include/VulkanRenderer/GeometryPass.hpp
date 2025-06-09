@@ -1,31 +1,14 @@
 #pragma once
 
+#include "Renderable.hpp"
+#include "Context.hpp"
 #include "VulkanRenderer.hpp"
 #include "DescriptorPool.hpp"
 
-#include "NormRenderPipeline.hpp"
-#include "WireframePipeline.hpp"
-#include "BaseTexturePipeline.hpp"
-#include "Texture.hpp"
-
-#include <variant>
 #include <algorithm>
 #include <filesystem>
 
-using Renderable = std::variant<NormColorRenderable,
-								BaseTextureRenderable,
-								WireframeRenderable>;
 
-
-struct SortedRenderables
-{
-	std::vector<BaseTextureRenderable> basetextures;
-	std::vector<NormColorRenderable> normcolors;
-	std::vector<WireframeRenderable> wireframes;
-};
-
-void sort_renderable(SortedRenderables* sorted,
-					 Renderable renderable);
 
 struct WorldRenderInfo
 {
@@ -36,7 +19,8 @@ struct WorldRenderInfo
 class Renderer
 {
 public:
-	Renderer(PresentationContext& presentation_context,
+	Renderer(Render::Context& context,
+			 PresentationContext& presentor,
 			 DescriptorPool& descriptor_pool,
 			 const std::filesystem::path shaders_root);
 

@@ -3,7 +3,12 @@
 #define _VULKANRENDERERIMPL_RENDERER_IMPL_
 
 #include <VulkanRenderer/GeometryPass.hpp>
+#include <VulkanRenderer/NormRenderPipeline.hpp>
+#include <VulkanRenderer/WireframePipeline.hpp>
+#include <VulkanRenderer/BaseTexturePipeline.hpp>
+
 #include "VulkanRendererImpl.hpp"
+#include "ContextImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
 
 struct GeometryPass
@@ -22,6 +27,13 @@ struct Pipelines
 	BaseTexturePipeline basetexture;
 	NormRenderPipeline normcolor;
 	WireframePipeline wireframe;
+};
+
+struct SortedRenderables
+{
+	std::vector<BaseTextureRenderable> basetextures;
+	std::vector<NormColorRenderable> normcolors;
+	std::vector<WireframeRenderable> wireframes;
 };
 
 void sort_renderable(SortedRenderables* sorted,

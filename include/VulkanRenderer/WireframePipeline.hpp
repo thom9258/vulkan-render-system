@@ -19,14 +19,6 @@ struct WireframeRenderInfo
 	glm::mat4 viewproj;
 };
 
-struct WireframeRenderable
-{
-	Mesh* mesh;
-	glm::mat4 model;
-	glm::vec4 basecolor;
-};
-
-
 WireframePipeline
 create_wireframe_render_pipeline(vk::Device& device,
 								 vk::RenderPass& renderpass,

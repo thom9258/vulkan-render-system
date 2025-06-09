@@ -4,16 +4,12 @@
 
 #include <filesystem>
 #include <variant>
-
-#include "VertexPosNormColor.hpp"
-#include "VertexPosNormColorUV.hpp"
 #include "VertexBuffer.hpp"
 
 struct Mesh
 {
 	//VertexBuffer<VertexPosNormColor> vertexbuffer;
 	VertexBuffer vertexbuffer;
-	std::string warning{};
 };
 
 struct MeshWithWarning
@@ -26,7 +22,6 @@ struct TexturedMesh
 {
 	//VertexBuffer<VertexPosNormColorUV> vertexbuffer;
 	VertexBuffer vertexbuffer;
-	std::string warning{};
 };
 
 struct TexturedMeshWithWarning

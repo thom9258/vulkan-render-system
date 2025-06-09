@@ -1,4 +1,9 @@
 #include <VulkanRenderer/Mesh.hpp>
+#include <VulkanRenderer/VertexPosNormColor.hpp>
+#include <VulkanRenderer/VertexPosNormColorUV.hpp>
+
+#include "VertexBufferImpl.hpp"
+#include "ContextImpl.hpp"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <VulkanRenderer/tiny_obj_loader.hpp>
@@ -72,15 +77,9 @@ auto load_obj(Render::Context& context,
 	}
 	
 
-	Mesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(context,
-											 vertices);
-	
+	Mesh mesh{VertexBuffer(context.impl.get(), vertices)};
 	if (!warn.empty()) {
-		MeshWithWarning with_warning{};
-		with_warning.warning = warn;
-		with_warning.mesh = std::move(mesh);
-		return with_warning;
+		return MeshWithWarning{std::move(mesh), warn};
 	}
 	
 	return mesh;
@@ -160,16 +159,9 @@ auto load_obj_with_texcoords(Render::Context& context,
 		}
 	}
 	
-
-	TexturedMesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(context,
-											 vertices);
-	
+	TexturedMesh mesh{VertexBuffer(context.impl.get(), vertices)};
 	if (!warn.empty()) {
-		TexturedMeshWithWarning with_warning{};
-		with_warning.warning = warn;
-		with_warning.mesh = std::move(mesh);
-		return with_warning;
+		return TexturedMeshWithWarning{std::move(mesh), warn};
 	}
 	
 	return mesh;

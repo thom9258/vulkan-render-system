@@ -52,13 +52,6 @@ struct BaseTextureRenderInfo
 	glm::mat4 proj;
 };
 
-struct BaseTextureRenderable
-{
-	TexturedMesh* mesh;
-	TextureSamplerReadOnly* texture;
-	glm::mat4 model;
-};
-
 std::vector<vk::UniqueDescriptorSet>
 create_descriptorset_for_texture(vk::Device device,
 								 vk::DescriptorSetLayout descriptorset_layout,
