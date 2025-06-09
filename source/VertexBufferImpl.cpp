@@ -1,5 +1,5 @@
 #include <VulkanRenderer/VertexBuffer.hpp>
-#include "VulkanRendererImpl.hpp"
+#include "ContextImpl.hpp"
 
 #if 0
 template<typename Vertex>
@@ -52,7 +52,7 @@ create_vertex_buffer(vk::PhysicalDevice& physical_device,
 #endif
 
 
-auto create_vertex_buffer(PresentationContext& presentation_context,
+auto create_vertex_buffer(Render::Context& context,
 						  void* vertices,
 						  size_t vertices_length,
 						  size_t vertex_memory_size)
@@ -63,8 +63,8 @@ auto create_vertex_buffer(PresentationContext& presentation_context,
 		.setUsage(vk::BufferUsageFlagBits::eVertexBuffer)
 		.setSharingMode(vk::SharingMode::eExclusive);
 	
-	auto physical_device = presentation_context.impl.get()->physical_device;
-	auto device = presentation_context.impl.get()->device.get();
+	auto physical_device = context.impl.get()->physical_device;
+	auto device = context.impl.get()->device.get();
 
 	VertexBuffer vertexbuffer{};
 	vertexbuffer.length = vertices_length;

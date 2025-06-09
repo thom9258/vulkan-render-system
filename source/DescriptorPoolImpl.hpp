@@ -3,13 +3,13 @@
 #define _DESCRIPTOR_POOL_IMPL_
 
 #include <VulkanRenderer/DescriptorPool.hpp>
-#include "VulkanRendererImpl.hpp"
+#include "ContextImpl.hpp"
 
 class DescriptorPool::Impl 
 {
 public:
     explicit Impl(DescriptorPoolCreateInfo const& create_info,
-				  PresentationContext::Impl* presentation_context);
+				  Render::Context::Impl* context);
     ~Impl();
 	
 	vk::UniqueDescriptorPool descriptor_pool;

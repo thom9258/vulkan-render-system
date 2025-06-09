@@ -1,7 +1,7 @@
 #include "DescriptorPoolImpl.hpp"
 
 DescriptorPool::Impl::Impl(DescriptorPoolCreateInfo const& create_info,
-						   PresentationContext::Impl* presentation_context)
+						   Render::Context::Impl* context)
 {
 	std::vector<vk::DescriptorPoolSize> sizes{};
 	uint32_t max_sets = 0;
@@ -32,7 +32,7 @@ DescriptorPool::Impl::Impl(DescriptorPoolCreateInfo const& create_info,
 		.setPoolSizes(sizes);
 	
 	descriptor_pool =
-		presentation_context->device.get().createDescriptorPoolUnique(pool_info, nullptr);
+		context->device.get().createDescriptorPoolUnique(pool_info, nullptr);
 }
 
 DescriptorPool::Impl::~Impl()
@@ -41,8 +41,8 @@ DescriptorPool::Impl::~Impl()
 
 
 DescriptorPool::DescriptorPool(DescriptorPoolCreateInfo const& create_info,
-							   PresentationContext& presentation_context)
-	: impl(std::make_unique<Impl>(create_info, presentation_context.impl.get()))
+							   Render::Context& context)
+	: impl(std::make_unique<Impl>(create_info, context.impl.get()))
 {
 }
 

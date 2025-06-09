@@ -87,8 +87,14 @@ std::vector<VertexPosNormColor> triangle_vertices = {
 int main()
 {
 
-	WindowConfig window_config;
 	Logger logger;
+	logger.log = [] (std::source_location loc, Logger::Type type, std::string msg) {
+		std::cout << "LOGGER OUT: " << msg;
+	}
+
+	Render::Context context(logger);
+
+	WindowConfig window_config;
 	PresentationContext presentation_context(window_config, logger);
 
 	const auto window = presentation_context.get_window_extent();

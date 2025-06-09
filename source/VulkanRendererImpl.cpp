@@ -1,244 +1,34 @@
 #include "VulkanRendererImpl.hpp"
 
+#include <iostream>
+
 vk::CommandPool& PresentationContext::Impl::command_pool()
 {
-	return commandpool_.get();
-}
-
-vk::Queue& PresentationContext::Impl::graphics_queue()
-{
-	return ::graphics_queue(index_queues_);
+	return commandpool.get();
 }
 
 PresentationContext::Impl::~Impl()
 {
 	// TODO: Port over the ResourceWrapperRuntime so we can automatically destroy all this stuff..
 	// Note we need to destroy the swapchain manually so it happens before the surface...
-	swapchain_.reset();
-	instance_->destroySurfaceKHR(raw_window_surface_, nullptr);
-	SDL_DestroyWindow(window_);
-	SDL_Vulkan_UnloadLibrary();
-	SDL_Quit();
+	swapchain.reset();
 }
 
-PresentationContext::Impl::Impl(WindowConfig const& config,
-								Logger logger)
-	: maxFramesInFlight_(2)
-	, logger(logger)
+PresentationContext::Impl::Impl(Render::Context::Impl* context)
+	: max_frames_in_flight(2)
+	, context(context)
 {
-	CreateContext();
-	CreateWindow(config);
-	CreateInstance();
-	CreateWindowSurface();
-	CreateDebugMessenger();
-	GetPhysicalDevice();
-	GetQueueFamilyIndices();
-	CreateDevice();
-	CreateIndexQueues();
 	CreateSwapChain();
 	CreateCommandpool();
 	CreateCommandbuffers();
 	CreateSyncObjects();
-
 	CreateRenderTargets();
-}
-
-void PresentationContext::Impl::CreateContext()
-{
-    if (SDL_Init(SDL_INIT_EVERYTHING) == 0)
-		throw std::runtime_error("Could not init sdl!");
-    SDL_Vulkan_LoadLibrary(nullptr);
-}
-
-void PresentationContext::Impl::CreateWindow(WindowConfig const& config)
-{
-	int pos_x = -1;
-	int pos_y = -1;
-	if (config.position.has_value()) {
-		pos_x = config.position.value().width();
-		pos_y = config.position.value().height();
-	}
-
-	window_ = SDL_CreateWindow(config.name.c_str(),
-							   pos_x,
-							   pos_y,
-							   config.size.width(),
-							   config.size.height(),
-							   0 | SDL_WINDOW_VULKAN);
-}
-
-[[nodiscard]]
-bool
-is_validation_layer_available(const char* layer)
-{
-	std::string str_layer = layer;
-	std::vector<vk::LayerProperties> properties = vk::enumerateInstanceLayerProperties();
-	for (vk::LayerProperties& property: properties) {
-		std::string str_available = property.layerName;
-		if (str_layer == str_available)
-			return true;
-	}
-
-	return false;
-}
-
-void PresentationContext::Impl::CreateInstance()
-{
-	std::vector<const char*> sdl_instance_extensions = get_sdl2_instance_extensions(window_);
-	auto instance_extensions = sdl_instance_extensions;
-	instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	//instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-	
-	std::cout << "Instance Extensions:\n";
-	for (const auto& extension: instance_extensions)
-		std::cout << "-> " << extension << "\n";
-	std::cout << std::endl;
-
-	//NOTE Only do validation layers for debugging
-	std::vector<const char*> validation_layers{
-		"VK_LAYER_KHRONOS_validation"
-	};
-	
-	for (auto wanted: validation_layers)
-		if (!is_validation_layer_available(wanted))
-			throw std::runtime_error("Validation layer not available");
-	
-	auto applicationInfo = vk::ApplicationInfo{}
-		.setPApplicationName("app")
-		.setPEngineName("engine")
-		.setApplicationVersion(VK_MAKE_VERSION(1, 1, 0))
-		.setEngineVersion(VK_MAKE_VERSION(1, 1, 0))
-		.setApiVersion(VK_MAKE_VERSION(1, 1, 0));
-
-	auto instanceCreateInfo = vk::InstanceCreateInfo{}
-		.setPApplicationInfo(&applicationInfo)
-		.setPEnabledLayerNames(validation_layers)
-		.setPEnabledExtensionNames(instance_extensions);
-	
-    instance_ = vk::createInstanceUnique(instanceCreateInfo);
-	std::cout << "Created Vulkan Instance!" << std::endl;
-}
-
-void PresentationContext::Impl::CreateWindowSurface()
-{
-	SDL_Vulkan_CreateSurface(window_, *instance_, &raw_window_surface_);
-}
-
-void PresentationContext::Impl::CreateDebugMessenger()
-{
-#if 0	
-	auto debugMessengerCreateInfo = vk::DebugUtilsMessengerCreateInfoEXT{}
-	.setFlags(vk::DebugUtilsMessengerCreateFlagsEXT())
-	.setMessageSeverity(vk::DebugUtilsMessageSeverityFlagBitsEXT::eError 
-					  | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-					  | vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-					  | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo)
-	.setMessageType(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral 
-				  | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation 
-				  | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance)
-	.setPfnUserCallback(&debugUtilsMessengerCallback);
-
-	debug_messenger_ = instance_->createDebugUtilsMessengerEXTUnique(debugMessengerCreateInfo);
-	std::cout << "Created Debug Messenger!" << std::endl;
-#endif
-	std::cout << "TODO: Cannot Create Debug Messenger!" << std::endl;
-}
-
-void PresentationContext::Impl::GetPhysicalDevice()
-{
-    std::vector<vk::PhysicalDevice> devices = instance_->enumeratePhysicalDevices();
-	physical_device = devices.front();
-	std::cout << PhysicalDevice_string(physical_device);
-}
-
-void PresentationContext::Impl::GetQueueFamilyIndices()
-{
-	auto graphics_present = get_graphics_present_indices(physical_device,
-														 raw_window_surface_);
-
-	if (!graphics_present)
-		throw std::runtime_error("could not get graphics and present indices");
-
-	graphics_present_indices_ = *graphics_present;
-	
-	if (std::holds_alternative<SharedGraphicsPresentIndex>(graphics_present_indices_)) {
-		std::cout << "> found SHARED graphics present indices" << std::endl;
-	}
-	else {
-		std::cout << "> found SPLIT graphics present indices" << std::endl;
-	}
-}
-
-void PresentationContext::Impl::CreateDevice()
-{
-	float queuePriority = 1.0f;
-	uint32_t device_index = present_index(graphics_present_indices_);
-
-	auto deviceQueueCreateInfo = vk::DeviceQueueCreateInfo{}
-		.setFlags({})
-		.setQueueFamilyIndex(device_index)
-		.setPQueuePriorities(&queuePriority)
-		.setQueueCount(1);
-
-	const std::vector<const char*> device_extensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	};
-	
-	// TODO: We actually need to check if these are available,
-	//       if not, we can:
-	//       1. discard the device alltogether
-	//       2. dont make use of the functionality in our code
-	const auto features = vk::PhysicalDeviceFeatures{}
-		.setFillModeNonSolid(true)
-		.setSamplerAnisotropy(true);
-	
-	auto deviceCreateInfo = vk::DeviceCreateInfo{}
-		.setQueueCreateInfoCount(1)
-		.setQueueCreateInfos(deviceQueueCreateInfo)
-		.setPEnabledFeatures(&features)
-		.setPpEnabledExtensionNames(device_extensions.data())
-		.setEnabledExtensionCount(device_extensions.size());
-	
-	device = physical_device.createDeviceUnique(deviceCreateInfo);
-	std::cout << "Created Logical Device!" << std::endl;
-}	
-
-void PresentationContext::Impl::CreateIndexQueues()
-{
-	index_queues_ = get_index_queues(*device,
-									 graphics_present_indices_);
-
-	if (std::holds_alternative<SharedIndexQueue>(index_queues_)) {
-		std::cout << "> created SHARED index queue" << std::endl;
-	}
-	else {
-		std::cout << "> created SPLIT index queues" << std::endl;
-	}
-}
-
-
-vk::Extent2D
-PresentationContext::Impl::get_window_extent() const noexcept
-{
-	int width;
-	int height;
-	SDL_GetWindowSize(window_, &width, &height);
-	return vk::Extent2D{}.setWidth(width).setHeight(height);
-}
-
-vk::Extent2D 
-PresentationContext::Impl::window_resize_event_triggered() noexcept
-{
-	//TODO: Implement resize of swapchain
-	return get_window_extent();
 }
 
 void PresentationContext::Impl::CreateSwapChain()
 {
-	const auto surface_capabilities =
-		physical_device.getSurfaceCapabilitiesKHR(raw_window_surface_);
-
-	const auto window_extent = get_window_extent();
+	const auto surface_capabilities = context->window_surface_capabilities();
+	const auto window_extent = context->get_window_extent();
 	std::cout << "> Window width:  " << window_extent.width << "\n"
 			  << "         height: " << window_extent.height << std::endl;
 
@@ -263,14 +53,13 @@ void PresentationContext::Impl::CreateSwapChain()
 	std::cout << "> SwapChain width:  " << swapchain_extent.width << "\n"
 			  << "            height: " << swapchain_extent.height << std::endl;
 
-	const std::vector<vk::SurfaceFormatKHR> formats =
-		physical_device.getSurfaceFormatsKHR(raw_window_surface_);
+	const auto formats = context->window_surface_formats();
 	if (formats.empty())
 		throw std::runtime_error("Swapchain has no formats!");
 	
-	swapchain_format_ = get_swapchain_surface_format(formats);
+	swapchain_format = get_swapchain_surface_format(formats);
 
-	std::cout << "> Swapchain format: " << vk::to_string(swapchain_format_.format) << std::endl;
+	std::cout << "> Swapchain format: " << vk::to_string(swapchain_format.format) << std::endl;
 
 	const vk::PresentModeKHR swapchainPresentMode = vk::PresentModeKHR::eFifo;
 	std::cout << "> Swapchain PresentMode: " << vk::to_string(swapchainPresentMode) << std::endl;
@@ -312,10 +101,10 @@ void PresentationContext::Impl::CreateSwapChain()
 	
 	auto swapChainCreateInfo = vk::SwapchainCreateInfoKHR{}
 		.setFlags(vk::SwapchainCreateFlagsKHR())
-		.setSurface(raw_window_surface_)
+		.setSurface(context->raw_window_surface)
 		.setMinImageCount(surface_image_count)
-		.setImageFormat(swapchain_format_.format)
-		.setImageColorSpace(swapchain_format_.colorSpace)
+		.setImageFormat(swapchain_format.format)
+		.setImageColorSpace(swapchain_format.colorSpace)
 		.setImageExtent(swapchain_extent)
 		.setImageArrayLayers(1)
 		.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment
@@ -329,11 +118,11 @@ void PresentationContext::Impl::CreateSwapChain()
 		.setPresentMode(swapchainPresentMode);
 	
 	std::array<uint32_t, 2> splitIndices = {
-		graphics_index(graphics_present_indices_),
-		present_index(graphics_present_indices_)
+		::graphics_index(context->graphics_present_indices),
+		::present_index(context->graphics_present_indices)
 	};
 
-	if (std::holds_alternative<SharedGraphicsPresentIndex>(graphics_present_indices_)) {
+	if (std::holds_alternative<SharedGraphicsPresentIndex>(context->graphics_present_indices)) {
 		swapChainCreateInfo
 			.setImageSharingMode(vk::SharingMode::eExclusive);
 	} 
@@ -343,12 +132,12 @@ void PresentationContext::Impl::CreateSwapChain()
 			.setQueueFamilyIndices(splitIndices);
 	}
 
-	swapchain_ = device->createSwapchainKHRUnique(swapChainCreateInfo, nullptr);
+	swapchain = context->device->createSwapchainKHRUnique(swapChainCreateInfo, nullptr);
 
-	swapchain_images_ = device->getSwapchainImagesKHR(*swapchain_);
-	std::cout << "> SwapChain image count: " << swapchain_images_.size() << std::endl;
+	swapchain_images = context->device->getSwapchainImagesKHR(*swapchain);
+	std::cout << "> SwapChain image count: " << swapchain_images.size() << std::endl;
 	
-	swapchain_imageviews_.reserve(swapchain_images_.size());
+	swapchain_imageviews.reserve(swapchain_images.size());
 	
 	auto subresourceRange = vk::ImageSubresourceRange{}
 		.setAspectMask(vk::ImageAspectFlagBits::eColor)
@@ -366,12 +155,13 @@ void PresentationContext::Impl::CreateSwapChain()
 	auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
 		.setSubresourceRange(subresourceRange)
 		.setViewType(vk::ImageViewType::e2D)
-		.setFormat(swapchain_format_.format)
+		.setFormat(swapchain_format.format)
 		.setComponents(componentMapping);
 	
-	for (auto& image : swapchain_images_) {
+	for (auto& image : swapchain_images) {
 		imageViewCreateInfo.setImage(image);
-		swapchain_imageviews_.push_back(device->createImageViewUnique(imageViewCreateInfo));
+		swapchain_imageviews
+			.push_back(context->device->createImageViewUnique(imageViewCreateInfo));
 	}
 
 	std::cout << "> created SwapChain!" << std::endl;
@@ -379,33 +169,32 @@ void PresentationContext::Impl::CreateSwapChain()
 
 void PresentationContext::Impl::CreateRenderTargets()
 {
-	for (size_t i = 0; i < swapchain_images_.size(); i++) {
-		const auto window_extent = get_window_extent();
+	for (size_t i = 0; i < swapchain_images.size(); i++) {
+		const auto window_extent = context->get_window_extent();
 		const auto extent = vk::Extent3D{}
 			.setWidth(window_extent.width)
 			.setHeight(window_extent.height)
 			.setDepth(1);
 		
 		Texture2D texture =
-			create_empty_rendertarget_texture(physical_device,
-											  device.get(),
+			create_empty_rendertarget_texture(context,
 											  vk::Format::eR8G8B8A8Srgb,
 											  extent,
 											  vk::ImageTiling::eOptimal,
 											  vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-		with_buffer_submit(device.get(),
+		with_buffer_submit(context->device.get(),
 						   command_pool(),
-						   graphics_queue(),
+						   context->graphics_queue(),
 						   [&] (vk::CommandBuffer& commandbuffer)
 						   {
 							   texture.layout =
-								  transition_image_for_color_override(get_image(texture),
-																  commandbuffer);
+								  transition_image_for_color_override(texture.allocated.image.get(),
+																	  commandbuffer);
 
 						   });
 		
-		rendertargets_.push_back(std::move(texture));
+		rendertargets.push_back(std::move(texture));
 	}
 	std::cout << "> Created Render Targets" << std::endl;
 }
@@ -414,8 +203,8 @@ void PresentationContext::Impl::CreateCommandpool()
 {
     auto commandPoolCreateInfo = vk::CommandPoolCreateInfo{}
 		.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
-		.setQueueFamilyIndex(graphics_index(graphics_present_indices_));
-	commandpool_ = device->createCommandPoolUnique(commandPoolCreateInfo, nullptr);
+		.setQueueFamilyIndex(graphics_index(context->graphics_present_indices));
+	commandpool = context->device->createCommandPoolUnique(commandPoolCreateInfo, nullptr);
 
 	std::cout << "> Created Command pool" << std::endl;
 }
@@ -425,12 +214,12 @@ void PresentationContext::Impl::CreateCommandbuffers()
 	// allocate a CommandBuffer from the CommandPool
     vk::CommandBufferAllocateInfo commandBufferAllocateInfo{};
 	commandBufferAllocateInfo
-		.setCommandPool(*commandpool_)
+		.setCommandPool(*commandpool)
 		.setLevel(vk::CommandBufferLevel::ePrimary)
-		.setCommandBufferCount(maxFramesInFlight_);
+		.setCommandBufferCount(max_frames_in_flight);
 
-	commandbuffers_ = device->allocateCommandBuffersUnique(commandBufferAllocateInfo);
-	std::cout << "> Created " << commandbuffers_.size() << " Command buffers" << std::endl;
+	commandbuffers = context->device->allocateCommandBuffersUnique(commandBufferAllocateInfo);
+	std::cout << "> Created " << commandbuffers.size() << " Command buffers" << std::endl;
 }
 
 void PresentationContext::Impl::CreateSyncObjects()
@@ -442,12 +231,12 @@ void PresentationContext::Impl::CreateSyncObjects()
 	// simplifies the first time we want to wait for it to not need
 	// extra logic
 
-	for (int i = 0; i < maxFramesInFlight_; i++) {
-		imageAvailableSemaphores_.push_back(device->createSemaphoreUnique(semaphoreCreateInfo,
+	for (int i = 0; i < max_frames_in_flight; i++) {
+		imageAvailableSemaphores.push_back(context->device->createSemaphoreUnique(semaphoreCreateInfo,
 																		   nullptr));
-		renderFinishedSemaphores_.push_back(device->createSemaphoreUnique(semaphoreCreateInfo,
+		renderFinishedSemaphores.push_back(context->device->createSemaphoreUnique(semaphoreCreateInfo,
 																		   nullptr));
-		inFlightFences_.push_back(device->createFenceUnique(fenceCreateInfo, nullptr));
+		inFlightFences.push_back(context->device->createFenceUnique(fenceCreateInfo, nullptr));
 	}
 
 	std::cout << "> Created Sync Objects" << std::endl;
@@ -524,7 +313,7 @@ PresentationContext::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& comma
 			.setBaseArrayLayer(0)
 			.setLayerCount(1)
 			.setMipLevel(0);
-		const auto window_extent = get_window_extent();
+		const auto window_extent = context->get_window_extent();
 		const std::array<vk::Offset3D, 2> dst_offsets{ 
 			vk::Offset3D(0, 0, 0),
 			vk::Offset3D(window_extent.width, window_extent.height, 1)
@@ -537,7 +326,9 @@ PresentationContext::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& comma
 			.setDstSubresource(dst_subresource)
 			;
 		
-		commandbuffer.blitImage(get_image(*texture),
+		// TODO: This always does linear blitting!, for low res games we need to be able
+		// to specify point filtering!
+		commandbuffer.blitImage(texture->allocated.image.get(),
 								vk::ImageLayout::eTransferSrcOptimal,
 								swapchain_image,
 								vk::ImageLayout::eTransferDstOptimal,
@@ -581,43 +372,38 @@ PresentationContext::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& comma
 }
 
 
-void PresentationContext::Impl::wait_until_idle() noexcept
-{
-	device.get().waitIdle();
-}
-
 void PresentationContext::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 {
 
 	const auto maxTimeout = std::numeric_limits<unsigned int>::max();
-	auto waitresult = device->waitForFences(*(inFlightFences_[current_frame_in_flight_]),
-										 true,
-										 maxTimeout);
-	device->resetFences(*(inFlightFences_[current_frame_in_flight_]));
+	auto waitresult = context->device->waitForFences(*(inFlightFences[current_frame_in_flight]),
+													 true,
+													 maxTimeout);
+	context->device->resetFences(*(inFlightFences[current_frame_in_flight]));
 
 	if (waitresult != vk::Result::eSuccess)
 		throw std::runtime_error("Could not wait for inFlightFence");
 	
 	auto [result, swapchain_index] =
-		device->acquireNextImageKHR(*swapchain_,
-									 maxTimeout,
-									 *(imageAvailableSemaphores_[current_frame_in_flight_]));
+		context->device->acquireNextImageKHR(*swapchain,
+											 maxTimeout,
+											 *(imageAvailableSemaphores[current_frame_in_flight]));
 
 	assert(result == vk::Result::eSuccess);
-	assert(swapchain_index < swapchain_imageviews_.size());
+	assert(swapchain_index < swapchain_imageviews.size());
 
 	if (per_frame_debug_print) {
 		const std::string line = ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
 		std::cout << line 
-				  << "\n> present flight index:    " << current_frame_in_flight_
+				  << "\n> present flight index:    " << current_frame_in_flight
 				  << "\n> present swapchain index: " << swapchain_index 
-				  << "\n> present total frames:    " << total_frames_ 
+				  << "\n> present total frames:    " << total_frames 
 				  << std::endl;
 	}
 	
 	CurrentFrameInfo currentFrameInfo;
-	currentFrameInfo.current_flight_frame_index = current_frame_in_flight_;
-	currentFrameInfo.total_frame_count = total_frames_;
+	currentFrameInfo.current_flight_frame_index = current_frame_in_flight;
+	currentFrameInfo.total_frame_count = total_frames;
 
 	std::optional<Texture2D*> frameToPresent = std::invoke(currentFrameGenerator,
 														   currentFrameInfo);
@@ -625,15 +411,15 @@ void PresentationContext::Impl::with_presentation(FrameProducer& currentFrameGen
 		throw std::runtime_error("SwapChain has not implemented a way to present the old"
 								 " swapchain image if generator returns nullopt");
 	
-	RecordBlitTextureToSwapchain(commandbuffers_[current_frame_in_flight_].get(),
-								 swapchain_images_[swapchain_index],
+	RecordBlitTextureToSwapchain(commandbuffers[current_frame_in_flight].get(),
+								 swapchain_images[swapchain_index],
 								 frameToPresent.value());
 
 	const std::vector<vk::Semaphore> waitSemaphores{
-		*(imageAvailableSemaphores_[current_frame_in_flight_]),
+		*(imageAvailableSemaphores[current_frame_in_flight]),
 	};
 	const std::vector<vk::Semaphore> signalSemaphores{
-		*(renderFinishedSemaphores_[current_frame_in_flight_]),
+		*(renderFinishedSemaphores[current_frame_in_flight]),
 	};
 	
 	const std::vector<vk::PipelineStageFlags> waitStages{
@@ -643,54 +429,35 @@ void PresentationContext::Impl::with_presentation(FrameProducer& currentFrameGen
 	auto submitInfo = vk::SubmitInfo{}
 		.setWaitSemaphores(waitSemaphores)
 		.setWaitDstStageMask(waitStages)
-		.setCommandBuffers(*(commandbuffers_[current_frame_in_flight_]))
+		.setCommandBuffers(*(commandbuffers[current_frame_in_flight]))
 		.setSignalSemaphores(signalSemaphores);
 	
-	::present_queue(index_queues_).submit(submitInfo,
-										  *(inFlightFences_[current_frame_in_flight_]));
+	::present_queue(context->index_queues).submit(submitInfo,
+												  *(inFlightFences[current_frame_in_flight]));
 
-	const std::vector<vk::SwapchainKHR> swapchains = {*swapchain_};
+	const std::vector<vk::SwapchainKHR> swapchains = {*swapchain};
 	const std::vector<uint32_t> imageIndices = {swapchain_index};
 	auto presentInfo = vk::PresentInfoKHR{}
 		.setSwapchains(swapchains)
 		.setImageIndices(imageIndices)
 		.setWaitSemaphores(signalSemaphores);
 	
-	auto presentResult = present_queue(index_queues_).presentKHR(presentInfo);
+	auto presentResult = present_queue(context->index_queues).presentKHR(presentInfo);
 	if (presentResult != vk::Result::eSuccess)
 		throw std::runtime_error("Could not wait for inFlightFence");
 
-    current_frame_in_flight_ = (current_frame_in_flight_ + 1) % maxFramesInFlight_;
-	total_frames_++;
+    current_frame_in_flight = (current_frame_in_flight + 1) % max_frames_in_flight;
+	total_frames++;
 }
 
 PresentationContext::~PresentationContext()
 {
 }
 
-PresentationContext::PresentationContext(WindowConfig const& config, Logger logger)
-  : impl(std::make_unique<PresentationContext::Impl>(config, logger))
+PresentationContext::PresentationContext(Render::Context* context)
+  : impl(std::make_unique<PresentationContext::Impl>(context->impl.get()))
 {
 }
-
-
-U32Extent PresentationContext::get_window_extent() const noexcept
-{
-	vk::Extent2D extent = impl->get_window_extent();
-	return U32Extent{extent.width, extent.height};
-}
-
-U32Extent PresentationContext::window_resize_event_triggered() noexcept
-{
-	vk::Extent2D extent = impl->window_resize_event_triggered();
-	return U32Extent{extent.width, extent.height};
-}
-
-void PresentationContext::wait_until_idle() noexcept
-{
-	impl->wait_until_idle();
-}
-
 
 void PresentationContext::with_presentation(FrameProducer& next_frame_producer)
 {

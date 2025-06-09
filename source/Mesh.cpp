@@ -3,7 +3,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <VulkanRenderer/tiny_obj_loader.hpp>
 
-auto load_obj(PresentationContext& presentation_context,
+auto load_obj(Render::Context& context,
 			  const std::filesystem::path& path,
 			  const std::string& filename)
 	-> LoadMeshResult
@@ -73,7 +73,7 @@ auto load_obj(PresentationContext& presentation_context,
 	
 
 	Mesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(presentation_context,
+	mesh.vertexbuffer = create_vertex_buffer(context,
 											 vertices);
 	
 	if (!warn.empty()) {
@@ -87,7 +87,7 @@ auto load_obj(PresentationContext& presentation_context,
 }
 
 
-auto load_obj_with_texcoords(PresentationContext& presentation_context,
+auto load_obj_with_texcoords(Render::Context& context,
 							 const std::filesystem::path& path,
 							 const std::string& filename)
 	-> LoadTexturedMeshResult
@@ -162,7 +162,7 @@ auto load_obj_with_texcoords(PresentationContext& presentation_context,
 	
 
 	TexturedMesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(presentation_context,
+	mesh.vertexbuffer = create_vertex_buffer(context,
 											 vertices);
 	
 	if (!warn.empty()) {

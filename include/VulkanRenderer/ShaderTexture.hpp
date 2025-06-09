@@ -47,7 +47,7 @@ TextureSamplerReadOnly& TextureSamplerReadOnly::operator=(TextureSamplerReadOnly
 vk::Image&
 get_image(TextureSamplerReadOnly& texture)
 {
-	return get_image(texture.allocated);
+	return texture.allocated.image.get();
 }
 
 vk::ImageView&
@@ -83,7 +83,7 @@ make_shader_readonly(vk::PhysicalDevice physical_device,
 						   auto barrier = vk::ImageMemoryBarrier{}
 							   .setOldLayout(texture.layout)
 							   .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-							   .setImage(get_image(texture))
+							   .setImage(texture.allocated.image.get())
 							   .setSubresourceRange(range)
 							   .setSrcAccessMask(vk::AccessFlags())
 							   .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);

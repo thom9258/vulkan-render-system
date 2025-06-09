@@ -35,6 +35,7 @@ target_include_directories(${PROJECT_NAME}
 set(PUBLIC_HEADER_PATH /include/VulkanRenderer)
 
 set(PUBLIC_HEADERS
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Context.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/BaseTexturePipeline.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Bitmap.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Canvas.hpp
@@ -61,6 +62,7 @@ set(PUBLIC_HEADERS
 )
 
 set(PRIVATE_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/ContextImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VulkanRendererImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/GeometryPassImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/DescriptorPoolImpl.cpp

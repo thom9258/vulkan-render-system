@@ -58,12 +58,12 @@ using LoadTexturedMeshResult = std::variant<
 	MeshLoadError,
 	MeshInvalidPath>;
 
-auto load_obj(PresentationContext& presentation_context,
+auto load_obj(Render::Context& context,
 			  const std::filesystem::path& path,
 			  const std::string& filename)
 	-> LoadMeshResult;
 
-auto load_obj_with_texcoords(PresentationContext& context,
+auto load_obj_with_texcoords(Render::Context& context,
 							 const std::filesystem::path& path,
 							 const std::string& filename)
 	-> LoadTexturedMeshResult;

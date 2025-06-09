@@ -3,7 +3,7 @@
 #include <memory>
 #include <optional>
 
-#include "VulkanRenderer.hpp"
+#include "Context.hpp"
 
 struct DescriptorPoolCreateInfo
 {
@@ -15,7 +15,7 @@ class DescriptorPool
 {
 public:
 	DescriptorPool(DescriptorPoolCreateInfo const& create_info,
-				   PresentationContext& presentation_context);
+				   Render::Context& context);
 	~DescriptorPool();
 
 	class Impl;
