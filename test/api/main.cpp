@@ -23,8 +23,9 @@ const std::string shaders_root = root + "compiled_shaders/";
 const std::string assets_root = root + "assets/";
 
 
-TexturedMesh 
-textured_cube(PresentationContext& presentation_context)
+
+auto textured_cube_vertices()
+	-> std::vector<VertexPosNormColorUV> 
 {
 	sg_status status;
 	size_t vertices_length{0};
@@ -56,11 +57,8 @@ textured_cube(PresentationContext& presentation_context)
 		vertices[i].color = {1.0f, 1.0f, 1.0f};
 		vertices[i].uv = {texcoords[i].u, texcoords[i].v};
 	}
-	
-	TexturedMesh mesh{};
-	mesh.vertexbuffer = create_vertex_buffer(presentation_context,
-											 vertices);
-	return mesh;
+
+	return vertices;
 }
 
 template <typename F, typename... Args>
@@ -95,9 +93,9 @@ int main()
 	Render::Context context(logger);
 
 	WindowConfig window_config;
-	PresentationContext presentation_context(window_config, logger);
+	PresentationContext presentor(window_config, logger);
 
-	const auto window = presentation_context.get_window_extent();
+	const auto window = context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
 	
 	WorldRenderInfo world_info{};
@@ -112,18 +110,15 @@ int main()
 	DescriptorPool descriptor_pool(descriptor_pool_info,
 								   presentation_context);
 
-	Renderer renderer(presentation_context,
+	Renderer renderer(context,
+					  presentor,
 					  descriptor_pool,
 					  shaders_root);
 	
-	Mesh triangle_mesh{};
-	triangle_mesh.vertexbuffer = create_vertex_buffer(presentation_context,
-													  triangle_vertices);
-	
+	Mesh triangle_mesh{VertexBuffer(context, triangle_vertices)};
+	TexturedMesh cube_mesh{VertexBuffer(context, textured_cube_vertices())};
 
-	TexturedMesh cube_mesh = textured_cube(presentation_context);
-
-	auto loaded_monkey_mesh = load_obj(presentation_context,
+	auto loaded_monkey_mesh = load_obj(context,
 									   assets_root,
 									   "models/monkey/monkey_flat.obj");
 	

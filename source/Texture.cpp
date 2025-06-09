@@ -230,8 +230,8 @@ auto copy_bitmap_to_gpu(Render::Context::Impl* context,
 						const LoadedBitmap2D& bitmap)
 	-> Texture2D
 {
-	AllocatedMemory staging = create_staging_buffer(context->impl->physical_device,
-													context->impl->device.get(),
+	AllocatedMemory staging = create_staging_buffer(context->physical_device,
+													context->device.get(),
 													get_pixels(bitmap),
 													bitmap.memory_size());
 	const auto extent = vk::Extent3D{}
@@ -246,9 +246,9 @@ auto copy_bitmap_to_gpu(Render::Context::Impl* context,
 													 vk::ImageTiling::eOptimal,
 													 propertyFlags);
 
-	with_buffer_submit(context->impl->device.get(),
-					   context->impl->command_pool(),
-					   context->impl->queue(),
+	with_buffer_submit(context->device.get(),
+					   context->command_pool(),
+					   context->queue(),
 					   [&] (vk::CommandBuffer& commandbuffer)
 					   {
 						   texture.layout =
@@ -269,8 +269,8 @@ auto copy_canvas_to_gpu(Render::Context::Impl* context,
 						Canvas8bitRGBA& canvas)
 	-> Texture2D
 {
-	AllocatedMemory staging = create_staging_buffer(context->impl->physical_device,
-													context->impl->device.get(),
+	AllocatedMemory staging = create_staging_buffer(context->physical_device,
+													context->device.get(),
 													get_pixels(canvas),
 													canvas.memory_size());
 	const auto extent = vk::Extent3D{}
@@ -284,9 +284,9 @@ auto copy_canvas_to_gpu(Render::Context::Impl* context,
 													 vk::ImageTiling::eOptimal,
 													 propertyFlags);
 
-	with_buffer_submit(context->impl->device.get(),
-					   context->impl->command_pool(),
-					   context->impl->queue(),
+	with_buffer_submit(context->device.get(),
+					   context->command_pool(),
+					   context->queue(),
 					   [&] (vk::CommandBuffer& commandbuffer)
 					   {
 						   texture.layout =
