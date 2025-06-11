@@ -1,5 +1,33 @@
 #include "GeometryPassImpl.hpp"
 
+auto create_texture_view(vk::Device& device,
+						 Texture2D& texture,
+						 const vk::ImageAspectFlags aspect)
+	-> vk::UniqueImageView
+{
+	const auto subresourceRange = vk::ImageSubresourceRange{}
+		.setAspectMask(aspect)
+		.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setBaseArrayLayer(0)
+		.setLayerCount(1);
+
+	const auto componentMapping = vk::ComponentMapping{}
+		.setR(vk::ComponentSwizzle::eIdentity)		
+		.setG(vk::ComponentSwizzle::eIdentity)
+		.setB(vk::ComponentSwizzle::eIdentity)
+		.setA(vk::ComponentSwizzle::eIdentity);
+
+	const auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
+		.setImage(texture.allocated.image.get())
+		.setFormat(texture.format)
+		.setSubresourceRange(subresourceRange)
+		.setViewType(vk::ImageViewType::e2D)
+		.setComponents(componentMapping);
+
+	return device.createImageViewUnique(imageViewCreateInfo);
+}
+
 void sort_renderable(SortedRenderables* sorted,
 					 Renderable renderable)
 {
@@ -14,39 +42,34 @@ void sort_renderable(SortedRenderables* sorted,
 };
 
 
-auto create_pipelines(vk::PhysicalDevice& physical_device,
-					  vk::Device& device,
-					  vk::CommandPool& command_pool,
-					  vk::Queue& graphics_queue,
-					  vk::DescriptorPool& descriptor_pool,
+auto create_pipelines(Render::Context::Impl* context,
+					  Presenter::Impl* presenter,
+					  DescriptorPool::Impl* descriptor_pool,
 					  vk::RenderPass& renderpass,
-					  const uint32_t frames_in_flight,
 					  const vk::Extent2D render_extent,
 					  const std::filesystem::path shader_root_path,
 					  bool debug_print) 
 	-> Pipelines
 {
 	Pipelines pipelines;
-	pipelines.basetexture = create_base_texture_pipeline(physical_device,
-														 device,
-														 command_pool,
-														 graphics_queue,
+	pipelines.basetexture = create_base_texture_pipeline(context,
+														 presenter,
 														 descriptor_pool,
 														 renderpass,
-														 frames_in_flight,
+														 presenter->max_frames_in_flight,
 														 render_extent,
 														 shader_root_path,
 														 debug_print);
 
-	pipelines.normcolor = create_norm_render_pipeline(physical_device,
-													  device,
+	pipelines.normcolor = create_norm_render_pipeline(context->physical_device,
+													  context->device.get(),
 													  renderpass,
-													  frames_in_flight,
+													  presenter->max_frames_in_flight,
 													  render_extent,
 													  shader_root_path,
 													  debug_print);
 
-	pipelines.wireframe = create_wireframe_render_pipeline(device,
+	pipelines.wireframe = create_wireframe_render_pipeline(context->device.get(),
 														   renderpass,
 														   render_extent,
 														   shader_root_path,
@@ -55,10 +78,7 @@ auto create_pipelines(vk::PhysicalDevice& physical_device,
 	return pipelines;
 }
 
-auto create_geometry_pass(vk::PhysicalDevice& physical_device,
-						  vk::Device& device,
-						  vk::CommandPool& command_pool,
-						  vk::Queue& graphics_queue,
+auto create_geometry_pass(Render::Context::Impl* context,
 						  vk::Extent2D render_extent,
 						  const uint32_t frames_in_flight,
 						  const bool debug_print)
@@ -133,7 +153,7 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 		.setDependencies(dependencies)
 		.setSubpasses(subpass);
 
-    pass.renderpass = device.createRenderPassUnique(renderPassCreateInfo);
+    pass.renderpass = context->device.get().createRenderPassUnique(renderPassCreateInfo);
 	if (debug_print)
 		std::cout << "> GeometryPass > created Render Pass!" << std::endl;
 	
@@ -146,8 +166,7 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 		/* Setup the rendertarget for the render pass
 		 */
 		pass.colorbuffers
-			.push_back(create_empty_rendertarget_texture(physical_device,
-														 device,
+			.push_back(create_empty_rendertarget_texture(context,
 														 render_format,
 														 texture_extent,
 														 vk::ImageTiling::eOptimal,
@@ -158,25 +177,24 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 			/* Setup the rendertarget
 			 */
 			pass.colorbuffers.back().layout =
-				transition_image_for_color_override(get_image(pass.colorbuffers.back()),
+				transition_image_for_color_override(pass.colorbuffers.back().allocated.image.get(),
 													commandbuffer);
 		};
 		
-		with_buffer_submit(device,
-						   command_pool,
-						   graphics_queue,
+		with_buffer_submit(context->device.get(),
+						   context->commandpool.get(),
+						   context->graphics_queue(),
 						   transition_to_transfer_src);
 		
 		/* Setup the rendertarget view
 		 */
-		pass.colorbuffer_views.push_back(create_texture_view(device,
+		pass.colorbuffer_views.push_back(create_texture_view(context->device.get(),
 															 pass.colorbuffers.back(),
 															 vk::ImageAspectFlagBits::eColor));
 
 		/* Setup the Depthbuffers
 		 */
-		pass.depthbuffers.push_back(create_empty_texture(physical_device,
-														 device,
+		pass.depthbuffers.push_back(create_empty_texture(context,
 														 depth_format,
 														 texture_extent,
 														 vk::ImageTiling::eOptimal,
@@ -185,7 +203,7 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 														 
 		/* Setup the depthbuffer view
 		 */
-		pass.depthbuffer_views.push_back(create_texture_view(device,
+		pass.depthbuffer_views.push_back(create_texture_view(context->device.get(),
 															 pass.depthbuffers.back(),
 															 vk::ImageAspectFlagBits::eDepth));
 		
@@ -202,7 +220,9 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 			.setHeight(render_extent.height)
 			.setRenderPass(pass.renderpass.get())
 			.setLayers(1);
-		pass.framebuffers.push_back(device.createFramebufferUnique(framebufferCreateInfo));
+		pass.framebuffers
+			.push_back(context->device.get()
+					   .createFramebufferUnique(framebufferCreateInfo));
 	}
 
 	if (debug_print)
@@ -312,32 +332,28 @@ auto render_geometry_pass(GeometryPass& pass,
 	return &pass.colorbuffers[current_frame_in_flight];
 }
 
-Renderer::Impl::Impl(PresentationContext::Impl* presentation_context,
+Renderer::Impl::Impl(Render::Context::Impl* context,
+					 Presenter::Impl* presenter,
 					 DescriptorPool::Impl* descriptor_pool,
 					 std::filesystem::path shaders_root)
-	: presentation_context(presentation_context)
+	: shaders_root(shaders_root)
+	, context(context)
+	, presenter(presenter)
 	, descriptor_pool(descriptor_pool)
-	, shaders_root(shaders_root)
 {
-	geometry_pass = create_geometry_pass(presentation_context->physical_device,
-										 presentation_context->device.get(),
-										 presentation_context->command_pool(),
-										 presentation_context->graphics_queue(),
+	geometry_pass = create_geometry_pass(context,
 										 //TODO: Allow extent to be set externally
-										 presentation_context->get_window_extent(),
-										 presentation_context->maxFramesInFlight_,
+										 context->get_window_extent(),
+										 presenter->max_frames_in_flight,
 										 //TODO: Allow debug print to be set externally
 										 true
 										 );
 	
-	pipelines = create_pipelines(presentation_context->physical_device,
-								 presentation_context->device.get(),
-								 presentation_context->command_pool(),
-								 presentation_context->graphics_queue(),
-								 descriptor_pool->descriptor_pool.get(),
+	pipelines = create_pipelines(context,
+								 presenter,
+								 descriptor_pool,
 								 geometry_pass.renderpass.get(),
-								 presentation_context->maxFramesInFlight_,
-								 presentation_context->get_window_extent(),
+								 context->get_window_extent(),
 								 shaders_root,
 								 true);
 }
@@ -355,12 +371,12 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 	return render_geometry_pass(geometry_pass,
 								&pipelines,
 								current_frame_in_flight,
-								presentation_context->maxFramesInFlight_,
+								presenter->max_frames_in_flight,
 								total_frames,
-								presentation_context->device.get(),
+								context->device.get(),
 								descriptor_pool->descriptor_pool.get(),
-								presentation_context->command_pool(),
-								presentation_context->graphics_queue(),
+								presenter->command_pool(),
+								context->graphics_queue(),
 								world_info,
 								renderables);
 }
@@ -377,10 +393,12 @@ auto Renderer::render(const uint32_t current_frame_in_flight,
 						renderables);
 }
 
-Renderer::Renderer(PresentationContext& presentation_context,
+Renderer::Renderer(Render::Context& context,
+				   Presenter& presenter,
 				   DescriptorPool& descriptor_pool,
 				   const std::filesystem::path shaders_root)
-	: impl(std::make_unique<Impl>(presentation_context.impl.get(),
+	: impl(std::make_unique<Impl>(context.impl.get(),
+								  presenter.impl.get(),
 								  descriptor_pool.impl.get(),
 								  shaders_root))
 {

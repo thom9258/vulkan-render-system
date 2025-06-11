@@ -2,7 +2,7 @@
 
 #include "Renderable.hpp"
 #include "Context.hpp"
-#include "VulkanRenderer.hpp"
+#include "Presenter.hpp"
 #include "DescriptorPool.hpp"
 
 #include <algorithm>
@@ -20,7 +20,7 @@ class Renderer
 {
 public:
 	Renderer(Render::Context& context,
-			 PresentationContext& presentor,
+			 Presenter& presenter,
 			 DescriptorPool& descriptor_pool,
 			 const std::filesystem::path shaders_root);
 

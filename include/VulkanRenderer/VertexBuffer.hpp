@@ -7,20 +7,25 @@
 struct VertexBuffer
 {
 	VertexBuffer(Render::Context& context,
-				 void* vertices,
+				 const void* vertices,
 				 size_t vertices_length,
 				 size_t vertex_memory_size);
 	
 	template<typename Vertex>
-	VertexBuffer(Render::Context& context,
-				 std::vector<Vertex>& vertices)
-		: VertexBuffer(context,
-					   vertices.data(),
-					   vertices.size(),
-					   sizeof(vertices[0]))
+	static VertexBuffer create(Render::Context& context,
+							   const std::vector<Vertex>& vertices)
 	{
+		return VertexBuffer(context,
+							vertices.data(),
+							vertices.size(),
+							sizeof(vertices[0]));
 	}
+	
+	explicit VertexBuffer();
+	~VertexBuffer();
+	VertexBuffer(VertexBuffer&& rhs);
+	VertexBuffer& operator=(VertexBuffer&& rhs);
 
 	class Impl;
-	std::unique_ptr<Impl> impl;
+	std::unique_ptr<Impl> impl{ nullptr };
 };

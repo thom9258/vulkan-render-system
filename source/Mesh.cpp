@@ -76,8 +76,8 @@ auto load_obj(Render::Context& context,
 		}
 	}
 	
-
-	Mesh mesh{VertexBuffer(context.impl.get(), vertices)};
+	auto buffer = VertexBuffer::create<VertexPosNormColor>(context, vertices);
+	Mesh mesh{std::move(buffer)};
 	if (!warn.empty()) {
 		return MeshWithWarning{std::move(mesh), warn};
 	}
@@ -159,7 +159,8 @@ auto load_obj_with_texcoords(Render::Context& context,
 		}
 	}
 	
-	TexturedMesh mesh{VertexBuffer(context.impl.get(), vertices)};
+	auto buffer = VertexBuffer::create<VertexPosNormColorUV>(context, vertices);
+	TexturedMesh mesh{std::move(buffer)};
 	if (!warn.empty()) {
 		return TexturedMeshWithWarning{std::move(mesh), warn};
 	}

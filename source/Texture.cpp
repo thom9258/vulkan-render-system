@@ -1,134 +1,5 @@
 #include <VulkanRenderer/Texture.hpp>
-#include "VulkanRendererImpl.hpp"
-
-#if 0
-Texture2D
-copy_to_gpu_as_shader_readonly(vk::PhysicalDevice& physical_device,
-							   vk::Device& device,
-							   vk::CommandPool& command_pool,
-							   vk::Queue& queue,
-							   const LoadedBitmap2D& bitmap)
-{
-	AllocatedMemory staging = create_staging_buffer(physical_device,
-													device,
-													get_pixels(bitmap),
-													bitmap.memory_size());
-	const auto extent = vk::Extent3D{}
-		.setWidth(bitmap.width)
-		.setHeight(bitmap.height)
-		.setDepth(1);
-
-	const auto format = BitmapPixelFormatToVulkanFormat(bitmap.format);
-	Texture2D texture = create_empty_general_texture(physical_device,
-													 device,
-													 format,
-													 extent,
-													 vk::ImageTiling::eOptimal,
-													 vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-	with_buffer_submit(device, command_pool, queue,
-					   [&] (vk::CommandBuffer& commandbuffer)
-					   {
-						   texture.layout =
-							   transition_image_for_color_override(get_image(texture),
-																   commandbuffer);
-
-						   copy_buffer_to_image(staging.buffer.get(),
-												get_image(texture),
-												texture.extent.width,
-												texture.extent.height,
-												commandbuffer);
-						   
-						   auto range = vk::ImageSubresourceRange{}
-							   .setAspectMask(vk::ImageAspectFlagBits::eColor)
-							   .setBaseMipLevel(0)
-							   .setLevelCount(1)
-							   .setBaseArrayLayer(0)
-							   .setLayerCount(1);
-						   
-						   auto barrier = vk::ImageMemoryBarrier{}
-							   .setOldLayout(texture.layout)
-							   .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-							   .setImage(get_image(texture))
-							   .setSubresourceRange(range)
-							   .setSrcAccessMask(vk::AccessFlags())
-							   .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
-						   
-						   commandbuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-														 vk::PipelineStageFlagBits::eTransfer,
-														 vk::DependencyFlags(),
-														 nullptr,
-														 nullptr,
-														 barrier);
-						   texture.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-					   });
-	return texture;
-}
-
-
-Texture2D
-copy_to_gpu_as_shader_readonly(vk::PhysicalDevice& physical_device,
-							   vk::Device& device,
-							   vk::CommandPool& command_pool,
-							   vk::Queue& queue,
-							   const Canvas8bitRGBA& canvas)
-{
-	AllocatedMemory staging = create_staging_buffer(physical_device,
-													device,
-													get_pixels(canvas),
-													canvas.memory_size());
-	const auto extent = vk::Extent3D{}
-		.setWidth(canvas.extent.width)
-		.setHeight(canvas.extent.height)
-		.setDepth(1);
-
-	Texture2D texture = create_empty_general_texture(physical_device,
-													 device,
-													 vk::Format::eR8G8B8A8Srgb,
-													 extent,
-													 vk::ImageTiling::eOptimal,
-													 vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-	with_buffer_submit(device, command_pool, queue,
-					   [&] (vk::CommandBuffer& commandbuffer)
-					   {
-						   texture.layout =
-							   transition_image_for_color_override(get_image(texture),
-																   commandbuffer);
-
-						   copy_buffer_to_image(staging.buffer.get(),
-												get_image(texture),
-												texture.extent.width,
-												texture.extent.height,
-												commandbuffer);
-
-						   auto range = vk::ImageSubresourceRange{}
-							   .setAspectMask(vk::ImageAspectFlagBits::eColor)
-							   .setBaseMipLevel(0)
-							   .setLevelCount(1)
-							   .setBaseArrayLayer(0)
-							   .setLayerCount(1);
-						   
-						   auto barrier = vk::ImageMemoryBarrier{}
-							   .setOldLayout(texture.layout)
-							   .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-							   .setImage(get_image(texture))
-							   .setSubresourceRange(range)
-							   .setSrcAccessMask(vk::AccessFlags())
-							   .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
-						   
-						   commandbuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-														 vk::PipelineStageFlagBits::eTransfer,
-														 vk::DependencyFlags(),
-														 nullptr,
-														 nullptr,
-														 barrier);
-						   texture.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-					   });
-
-	return texture;
-}
-#endif
+#include "ContextImpl.hpp"
 
 Texture2D::Texture2D(Texture2D&& rhs) noexcept
 {
@@ -182,8 +53,7 @@ auto create_empty_general_texture(Render::Context::Impl* context,
 								  const vk::MemoryPropertyFlags propertyFlags)
 	-> Texture2D
 {
-	return create_empty_texture(context->physical_device,
-								context->device.get(),
+	return create_empty_texture(context,
 								format,
 								extent,
 								tiling,
@@ -200,8 +70,7 @@ auto create_empty_rendertarget_texture(Render::Context::Impl* context,
 									   const vk::MemoryPropertyFlags propertyFlags)
 	-> Texture2D
 {
-	return create_empty_texture(context->physical_device,
-								context->device.get(),
+	return create_empty_texture(context,
 								format,
 								extent,
 								tiling,
@@ -240,15 +109,15 @@ auto copy_bitmap_to_gpu(Render::Context::Impl* context,
 		.setDepth(1);
 
 	const auto format = BitmapPixelFormatToVulkanFormat(bitmap.format);
-	Texture2D texture = create_empty_general_texture(*context,
+	Texture2D texture = create_empty_general_texture(context,
 													 format,
 													 extent,
 													 vk::ImageTiling::eOptimal,
 													 propertyFlags);
 
 	with_buffer_submit(context->device.get(),
-					   context->command_pool(),
-					   context->queue(),
+					   context->commandpool.get(),
+					   context->graphics_queue(),
 					   [&] (vk::CommandBuffer& commandbuffer)
 					   {
 						   texture.layout =
@@ -278,15 +147,15 @@ auto copy_canvas_to_gpu(Render::Context::Impl* context,
 		.setHeight(canvas.extent.height)
 		.setDepth(1);
 
-	Texture2D texture = create_empty_general_texture(*context,
+	Texture2D texture = create_empty_general_texture(context,
 													 vk::Format::eR8G8B8A8Srgb,
 													 extent,
 													 vk::ImageTiling::eOptimal,
 													 propertyFlags);
 
 	with_buffer_submit(context->device.get(),
-					   context->command_pool(),
-					   context->queue(),
+					   context->commandpool.get(),
+					   context->graphics_queue(),
 					   [&] (vk::CommandBuffer& commandbuffer)
 					   {
 						   texture.layout =
@@ -346,6 +215,9 @@ auto move_bitmap_to_gpu(Render::Context::Impl* context,
 	};
 }
 
+#if 0
+//TODO: This is part of a pimpl wrapper for textures!
+// also defined in geometrypass for now, TO BE DELETED
 auto create_texture_view(vk::Device& device,
 						 Texture2D& texture,
 						 const vk::ImageAspectFlags aspect)
@@ -373,3 +245,4 @@ auto create_texture_view(vk::Device& device,
 
 	return device.createImageViewUnique(imageViewCreateInfo);
 }
+#endif

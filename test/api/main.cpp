@@ -6,10 +6,13 @@
 #include <chrono>
 #include <thread>
 
-#include <VulkanRenderer/VulkanRenderer.hpp>
+#include <VulkanRenderer/Context.hpp>
+#include <VulkanRenderer/Presenter.hpp>
 #include <VulkanRenderer/GeometryPass.hpp>
 #include <VulkanRenderer/DescriptorPool.hpp>
 
+#include <VulkanRenderer/VertexPosNormColor.hpp>
+#include <VulkanRenderer/VertexPosNormColorUV.hpp>
 
 #include <VulkanRenderer/Bitmap.hpp>
 #include <VulkanRenderer/Canvas.hpp>
@@ -85,15 +88,35 @@ std::vector<VertexPosNormColor> triangle_vertices = {
 int main()
 {
 
+	WindowConfig window_config;
 	Logger logger;
 	logger.log = [] (std::source_location loc, Logger::Type type, std::string msg) {
-		std::cout << "LOGGER OUT: " << msg;
-	}
+		
+		std::string typestr = "?";
+		switch (type) {
+			case Logger::Type::Info: 
+				typestr = "Info";
+				break;
+			case Logger::Type::Warn: 
+				typestr = "Warn";
+				break;
+			case Logger::Type::Error: 
+				typestr = "Error";
+				break;
+			case Logger::Type::Fatal: 
+				typestr = "Fatal";
+				break;
+		};
+		
+		std::cout << std::format("[{} : {}] ({}) {}\n",
+								 loc.file_name(),
+								 loc.line(),
+								 typestr,
+								 msg);
+	};
 
-	Render::Context context(logger);
-
-	WindowConfig window_config;
-	PresentationContext presentor(window_config, logger);
+	Render::Context context(window_config, logger);
+	Presenter presenter(&context);
 
 	const auto window = context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
@@ -108,21 +131,25 @@ int main()
 	descriptor_pool_info.combined_image_sampler_count = 100;
 
 	DescriptorPool descriptor_pool(descriptor_pool_info,
-								   presentation_context);
+								   context);
 
 	Renderer renderer(context,
-					  presentor,
+					  presenter,
 					  descriptor_pool,
 					  shaders_root);
 	
-	Mesh triangle_mesh{VertexBuffer(context, triangle_vertices)};
-	TexturedMesh cube_mesh{VertexBuffer(context, textured_cube_vertices())};
+	Mesh triangle_mesh{VertexBuffer::create(context, triangle_vertices)};
+
+	const std::vector<VertexPosNormColorUV> cube_vertices = textured_cube_vertices();
+	TexturedMesh cube_mesh{
+		VertexBuffer::create<VertexPosNormColorUV>(context, cube_vertices)
+	};
 
 	auto loaded_monkey_mesh = load_obj(context,
 									   assets_root,
 									   "models/monkey/monkey_flat.obj");
 	
-	Mesh monkey_mesh{};
+	Mesh monkey_mesh;
 	if (std::holds_alternative<Mesh>(loaded_monkey_mesh)) {
 		monkey_mesh = std::move(std::get<Mesh>(loaded_monkey_mesh));
 	}
@@ -144,10 +171,10 @@ int main()
 	
 	//https://opengameart.org/art-search-advanced?keys=&field_art_type_tid%5B0%5D=10&sort_by=count&sort_order=DESC&page=3
 	std::cout << "loading chest model!" << std::endl;
-	auto loaded_chest = load_obj_with_texcoords(presentation_context,
+	auto loaded_chest = load_obj_with_texcoords(context,
 												assets_root,
 												"models/ChestWowStyle/Chest.obj");
-	TexturedMesh chest_mesh{};
+	TexturedMesh chest_mesh;
 	if (auto p = std::get_if<TexturedMesh>(&loaded_chest)) {
 		chest_mesh = std::move(*p);
 	}
@@ -284,7 +311,7 @@ int main()
 				switch (wev.event) {
 				case SDL_WINDOWEVENT_RESIZED:
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
-					presentation_context.window_resize_event_triggered();
+					context.window_resize_event_triggered();
 					//TODO: DO RESIZE
 					break;
 				case SDL_WINDOWEVENT_CLOSE:
@@ -359,7 +386,7 @@ int main()
 			};
 			
 		auto render_time = with_time_measurement([&] () {
-			presentation_context.with_presentation(frameGenerator);
+			presenter.with_presentation(frameGenerator);
 		});
 
 		if (slowframes) {
@@ -380,6 +407,6 @@ int main()
 		framecount++;
 	}
 	
-	presentation_context.wait_until_idle();
+	context.wait_until_idle();
 	return 0;
 }

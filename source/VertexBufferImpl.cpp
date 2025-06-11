@@ -52,9 +52,9 @@ create_vertex_buffer(vk::PhysicalDevice& physical_device,
 
 
 VertexBuffer::Impl::Impl(Render::Context::Impl* context,
-		 void* vertices,
-		 size_t vertices_length,
-		 size_t vertex_memory_size)
+						 const void* vertices,
+						 size_t vertices_length,
+						 size_t vertex_memory_size)
 {
 	auto physical_device = context->physical_device;
 	auto device = context->device.get();
@@ -99,9 +99,10 @@ VertexBuffer::Impl::Impl(Render::Context::Impl* context,
 }
 
 
+VertexBuffer::VertexBuffer() {}
 
 VertexBuffer::VertexBuffer(Render::Context& context,
-						   void* vertices,
+						   const void* vertices,
 						   size_t vertices_length,
 						   size_t vertex_memory_size)
 	: impl(std::make_unique<Impl>(context.impl.get(),
@@ -111,3 +112,17 @@ VertexBuffer::VertexBuffer(Render::Context& context,
 {
 }
 	
+VertexBuffer::VertexBuffer(VertexBuffer&& rhs)
+{
+	std::swap(impl, rhs.impl);
+}
+
+VertexBuffer::~VertexBuffer() 
+{
+}
+
+VertexBuffer& VertexBuffer::operator=(VertexBuffer&& rhs)
+{
+	std::swap(impl, rhs.impl);
+	return *this;
+}

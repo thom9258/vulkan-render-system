@@ -3,11 +3,11 @@
 #define _VULKANRENDERERIMPL_RENDERER_IMPL_
 
 #include <VulkanRenderer/GeometryPass.hpp>
-#include <VulkanRenderer/NormRenderPipeline.hpp>
-#include <VulkanRenderer/WireframePipeline.hpp>
-#include <VulkanRenderer/BaseTexturePipeline.hpp>
+#include "NormRenderPipeline.hpp"
+#include "WireframePipeline.hpp"
+#include "BaseTexturePipeline.hpp"
 
-#include "VulkanRendererImpl.hpp"
+#include "PresenterImpl.hpp"
 #include "ContextImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
 
@@ -39,13 +39,9 @@ struct SortedRenderables
 void sort_renderable(SortedRenderables* sorted,
 					 Renderable renderable);
 
-auto create_pipelines(vk::PhysicalDevice& physical_device,
-					  vk::Device& device,
-					  vk::CommandPool& command_pool,
-					  vk::Queue& graphics_queue,
-					  vk::DescriptorPool& descriptor_pool,
-					  vk::RenderPass& renderpass,
-					  const uint32_t frames_in_flight,
+
+auto create_pipelines(Render::Context::Impl* context,
+					  Presenter::Impl* presenter,
 					  const vk::Extent2D render_extent,
 					  const std::filesystem::path shader_root_path,
 					  bool debug_print) 
@@ -80,7 +76,8 @@ auto render_geometry_pass(GeometryPass& pass,
 class Renderer::Impl 
 {
 public:
-    explicit Impl(PresentationContext::Impl* presentation_context,
+    explicit Impl(Render::Context::Impl* context,
+				  Presenter::Impl* presenter,
 				  DescriptorPool::Impl* descriptor_pool,
 				  const std::filesystem::path shaders_root);
     ~Impl();
@@ -93,7 +90,8 @@ public:
 	
 	std::filesystem::path shaders_root;
 
-	PresentationContext::Impl* presentation_context{nullptr};
+	Render::Context::Impl* context{nullptr};
+	Presenter::Impl* presenter{nullptr};
 	DescriptorPool::Impl* descriptor_pool;
 
 	GeometryPass geometry_pass;
