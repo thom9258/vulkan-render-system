@@ -63,7 +63,6 @@ auto copy_bitmap_to_gpu(Render::Context::Impl* context,
 	-> Texture2D;
 
 
-
 auto copy_canvas_to_gpu(Render::Context::Impl* context,
 						const vk::MemoryPropertyFlags propertyFlags,
 						Canvas8bitRGBA& canvas)

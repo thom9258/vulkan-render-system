@@ -108,8 +108,11 @@ int main()
 				break;
 		};
 		
-		std::cout << std::format("[{} : {}] ({}) {}\n",
-								 loc.file_name(),
+		auto filename = std::string_view(loc.file_name());
+		filename.remove_prefix(filename.find_last_of("/"));
+		
+		std::cout << std::format("[{} L{}] ({}) {}\n",
+								 filename,
 								 loc.line(),
 								 typestr,
 								 msg);
