@@ -186,7 +186,6 @@ int main()
 		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
 	}
 
-#if 0	
 	std::cout << "loading chest texture!" << std::endl;
 	TextureSamplerReadOnly chest_texture;
 	auto loaded_chest_texture = 
@@ -196,16 +195,10 @@ int main()
 
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_chest_texture)) {
 		chest_texture = std::move(*p) 
-			| move_bitmap_to_gpu(context.physical_device,
-								 context.device.get(),
-								 context.command_pool(),
-								 context.graphics_queue(),
+			| move_bitmap_to_gpu(context.impl.get(),
 								 vk::MemoryPropertyFlagBits::eDeviceLocal)
-			| make_shader_readonly(context.physical_device,
-								   context.device.get(),
-								   context.graphics_queue(),
-								   InterpolationType::Linear,
-								   context.command_pool());
+			| make_shader_readonly(&context,
+								   InterpolationType::Linear);
 	}
 	else if (auto p = std::get_if<InvalidPath>(&loaded_chest_texture)) {
 		std::cout << "Invalid texture path: " << p->path << std::endl;
@@ -217,27 +210,18 @@ int main()
 		std::cout << "Texture has invalid native pixels" << std::endl;
 	}
 
-
-	
-	
 	std::cout << "loading statue jpg!" << std::endl;
 	TextureSamplerReadOnly statue;
 	auto loaded_statue =
 		load_bitmap(assets_root + "textures/texture.jpg",
 					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes);
+					VerticalFlipOnLoad::No);
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_statue)) {
 		statue = std::move(*p) 
-			| move_bitmap_to_gpu(context.physical_device,
-								 context.device.get(),
-								 context.command_pool(),
-								 context.graphics_queue(),
+			| move_bitmap_to_gpu(context.impl.get(),
 								 vk::MemoryPropertyFlagBits::eDeviceLocal)
-			| make_shader_readonly(context.physical_device,
-								   context.device.get(),
-								   context.graphics_queue(),
-								   InterpolationType::Point,
-								   context.command_pool());
+			| make_shader_readonly(&context,
+								   InterpolationType::Point);
 	}
 	else if (auto p = std::get_if<InvalidPath>(&loaded_statue)) {
 		std::cout << "Invalid texture path: " << p->path << std::endl;
@@ -253,19 +237,13 @@ int main()
 	TextureSamplerReadOnly lulu;
 	auto loaded_lulu = load_bitmap(assets_root + "textures/lulu.jpg",
 								   BitmapPixelFormat::RGBA,
-								   VerticalFlipOnLoad::Yes);
+								   VerticalFlipOnLoad::No);
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_lulu)) {
 		lulu = std::move(*p) 
-			| move_bitmap_to_gpu(context.physical_device,
-								 context.device.get(),
-								 context.command_pool(),
-								 context.graphics_queue(),
+			| move_bitmap_to_gpu(context.impl.get(),
 								 vk::MemoryPropertyFlagBits::eDeviceLocal)
-			| make_shader_readonly(context.physical_device,
-								   context.device.get(),
-								   context.graphics_queue(),
-								   InterpolationType::Linear,
-								   context.command_pool());
+			| make_shader_readonly(&context,
+								   InterpolationType::Linear);
 	}
 	else if (auto p = std::get_if<InvalidPath>(&loaded_lulu)) {
 		std::cout << "Invalid texture path: " << p->path << std::endl;
@@ -276,8 +254,6 @@ int main()
 	else if (std::get_if<InvalidNativePixels>(&loaded_lulu)) {
 		std::cout << "Texture has invalid native pixels" << std::endl;
 	}
-#endif
-
 
 	std::cout << "STARTING DRAW LOOP" << std::endl;
 	/** ************************************************************************
@@ -332,7 +308,7 @@ int main()
 			
 				BaseTextureRenderable chest{};
 				chest.mesh = &chest_mesh;
-				//chest.texture = &chest_texture;
+				chest.texture = &chest_texture;
 				chest.model = glm::mat4(1.0f);
 				chest.model = glm::translate(chest.model, glm::vec3(0.0f, -1.0f, 0.0f));
 				chest.model = glm::scale(chest.model, glm::vec3(0.02f));
@@ -343,7 +319,7 @@ int main()
 
 				BaseTextureRenderable t{};
 				t.mesh = &cube_mesh;
-				//t.texture = &lulu;
+				t.texture = &lulu;
 				t.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.0f));
 				t.model = glm::rotate(t.model,
 									  glm::radians(frameInfo.total_frame_count * 1.0f),
@@ -351,7 +327,7 @@ int main()
 				renderables.push_back(t);
 				
 				t.mesh = &cube_mesh;
-				//t.texture = &statue;
+				t.texture = &statue;
 				t.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.4f, 0.0f));
 				t.model = glm::rotate(t.model,
 									  glm::radians(frameInfo.total_frame_count * 1.0f),
