@@ -1,6 +1,7 @@
 #include <VulkanRenderer/ShaderTexture.hpp>
 
 #include "ContextImpl.hpp"
+#include "TextureImpl.hpp"
 
 TextureSamplerReadOnly::TextureSamplerReadOnly(TextureSamplerReadOnly&& rhs) noexcept
 {
@@ -55,9 +56,9 @@ auto make_shader_readonly(Render::Context::Impl* context,
 							   .setLayerCount(1);
 						   
 						   auto barrier = vk::ImageMemoryBarrier{}
-							   .setOldLayout(texture.layout)
+							   .setOldLayout(texture.impl->layout)
 							   .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-							   .setImage(texture.allocated.image.get())
+							   .setImage(texture.impl->image())
 							   .setSubresourceRange(range)
 							   .setSrcAccessMask(vk::AccessFlags())
 							   .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
@@ -68,12 +69,12 @@ auto make_shader_readonly(Render::Context::Impl* context,
 														 nullptr,
 														 nullptr,
 														 barrier);
-						   texture.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+						   texture.impl->layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 					   });
 
 	TextureSamplerReadOnly shader_texture{};
-	std::swap(shader_texture.allocated, texture.allocated);
-	shader_texture.format = texture.format;
+	std::swap(shader_texture.allocated, texture.impl->allocated);
+	shader_texture.format = texture.impl->format;
 	
 	const auto view_subresource_range = vk::ImageSubresourceRange{}
 		.setAspectMask(vk::ImageAspectFlagBits::eColor)

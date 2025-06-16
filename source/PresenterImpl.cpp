@@ -1,4 +1,5 @@
 #include "PresenterImpl.hpp"
+#include "TextureImpl.hpp"
 
 #include <iostream>
 
@@ -170,18 +171,13 @@ void Presenter::Impl::CreateSwapChain()
 void Presenter::Impl::CreateRenderTargets()
 {
 	for (size_t i = 0; i < swapchain_images.size(); i++) {
-		const auto window_extent = context->get_window_extent();
-		const auto extent = vk::Extent3D{}
-			.setWidth(window_extent.width)
-			.setHeight(window_extent.height)
-			.setDepth(1);
-		
-		Texture2D texture =
-			create_empty_rendertarget_texture(context,
-											  vk::Format::eR8G8B8A8Srgb,
-											  extent,
-											  vk::ImageTiling::eOptimal,
-											  vk::MemoryPropertyFlagBits::eDeviceLocal);
+		const auto extent = context->get_window_extent();
+		auto texture = Texture2D::Impl(RenderTargetTexture,
+									   context,
+									   U32Extent{
+										   extent.width,
+										   extent.height},
+									   TextureFormat::R8G8B8A8Srgb);
 
 		with_buffer_submit(context->device.get(),
 						   command_pool(),
@@ -189,7 +185,7 @@ void Presenter::Impl::CreateRenderTargets()
 						   [&] (vk::CommandBuffer& commandbuffer)
 						   {
 							   texture.layout =
-								  transition_image_for_color_override(texture.allocated.image.get(),
+								  transition_image_for_color_override(texture.image(),
 																	  commandbuffer);
 
 						   });
@@ -245,7 +241,7 @@ void Presenter::Impl::CreateSyncObjects()
 void
 Presenter::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& commandbuffer,
 											 vk::Image& swapchain_image,
-											 Texture2D* texture)
+											 Texture2D::Impl* texture)
 {
 	auto printImageBarrierTransition = [&] (const std::string name, 
 											const vk::ImageMemoryBarrier& barrier)
@@ -328,7 +324,7 @@ Presenter::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& commandbuffer,
 		
 		// TODO: This always does linear blitting!, for low res games we need to be able
 		// to specify point filtering!
-		commandbuffer.blitImage(texture->allocated.image.get(),
+		commandbuffer.blitImage(texture->image(),
 								vk::ImageLayout::eTransferSrcOptimal,
 								swapchain_image,
 								vk::ImageLayout::eTransferDstOptimal,
@@ -405,8 +401,8 @@ void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 	currentFrameInfo.current_flight_frame_index = current_frame_in_flight;
 	currentFrameInfo.total_frame_count = total_frames;
 
-	std::optional<Texture2D*> frameToPresent = std::invoke(currentFrameGenerator,
-														   currentFrameInfo);
+	std::optional<Texture2D::Impl*> frameToPresent = std::invoke(currentFrameGenerator,
+																 currentFrameInfo);
 	if (!frameToPresent.has_value())
 		throw std::runtime_error("SwapChain has not implemented a way to present the old"
 								 " swapchain image if generator returns nullopt");

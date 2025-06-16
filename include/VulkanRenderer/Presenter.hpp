@@ -22,7 +22,7 @@ struct ReUseLastFrame {};
 using GeneratedFrame = std::variant<Texture2D*,
 									ReUseLastFrame>;
 
-using FrameProducer = std::function<std::optional<Texture2D*>(CurrentFrameInfo)>;
+using FrameProducer = std::function<std::optional<Texture2D::Impl*>(CurrentFrameInfo)>;
 
 class Presenter
 {

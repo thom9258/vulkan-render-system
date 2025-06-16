@@ -30,7 +30,7 @@ public:
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables)
-		-> Texture2D*;
+		-> Texture2D::Impl*;
 
 	class Impl;
 	std::unique_ptr<Impl> impl;

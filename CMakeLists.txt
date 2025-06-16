@@ -70,7 +70,7 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Utils.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/source/Texture.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/TextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexPosNormColor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexPosNormColorUV.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/DebugMessenger.cpp

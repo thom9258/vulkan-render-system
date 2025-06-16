@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Utils.hpp"
 #include "Texture.hpp"
 
 enum class InterpolationType {

@@ -19,8 +19,8 @@ auto create_texture_view(vk::Device& device,
 		.setA(vk::ComponentSwizzle::eIdentity);
 
 	const auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
-		.setImage(texture.allocated.image.get())
-		.setFormat(texture.format)
+		.setImage(texture.impl->image())
+		.setFormat(texture.impl->format)
 		.setSubresourceRange(subresourceRange)
 		.setViewType(vk::ImageViewType::e2D)
 		.setComponents(componentMapping);
@@ -157,20 +157,17 @@ auto create_geometry_pass(Render::Context::Impl* context,
 	if (debug_print)
 		std::cout << "> GeometryPass > created Render Pass!" << std::endl;
 	
-	const auto texture_extent = vk::Extent3D{}
-		.setWidth(render_extent.width)
-		.setHeight(render_extent.height)
-		.setDepth(1);
-
 	for (size_t i = 0; i < frames_in_flight; i++) {
 		/* Setup the rendertarget for the render pass
 		 */
-		pass.colorbuffers
-			.push_back(create_empty_rendertarget_texture(context,
-														 render_format,
-														 texture_extent,
-														 vk::ImageTiling::eOptimal,
-														 vk::MemoryPropertyFlagBits::eDeviceLocal));
+		const auto rendertarget_extent = U32Extent{
+			render_extent.width,
+			render_extent.height};
+
+		pass.colorbuffers.push_back(Texture2D::Impl(RenderTargetTexture,
+													context,
+													rendertarget_extent,
+													vkformat_to_textureformat(render_format)));
 		
 		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
 		{
@@ -188,24 +185,23 @@ auto create_geometry_pass(Render::Context::Impl* context,
 		
 		/* Setup the rendertarget view
 		 */
-		pass.colorbuffer_views.push_back(create_texture_view(context->device.get(),
-															 pass.colorbuffers.back(),
-															 vk::ImageAspectFlagBits::eColor));
+		pass.colorbuffer_views
+			.push_back(pass.colorbuffers.back()
+					   .create_view(context,
+									vk::ImageAspectFlagBits::eColor));
 
 		/* Setup the Depthbuffers
 		 */
-		pass.depthbuffers.push_back(create_empty_texture(context,
-														 depth_format,
-														 texture_extent,
-														 vk::ImageTiling::eOptimal,
-														 vk::MemoryPropertyFlagBits::eDeviceLocal,
-														 vk::ImageUsageFlagBits::eDepthStencilAttachment));
+		pass.depthbuffers.push_back(Texture2D::Impl(DepthBufferTexture,
+													context,
+													rendertarget_extent));
 														 
 		/* Setup the depthbuffer view
 		 */
-		pass.depthbuffer_views.push_back(create_texture_view(context->device.get(),
-															 pass.depthbuffers.back(),
-															 vk::ImageAspectFlagBits::eDepth));
+		pass.depthbuffer_views
+			.push_back(pass.depthbuffers.back()
+					   .create_view(context,
+									vk::ImageAspectFlagBits::eDepth));
 		
 		/* Setup the FrameBuffers
 		 */
@@ -244,7 +240,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  vk::Queue& queue,
 						  const WorldRenderInfo& world_info,
 						  std::vector<Renderable>& renderables)
-	-> Texture2D*
+	-> Texture2D::Impl*
 {
 	//TODO: Pull clearvalues out!
 	const float flash = std::abs(std::sin(total_frames / 120.f));
@@ -366,7 +362,7 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 							const uint64_t total_frames,
 							const WorldRenderInfo& world_info,
 							std::vector<Renderable>& renderables)
-		-> Texture2D*
+		-> Texture2D::Impl*
 {
 	return render_geometry_pass(geometry_pass,
 								&pipelines,
@@ -385,7 +381,7 @@ auto Renderer::render(const uint32_t current_frame_in_flight,
 					  const uint64_t total_frames,
 					  const WorldRenderInfo& world_info,
 					  std::vector<Renderable>& renderables)
-		-> Texture2D*
+		-> Texture2D::Impl*
 {
 	return impl->render(current_frame_in_flight,
 						total_frames,

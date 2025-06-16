@@ -10,6 +10,7 @@
 #include "ContextImpl.hpp"
 #include "PresenterImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
+#include "TextureImpl.hpp"
 
 #include <algorithm>
 #include <map>
@@ -412,7 +413,7 @@ create_base_texture_pipeline(Render::Context::Impl* context,
 	canvas.draw_checkerboard(yellow, CheckerSquareSize{4});
 
 	pipeline.base_texture = std::move(canvas)
-		| move_canvas_to_gpu(context, vk::MemoryPropertyFlagBits::eDeviceLocal)
+		| move_canvas_to_gpu(context)
 		| make_shader_readonly(context, InterpolationType::Point);
 	
 	if (debug_print)

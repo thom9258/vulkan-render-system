@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <chrono>
 #include <thread>
+#include <ranges>
+#include <thread>
 
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/Presenter.hpp>
@@ -52,6 +54,9 @@ auto textured_cube_vertices()
 							  texcoords.data());
 	if (status != SG_OK_RETURNED_BUFFER)
 		throw std::runtime_error("Could not get vertices");
+	
+
+
 
 	std::vector<VertexPosNormColorUV> vertices(positions.size());
 	for (size_t i = 0; i < vertices.size(); i++) {
@@ -198,10 +203,8 @@ int main()
 
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_chest_texture)) {
 		chest_texture = std::move(*p) 
-			| move_bitmap_to_gpu(context.impl.get(),
-								 vk::MemoryPropertyFlagBits::eDeviceLocal)
-			| make_shader_readonly(&context,
-								   InterpolationType::Linear);
+			| move_bitmap_to_gpu(&context)
+			| make_shader_readonly(&context, InterpolationType::Linear);
 	}
 	else if (auto p = std::get_if<InvalidPath>(&loaded_chest_texture)) {
 		std::cout << "Invalid texture path: " << p->path << std::endl;
@@ -221,10 +224,8 @@ int main()
 					VerticalFlipOnLoad::No);
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_statue)) {
 		statue = std::move(*p) 
-			| move_bitmap_to_gpu(context.impl.get(),
-								 vk::MemoryPropertyFlagBits::eDeviceLocal)
-			| make_shader_readonly(&context,
-								   InterpolationType::Point);
+			| move_bitmap_to_gpu(&context)
+			| make_shader_readonly(&context, InterpolationType::Point);
 	}
 	else if (auto p = std::get_if<InvalidPath>(&loaded_statue)) {
 		std::cout << "Invalid texture path: " << p->path << std::endl;
@@ -243,10 +244,8 @@ int main()
 								   VerticalFlipOnLoad::No);
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_lulu)) {
 		lulu = std::move(*p) 
-			| move_bitmap_to_gpu(context.impl.get(),
-								 vk::MemoryPropertyFlagBits::eDeviceLocal)
-			| make_shader_readonly(&context,
-								   InterpolationType::Linear);
+			| move_bitmap_to_gpu(&context)
+			| make_shader_readonly(&context, InterpolationType::Linear);
 	}
 	else if (auto p = std::get_if<InvalidPath>(&loaded_lulu)) {
 		std::cout << "Invalid texture path: " << p->path << std::endl;
@@ -305,7 +304,7 @@ int main()
 		 * Render Loop
 		 */
 		FrameProducer frameGenerator = [&] (CurrentFrameInfo frameInfo)
-			-> std::optional<Texture2D*>
+			-> std::optional<Texture2D::Impl*>
 			{
 				std::vector<Renderable> renderables{};
 			

@@ -15,9 +15,9 @@ struct GeometryPass
 {
 	vk::Extent2D extent;
 	vk::UniqueRenderPass renderpass;
-	std::vector<Texture2D> colorbuffers;
+	std::vector<Texture2D::Impl> colorbuffers;
 	std::vector<vk::UniqueImageView> colorbuffer_views;
-	std::vector<Texture2D> depthbuffers;
+	std::vector<Texture2D::Impl> depthbuffers;
 	std::vector<vk::UniqueImageView> depthbuffer_views;
 	std::vector<vk::UniqueFramebuffer> framebuffers;
 };
@@ -70,7 +70,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  vk::Queue& queue,
 						  const WorldRenderInfo& world_info,
 						  std::vector<Renderable>& renderables)
-	-> Texture2D*;
+	-> Texture2D::Impl*;
 
 
 class Renderer::Impl 
@@ -86,7 +86,7 @@ public:
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables)
-		-> Texture2D*;
+		-> Texture2D::Impl*;
 	
 	std::filesystem::path shaders_root;
 

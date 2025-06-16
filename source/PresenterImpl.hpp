@@ -11,14 +11,11 @@ public:
     explicit Impl(Render::Context::Impl* context);
     ~Impl();
 
-	Render::Context::Impl* context;
-
 	void with_presentation(FrameProducer& f);
-
 	vk::CommandPool& command_pool();
-	
-	const bool per_frame_debug_print{false};
 
+	Render::Context::Impl* context;
+	const bool per_frame_debug_print{false};
 	//TODO we should have a smart little object to handle this logic...
 	const int max_frames_in_flight = 2;
 	uint32_t current_frame_in_flight{0};
@@ -31,7 +28,7 @@ public:
 	/*Per swapchain image*/
 	std::vector<vk::Image> swapchain_images;
 	std::vector<vk::UniqueImageView> swapchain_imageviews;
-	std::vector<Texture2D> rendertargets;
+	std::vector<Texture2D::Impl> rendertargets;
 
 
 	/*Per Frame-in-Flight*/
@@ -49,6 +46,6 @@ private:
 
 	void RecordBlitTextureToSwapchain(vk::CommandBuffer& commandbuffer,
 									  vk::Image& swapchain_image,
-									  Texture2D* texture);
+									  Texture2D::Impl* texture);
 
 };
