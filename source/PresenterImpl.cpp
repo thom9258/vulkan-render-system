@@ -12,12 +12,15 @@ Presenter::Impl::~Impl()
 {
 	// TODO: Port over the ResourceWrapperRuntime so we can automatically destroy all this stuff..
 	// Note we need to destroy the swapchain manually so it happens before the surface...
+	logger.info(std::source_location::current(), 
+				 "Presenter is getting destructed.");
 	swapchain.reset();
 }
 
-Presenter::Impl::Impl(Render::Context::Impl* context)
+Presenter::Impl::Impl(Render::Context::Impl* context, Logger logger)
 	: max_frames_in_flight(2)
 	, context(context)
+	, logger(logger)
 {
 	CreateSwapChain();
 	CreateCommandpool();
@@ -30,8 +33,12 @@ void Presenter::Impl::CreateSwapChain()
 {
 	const auto surface_capabilities = context->window_surface_capabilities();
 	const auto window_extent = context->get_window_extent();
-	std::cout << "> Window width:  " << window_extent.width << "\n"
-			  << "         height: " << window_extent.height << std::endl;
+	
+
+	logger.info(std::source_location::current(), 
+				 std::format("Window width/height = {}/{}",
+							 window_extent.width,
+							 window_extent.height));
 
 	vk::Extent2D swapchain_extent;
 	const bool surface_size_is_undefined = 
@@ -51,19 +58,30 @@ void Presenter::Impl::CreateSwapChain()
 		swapchain_extent = surface_capabilities.currentExtent;
 	}
 	
-	std::cout << "> SwapChain width:  " << swapchain_extent.width << "\n"
-			  << "            height: " << swapchain_extent.height << std::endl;
+	logger.info(std::source_location::current(), 
+				 std::format("Window width/height = {}/{}",
+							 swapchain_extent.width,
+							 swapchain_extent.height));
 
 	const auto formats = context->window_surface_formats();
-	if (formats.empty())
+	if (formats.empty()) {
+		logger.fatal(std::source_location::current(), 
+					"Swapchain has no formats!");
 		throw std::runtime_error("Swapchain has no formats!");
+	}
 	
 	swapchain_format = get_swapchain_surface_format(formats);
 
-	std::cout << "> Swapchain format: " << vk::to_string(swapchain_format.format) << std::endl;
+		logger.info(std::source_location::current(), 
+					std::format("Swapchain format {}",
+								vk::to_string(swapchain_format.format)));
 
 	const vk::PresentModeKHR swapchainPresentMode = vk::PresentModeKHR::eFifo;
-	std::cout << "> Swapchain PresentMode: " << vk::to_string(swapchainPresentMode) << std::endl;
+
+	logger.info(std::source_location::current(), 
+				 std::format("Swapchain PresentMode {}",
+							 vk::to_string(swapchainPresentMode)));
+
 	// vk::PresentModeKHR::eMailBox is potentially good on low power devices..
 
 	const auto supports_identity = 
@@ -94,11 +112,18 @@ void Presenter::Impl::CreateSwapChain()
 									   surface_capabilities.minImageCount);
 	}
 
-	std::cout << "> surface capabilities:\n"
-	<< "  > min image count: " << surface_capabilities.minImageCount << "\n"
-	<< "  > max image count: " << surface_capabilities.maxImageCount << "\n"
-	<< "  > requested image count: " << surface_image_count 
-	<< std::endl;
+	logger.info(std::source_location::current(), 
+				 "surface capabilities:");
+
+	logger.info(std::source_location::current(), 
+				 std::format("  min image count: {}",
+							 surface_capabilities.minImageCount));
+	logger.info(std::source_location::current(), 
+				 std::format("  max image count: {}",
+							 surface_capabilities.maxImageCount));
+	logger.info(std::source_location::current(), 
+				 std::format("  requested image count: {}",
+							 surface_image_count));
 	
 	auto swapChainCreateInfo = vk::SwapchainCreateInfoKHR{}
 		.setFlags(vk::SwapchainCreateFlagsKHR())
@@ -136,7 +161,9 @@ void Presenter::Impl::CreateSwapChain()
 	swapchain = context->device->createSwapchainKHRUnique(swapChainCreateInfo, nullptr);
 
 	swapchain_images = context->device->getSwapchainImagesKHR(*swapchain);
-	std::cout << "> SwapChain image count: " << swapchain_images.size() << std::endl;
+	logger.info(std::source_location::current(), 
+				 std::format("  returned image count: {}",
+							 swapchain_images.size()));
 	
 	swapchain_imageviews.reserve(swapchain_images.size());
 	
@@ -165,7 +192,8 @@ void Presenter::Impl::CreateSwapChain()
 			.push_back(context->device->createImageViewUnique(imageViewCreateInfo));
 	}
 
-	std::cout << "> created SwapChain!" << std::endl;
+	logger.info(std::source_location::current(), 
+				"Created Swapchain for Presenter");
 }
 
 void Presenter::Impl::CreateRenderTargets()
@@ -192,7 +220,9 @@ void Presenter::Impl::CreateRenderTargets()
 		
 		rendertargets.push_back(std::move(texture));
 	}
-	std::cout << "> Created Render Targets" << std::endl;
+
+	logger.info(std::source_location::current(), 
+				"Created Render Targets for Presenter");
 }
 
 void Presenter::Impl::CreateCommandpool()
@@ -202,7 +232,8 @@ void Presenter::Impl::CreateCommandpool()
 		.setQueueFamilyIndex(graphics_index(context->graphics_present_indices));
 	commandpool = context->device->createCommandPoolUnique(commandPoolCreateInfo, nullptr);
 
-	std::cout << "> Created Command pool" << std::endl;
+	logger.info(std::source_location::current(), 
+				"Created Command Pool Presenter");
 }
 
 void Presenter::Impl::CreateCommandbuffers()
@@ -215,7 +246,10 @@ void Presenter::Impl::CreateCommandbuffers()
 		.setCommandBufferCount(max_frames_in_flight);
 
 	commandbuffers = context->device->allocateCommandBuffersUnique(commandBufferAllocateInfo);
-	std::cout << "> Created " << commandbuffers.size() << " Command buffers" << std::endl;
+
+	logger.info(std::source_location::current(), 
+				std::format("Created {} Command Buffers for  Presenter",
+							commandbuffers.size()));
 }
 
 void Presenter::Impl::CreateSyncObjects()
@@ -235,7 +269,8 @@ void Presenter::Impl::CreateSyncObjects()
 		inFlightFences.push_back(context->device->createFenceUnique(fenceCreateInfo, nullptr));
 	}
 
-	std::cout << "> Created Sync Objects" << std::endl;
+	logger.info(std::source_location::current(), 
+				"Created Sync objects for Presenter");
 }
 
 void
@@ -377,8 +412,11 @@ void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 													 maxTimeout);
 	context->device->resetFences(*(inFlightFences[current_frame_in_flight]));
 
-	if (waitresult != vk::Result::eSuccess)
+	if (waitresult != vk::Result::eSuccess) {
+		logger.error(std::source_location::current(), 
+					 "Could not wait for inFlightFence");
 		throw std::runtime_error("Could not wait for inFlightFence");
+	}
 	
 	auto [result, swapchain_index] =
 		context->device->acquireNextImageKHR(*swapchain,
@@ -403,9 +441,12 @@ void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 
 	std::optional<Texture2D::Impl*> frameToPresent = std::invoke(currentFrameGenerator,
 																 currentFrameInfo);
-	if (!frameToPresent.has_value())
-		throw std::runtime_error("SwapChain has not implemented a way to present the old"
-								 " swapchain image if generator returns nullopt");
+	if (!frameToPresent.has_value()) {
+		const auto msg = "SwapChain has not implemented a way to present the old"
+								 " swapchain image if generator returns nullopt";
+		logger.error(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
 	
 	RecordBlitTextureToSwapchain(commandbuffers[current_frame_in_flight].get(),
 								 swapchain_images[swapchain_index],
@@ -439,8 +480,11 @@ void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 		.setWaitSemaphores(signalSemaphores);
 	
 	auto presentResult = present_queue(context->index_queues).presentKHR(presentInfo);
-	if (presentResult != vk::Result::eSuccess)
-		throw std::runtime_error("Could not wait for inFlightFence");
+	if (presentResult != vk::Result::eSuccess) {
+		const auto msg = "Could not wait for inFlightFence";
+		logger.error(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
 
     current_frame_in_flight = (current_frame_in_flight + 1) % max_frames_in_flight;
 	total_frames++;
@@ -450,8 +494,8 @@ Presenter::~Presenter()
 {
 }
 
-Presenter::Presenter(Render::Context* context)
-  : impl(std::make_unique<Presenter::Impl>(context->impl.get()))
+Presenter::Presenter(Render::Context* context, Logger logger)
+  : impl(std::make_unique<Presenter::Impl>(context->impl.get(), logger))
 {
 }
 

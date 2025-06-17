@@ -1,7 +1,7 @@
 #pragma once
 #include <VulkanRenderer/Texture.hpp>
-#include <VulkanRenderer/Utils.hpp>
 
+#include "Utils.hpp"
 #include "ContextImpl.hpp"
 
 struct Texture2D::Impl

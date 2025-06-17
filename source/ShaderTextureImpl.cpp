@@ -1,41 +1,9 @@
-#include <VulkanRenderer/ShaderTexture.hpp>
+#include "ShaderTextureImpl.hpp"
 
-#include "ContextImpl.hpp"
-#include "TextureImpl.hpp"
-
-TextureSamplerReadOnly::TextureSamplerReadOnly(TextureSamplerReadOnly&& rhs) noexcept
-{
-	std::swap(allocated, rhs.allocated);
-	std::swap(view, rhs.view);
-	std::swap(sampler, rhs.sampler);
-	std::swap(format, rhs.format);
-}
-
-TextureSamplerReadOnly& TextureSamplerReadOnly::operator=(TextureSamplerReadOnly&& rhs) noexcept
-{
-	std::swap(allocated, rhs.allocated);
-	std::swap(view, rhs.view);
-	std::swap(sampler, rhs.sampler);
-	std::swap(format, rhs.format);
-	return *this;
-}
-
-auto get_image(TextureSamplerReadOnly& texture)
+auto TextureSamplerReadOnly::Impl::image()
 	-> vk::Image&
 {
-	return texture.allocated.image.get();
-}
-
-auto get_image_view(TextureSamplerReadOnly& texture)
-	-> vk::ImageView&
-{
-	return texture.view.get();
-}
-
-auto get_sampler(TextureSamplerReadOnly& texture)
-	-> vk::Sampler&
-{
-	return texture.sampler.get();
+	return allocated.image.get();
 }
 
 auto make_shader_readonly(Render::Context::Impl* context,
@@ -72,9 +40,9 @@ auto make_shader_readonly(Render::Context::Impl* context,
 						   texture.impl->layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 					   });
 
-	TextureSamplerReadOnly shader_texture{};
-	std::swap(shader_texture.allocated, texture.impl->allocated);
-	shader_texture.format = texture.impl->format;
+	auto sampler_impl = std::make_unique<TextureSamplerReadOnly::Impl>();
+	std::swap(sampler_impl->allocated, texture.impl->allocated);
+	sampler_impl->format = texture.impl->format;
 	
 	const auto view_subresource_range = vk::ImageSubresourceRange{}
 		.setAspectMask(vk::ImageAspectFlagBits::eColor)
@@ -83,12 +51,11 @@ auto make_shader_readonly(Render::Context::Impl* context,
 		.setBaseArrayLayer(0)
 		.setLayerCount(1);
 	const auto view_info = vk::ImageViewCreateInfo{}
-		.setImage(get_image(shader_texture))
+		.setImage(sampler_impl->image())
 		.setViewType(vk::ImageViewType::e2D)
-		.setFormat(shader_texture.format)
+		.setFormat(sampler_impl->format)
 		.setSubresourceRange(view_subresource_range);
-	shader_texture.view = context->device.get().createImageViewUnique(view_info);
-
+	sampler_impl->view = context->device.get().createImageViewUnique(view_info);
 
 	const auto properties = context->physical_device.getProperties();
 	const auto has_anisotropy = true; // TODO: set this from device
@@ -117,8 +84,8 @@ auto make_shader_readonly(Render::Context::Impl* context,
 		.setMipLodBias(0.0f)
 		.setMinLod(0.0f)
 		.setMaxLod(0.0f);
-	shader_texture.sampler = context->device.get().createSamplerUnique(sampler_info);
-	return shader_texture;
+	sampler_impl->sampler = context->device.get().createSamplerUnique(sampler_info);
+	return TextureSamplerReadOnly(std::move(sampler_impl));
 }
 
 auto make_shader_readonly(Render::Context* context,
@@ -149,3 +116,26 @@ auto make_shader_readonly(Render::Context* context,
 	return make_shader_readonly(context->impl.get(), interpolation);
 }
 
+TextureSamplerReadOnly::TextureSamplerReadOnly(std::unique_ptr<TextureSamplerReadOnly::Impl>&& impl)
+	: impl(std::move(impl))
+{
+}
+
+TextureSamplerReadOnly::TextureSamplerReadOnly()
+{
+}
+
+TextureSamplerReadOnly::~TextureSamplerReadOnly()
+{
+}
+
+TextureSamplerReadOnly::TextureSamplerReadOnly(TextureSamplerReadOnly&& rhs) noexcept
+{
+	std::swap(impl, rhs.impl);
+}
+
+TextureSamplerReadOnly& TextureSamplerReadOnly::operator=(TextureSamplerReadOnly&& rhs) noexcept
+{
+	std::swap(impl, rhs.impl);
+	return *this;
+}

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <VulkanRenderer/VertexBuffer.hpp>
-#include <VulkanRenderer/Utils.hpp>
+#include "Utils.hpp"
 #include "ContextImpl.hpp"
 
 struct VertexBuffer::Impl

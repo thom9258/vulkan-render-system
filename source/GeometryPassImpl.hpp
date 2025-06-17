@@ -78,6 +78,7 @@ class Renderer::Impl
 public:
     explicit Impl(Render::Context::Impl* context,
 				  Presenter::Impl* presenter,
+				  Logger logger,
 				  DescriptorPool::Impl* descriptor_pool,
 				  const std::filesystem::path shaders_root);
     ~Impl();
@@ -88,6 +89,7 @@ public:
 				std::vector<Renderable>& renderables)
 		-> Texture2D::Impl*;
 	
+	Logger logger;
 	std::filesystem::path shaders_root;
 
 	Render::Context::Impl* context{nullptr};

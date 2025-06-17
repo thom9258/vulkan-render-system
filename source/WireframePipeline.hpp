@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "VertexImpl.hpp"
+
 struct WireframePipeline
 {
 	vk::UniquePipelineLayout layout;

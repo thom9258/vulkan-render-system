@@ -330,11 +330,13 @@ auto render_geometry_pass(GeometryPass& pass,
 
 Renderer::Impl::Impl(Render::Context::Impl* context,
 					 Presenter::Impl* presenter,
+					 Logger logger,
 					 DescriptorPool::Impl* descriptor_pool,
 					 std::filesystem::path shaders_root)
 	: shaders_root(shaders_root)
 	, context(context)
 	, presenter(presenter)
+	, logger(logger)
 	, descriptor_pool(descriptor_pool)
 {
 	geometry_pass = create_geometry_pass(context,
@@ -391,10 +393,12 @@ auto Renderer::render(const uint32_t current_frame_in_flight,
 
 Renderer::Renderer(Render::Context& context,
 				   Presenter& presenter,
+				   Logger logger,
 				   DescriptorPool& descriptor_pool,
 				   const std::filesystem::path shaders_root)
 	: impl(std::make_unique<Impl>(context.impl.get(),
 								  presenter.impl.get(),
+								  logger,
 								  descriptor_pool.impl.get(),
 								  shaders_root))
 {

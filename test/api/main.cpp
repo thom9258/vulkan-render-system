@@ -12,10 +12,7 @@
 #include <VulkanRenderer/Presenter.hpp>
 #include <VulkanRenderer/GeometryPass.hpp>
 #include <VulkanRenderer/DescriptorPool.hpp>
-
-#include <VulkanRenderer/VertexPosNormColor.hpp>
-#include <VulkanRenderer/VertexPosNormColorUV.hpp>
-
+#include <VulkanRenderer/Vertex.hpp>
 #include <VulkanRenderer/Bitmap.hpp>
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/ShaderTexture.hpp>
@@ -26,8 +23,6 @@
 const std::string root = "../../../";
 const std::string shaders_root = root + "compiled_shaders/";
 const std::string assets_root = root + "assets/";
-
-
 
 auto textured_cube_vertices()
 	-> std::vector<VertexPosNormColorUV> 
@@ -92,8 +87,9 @@ std::vector<VertexPosNormColor> triangle_vertices = {
 
 int main()
 {
-
 	WindowConfig window_config;
+	//window_config.size = U32Extent{400, 300};
+
 	Logger logger;
 	logger.log = [] (std::source_location loc, Logger::Type type, std::string msg) {
 		
@@ -114,7 +110,7 @@ int main()
 		};
 		
 		auto filename = std::string_view(loc.file_name());
-		filename.remove_prefix(filename.find_last_of("/"));
+		filename.remove_prefix(filename.find_last_of("/") + 1);
 		
 		std::cout << std::format("[{} L{}] ({}) {}\n",
 								 filename,
@@ -124,7 +120,7 @@ int main()
 	};
 
 	Render::Context context(window_config, logger);
-	Presenter presenter(&context);
+	Presenter presenter(&context, logger);
 
 	const auto window = context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
@@ -143,6 +139,7 @@ int main()
 
 	Renderer renderer(context,
 					  presenter,
+					  logger,
 					  descriptor_pool,
 					  shaders_root);
 	

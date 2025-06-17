@@ -10,8 +10,6 @@
 #include "Texture.hpp"
 #include "Extent.hpp"
 
-
-
 struct CurrentFrameInfo
 {
 	uint64_t total_frame_count;
@@ -27,7 +25,7 @@ using FrameProducer = std::function<std::optional<Texture2D::Impl*>(CurrentFrame
 class Presenter
 {
 public:
-    explicit Presenter(Render::Context* context);
+    explicit Presenter(Render::Context* context, Logger logger);
     ~Presenter();
 
 	void with_presentation(FrameProducer& next_frame_producer);

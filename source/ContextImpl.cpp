@@ -7,6 +7,8 @@ namespace Render
 	
 Context::Impl::~Impl()
 {
+	logger.info(std::source_location::current(), 
+				 "Context is getting destructed.");
 	instance->destroySurfaceKHR(raw_window_surface, nullptr);
 	SDL_DestroyWindow(window);
 	SDL_Vulkan_UnloadLibrary();

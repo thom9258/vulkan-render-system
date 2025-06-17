@@ -1,7 +1,7 @@
 #pragma once
 
 #include <VulkanRenderer/Context.hpp>
-#include <VulkanRenderer/Utils.hpp>
+#include "Utils.hpp"
 #include "DebugMessenger.hpp"
 
 namespace Render

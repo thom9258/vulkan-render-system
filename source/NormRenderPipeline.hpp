@@ -2,8 +2,9 @@
 
 #include <iostream>
 #include <filesystem>
-#include "VertexPosNormColor.hpp"
+#include "Utils.hpp"
 #include "VertexBufferImpl.hpp"
+#include "VertexImpl.hpp"
 #include "Mesh.hpp"
 
 #include <vector>

@@ -1,6 +1,4 @@
 #pragma once
-#ifndef _VULKANRENDERER_MESH_
-#define _VULKANRENDERER_MESH_
 
 #include <filesystem>
 #include <variant>
@@ -62,5 +60,3 @@ auto load_obj_with_texcoords(Render::Context& context,
 							 const std::filesystem::path& path,
 							 const std::string& filename)
 	-> LoadTexturedMeshResult;
-
-#endif //_VULKANRENDERER_MESH_

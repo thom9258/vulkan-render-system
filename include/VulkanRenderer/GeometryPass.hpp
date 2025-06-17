@@ -21,6 +21,7 @@ class Renderer
 public:
 	Renderer(Render::Context& context,
 			 Presenter& presenter,
+			 Logger logger,
 			 DescriptorPool& descriptor_pool,
 			 const std::filesystem::path shaders_root);
 

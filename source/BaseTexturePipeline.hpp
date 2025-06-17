@@ -1,7 +1,8 @@
 #pragma once 
 
 #include <filesystem>
-#include "VertexPosNormColorUV.hpp"
+
+#include "VertexImpl.hpp"
 #include "VertexBuffer.hpp"
 #include "Mesh.hpp"
 #include "Texture.hpp"
@@ -11,6 +12,7 @@
 #include "PresenterImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
 #include "TextureImpl.hpp"
+#include "ShaderTextureImpl.hpp"
 
 #include <algorithm>
 #include <map>
@@ -76,8 +78,8 @@ create_descriptorset_for_texture(vk::Device device,
 		
 		const auto image_info = vk::DescriptorImageInfo{}
 			.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-			.setImageView(get_image_view(texture))
-			.setSampler(get_sampler(texture));
+			.setImageView(texture.impl->view.get())
+			.setSampler(texture.impl->sampler.get());
 		
 		const std::array<vk::WriteDescriptorSet, 1> write{
 			vk::WriteDescriptorSet{}

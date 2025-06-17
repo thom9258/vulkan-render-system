@@ -1,20 +1,22 @@
 #pragma once
 
 #include <VulkanRenderer/Presenter.hpp>
-#include "ContextImpl.hpp"
-#include <VulkanRenderer/Utils.hpp>
 #include <VulkanRenderer/Texture.hpp>
+#include "ContextImpl.hpp"
+#include "Utils.hpp"
 
 class Presenter::Impl 
 {
 public:
-    explicit Impl(Render::Context::Impl* context);
+    explicit Impl(Render::Context::Impl* context, Logger logger);
     ~Impl();
 
 	void with_presentation(FrameProducer& f);
 	vk::CommandPool& command_pool();
 
 	Render::Context::Impl* context;
+	Logger logger;
+
 	const bool per_frame_debug_print{false};
 	//TODO we should have a smart little object to handle this logic...
 	const int max_frames_in_flight = 2;

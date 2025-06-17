@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _VULKANRENDERER_CONTEXT_
-#define _VULKANRENDERER_CONTEXT_
+
+#include <SDL2/SDL.h>
 
 #include <cstdint>
 #include <functional>
@@ -67,5 +67,3 @@ public:
 };
 
 }
-
-#endif //_VULKANRENDERER_CONTEXT_

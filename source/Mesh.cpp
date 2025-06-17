@@ -1,7 +1,6 @@
 #include <VulkanRenderer/Mesh.hpp>
-#include <VulkanRenderer/VertexPosNormColor.hpp>
-#include <VulkanRenderer/VertexPosNormColorUV.hpp>
 
+#include "VertexImpl.hpp"
 #include "VertexBufferImpl.hpp"
 #include "ContextImpl.hpp"
 
