@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iostream>
+#include <format>
 
 #include "VertexImpl.hpp"
 
@@ -22,7 +22,8 @@ struct WireframeRenderInfo
 };
 
 WireframePipeline
-create_wireframe_render_pipeline(vk::Device& device,
+create_wireframe_render_pipeline(Logger& logger,
+								 vk::Device& device,
 								 vk::RenderPass& renderpass,
 								 const vk::Extent2D render_extent,
 								 const std::filesystem::path shader_root_path,
@@ -32,19 +33,24 @@ create_wireframe_render_pipeline(vk::Device& device,
 	const std::filesystem::path vertexshader_name = "Wireframe.vert.spv";
 	const std::filesystem::path fragmentshader_name = "Wireframe.frag.spv";
 
-	if (debug_print) {
-		std::cout << "> " << pipeline_name << "\n"
-				  << "  -> vertexshader   " << vertexshader_name << "\n"
-				  << "  -> fragmentshader " << fragmentshader_name
-				  << std::endl;
-	}
+	logger.info(std::source_location::current(),
+				std::format("Creating Pipeline {}",
+							pipeline_name));
+	logger.info(std::source_location::current(),
+				std::format("  Vertex Shader {}",
+							vertexshader_name.string()));
+	logger.info(std::source_location::current(),
+				std::format("  Fragment Shader {}",
+							fragmentshader_name.string()));
 
 	WireframePipeline pipeline;
-
 	const auto vert =
 		read_binary_file((shader_root_path / vertexshader_name).string().c_str());
-	if (!vert)
-		throw std::runtime_error("COULD NOT LOAD VERTEX SHADER BINARY");
+	if (!vert) {
+		const auto msg = "COULD NOT LOAD VERTEX SHADER BINARY";
+		logger.fatal(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
 	
 	auto vertexShaderModuleCreateInfo = vk::ShaderModuleCreateInfo{}
 		.setFlags(vk::ShaderModuleCreateFlags())
@@ -55,8 +61,11 @@ create_wireframe_render_pipeline(vk::Device& device,
 	
 	const auto frag =
 		read_binary_file((shader_root_path / fragmentshader_name).string().c_str());
-	if (!frag)
-		throw std::runtime_error("COULD NOT LOAD FRAGMENT SHADER BINARY");
+	if (!frag) {
+		const auto msg = "COULD NOT LOAD FRAGMENT SHADER BINARY";
+		logger.fatal(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
 	
 	auto fragmentShaderModuleCreateInfo = vk::ShaderModuleCreateInfo{}
 		.setFlags(vk::ShaderModuleCreateFlags())
@@ -78,9 +87,6 @@ create_wireframe_render_pipeline(vk::Device& device,
 		.setModule(*fragment_module)
 		.setPName("main"),
 	};
-
-	if (debug_print)
-		std::cout << "> Created shaders" << std::endl;
 
     std::array<vk::DynamicState, 2> dynamicStates{
 		vk::DynamicState::eViewport,
@@ -168,14 +174,11 @@ create_wireframe_render_pipeline(vk::Device& device,
 		.setSize(sizeof(WireframePipeline::PushConstants))
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex);
 	
-	if (debug_print)
-		std::cout << "> PushConstant size: " << sizeof(WireframePipeline::PushConstants) 
-				  << std::endl;
-
 	if (sizeof(WireframePipeline::PushConstants) > 128) {
-		std::cout << "> WARNING: PushConstant size is larger than minimum supported!\n"
-				  << "  -> This can cause compatability issues..."
-				  << std::endl;
+		logger.warn(std::source_location::current(), 
+					std::format("PushConstant size={} is larger than minimum supported (128)"
+								"This can cause compatability issues on some devices",
+								sizeof(WireframePipeline::PushConstants)));
 	}
 	
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
@@ -186,8 +189,7 @@ create_wireframe_render_pipeline(vk::Device& device,
 	pipeline.layout = 
 		device.createPipelineLayoutUnique(pipelineLayoutCreateInfo);
 	
-	if (debug_print)
-		std::cout << "> Created Pipeline Layout" << std::endl;
+	logger.info(std::source_location::current(), "Created Pipeline Layout");
 	
 	auto depth_stencil_state_info = vk::PipelineDepthStencilStateCreateInfo{}
 		.setDepthTestEnable(true)
@@ -221,15 +223,14 @@ create_wireframe_render_pipeline(vk::Device& device,
 	case vk::Result::eSuccess:
 		break;
 	case vk::Result::ePipelineCompileRequiredEXT:
-		throw std::runtime_error("Creating pipeline error: PipelineCompileRequiredEXT");
+		logger.error(std::source_location::current(),
+					 "Creating pipeline error: PipelineCompileRequiredEXT");
 	default: 
-		throw std::runtime_error("Invalid Result state");
+		logger.error(std::source_location::current(),
+					 "Creating pipeline error: Unknown invalid Result state");
     }
 	
 	pipeline.pipeline = std::move(result.value);
-	if (debug_print)
-		std::cout << "> created wireframe Graphics Pipeline!" << std::endl;
-	
 	return pipeline;
 }
 

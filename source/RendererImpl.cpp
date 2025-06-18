@@ -1,4 +1,4 @@
-#include "GeometryPassImpl.hpp"
+#include "RendererImpl.hpp"
 
 auto create_texture_view(vk::Device& device,
 						 Texture2D& texture,
@@ -28,7 +28,8 @@ auto create_texture_view(vk::Device& device,
 	return device.createImageViewUnique(imageViewCreateInfo);
 }
 
-void sort_renderable(SortedRenderables* sorted,
+void sort_renderable(Logger* logger,
+					 SortedRenderables* sorted,
 					 Renderable renderable)
 {
 	if (auto p = std::get_if<NormColorRenderable>(&renderable))
@@ -37,10 +38,27 @@ void sort_renderable(SortedRenderables* sorted,
 		sorted->wireframes.push_back(*p);
 	else if (auto p = std::get_if<BaseTextureRenderable>(&renderable))
 		sorted->basetextures.push_back(*p);
-	else
-		throw std::runtime_error("Not sortable");
-};
+	else {
+		logger->warn(std::source_location::current(),
+					 "Found unknown Renderable that can not be sorted and drawn");
+	}
+}
 
+void sort_light(Logger* logger,
+				SortedLights* sorted,
+				Light light)
+{
+	if (auto p = std::get_if<AreaLight>(&light))
+		sorted->arealights.push_back(*p);
+	else if (auto p = std::get_if<PointLight>(&light))
+		sorted->pointlights.push_back(*p);
+	else if (auto p = std::get_if<SpotLight>(&light))
+		sorted->spotlights.push_back(*p);
+	else {
+		logger->warn(std::source_location::current(),
+					 "Found unknown Light that can not be sorted and used for drawing");
+	}
+}
 
 auto create_pipelines(Render::Context::Impl* context,
 					  Presenter::Impl* presenter,
@@ -52,7 +70,8 @@ auto create_pipelines(Render::Context::Impl* context,
 	-> Pipelines
 {
 	Pipelines pipelines;
-	pipelines.basetexture = create_base_texture_pipeline(context,
+	pipelines.basetexture = create_base_texture_pipeline(context->logger,
+														 context,
 														 presenter,
 														 descriptor_pool,
 														 renderpass,
@@ -60,20 +79,28 @@ auto create_pipelines(Render::Context::Impl* context,
 														 render_extent,
 														 shader_root_path,
 														 debug_print);
+	context->logger.info(std::source_location::current(),
+						 "Created BaseTexture Pipeline");
 
-	pipelines.normcolor = create_norm_render_pipeline(context->physical_device,
+	pipelines.normcolor = create_norm_render_pipeline(context->logger,
+													  context->physical_device,
 													  context->device.get(),
 													  renderpass,
 													  presenter->max_frames_in_flight,
 													  render_extent,
 													  shader_root_path,
 													  debug_print);
+	context->logger.info(std::source_location::current(),
+						 "Created NormColor Pipeline");
 
-	pipelines.wireframe = create_wireframe_render_pipeline(context->device.get(),
+	pipelines.wireframe = create_wireframe_render_pipeline(context->logger,
+														   context->device.get(),
 														   renderpass,
 														   render_extent,
 														   shader_root_path,
 														   debug_print);
+	context->logger.info(std::source_location::current(),
+						 "Created Wireframe Pipeline");
 	
 	return pipelines;
 }
@@ -154,8 +181,8 @@ auto create_geometry_pass(Render::Context::Impl* context,
 		.setSubpasses(subpass);
 
     pass.renderpass = context->device.get().createRenderPassUnique(renderPassCreateInfo);
-	if (debug_print)
-		std::cout << "> GeometryPass > created Render Pass!" << std::endl;
+	context->logger.info(std::source_location::current(),
+						 "Created Render Pass!");
 	
 	for (size_t i = 0; i < frames_in_flight; i++) {
 		/* Setup the rendertarget for the render pass
@@ -221,8 +248,8 @@ auto create_geometry_pass(Render::Context::Impl* context,
 					   .createFramebufferUnique(framebufferCreateInfo));
 	}
 
-	if (debug_print)
-		std::cout << "> GeometryPass > Created FramePasses" << std::endl;
+	context->logger.info(std::source_location::current(),
+						 "Created FramePasses!");
 
 	return pass;
 }
@@ -231,6 +258,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  Pipelines* pipelines,
+						  Logger* logger,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
 						  const uint64_t total_frames,
@@ -283,7 +311,7 @@ auto render_geometry_pass(GeometryPass& pass,
 		commandbuffer.setScissor(scissor_start, scissors);
 		
 		SortedRenderables sorted{};
-		auto sort = std::bind_front(sort_renderable, &sorted);
+		auto sort = std::bind_front(sort_renderable, logger, &sorted);
 		std::ranges::for_each(renderables, sort);
 	
 		NormColorRenderInfo normcolor_info{};
@@ -309,6 +337,7 @@ auto render_geometry_pass(GeometryPass& pass,
 		texture_info.view = world_info.view;
 		texture_info.proj = world_info.projection;
 		draw_base_texture_renderables(pipelines->basetexture,
+									  *logger,
 									  device,
 									  descriptor_pool,
 									  commandbuffer,
@@ -363,11 +392,13 @@ Renderer::Impl::~Impl()
 auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 							const uint64_t total_frames,
 							const WorldRenderInfo& world_info,
-							std::vector<Renderable>& renderables)
+							std::vector<Renderable>& renderables,
+							std::vector<Light>& lights)
 		-> Texture2D::Impl*
 {
 	return render_geometry_pass(geometry_pass,
 								&pipelines,
+								&logger,
 								current_frame_in_flight,
 								presenter->max_frames_in_flight,
 								total_frames,
@@ -382,13 +413,15 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 auto Renderer::render(const uint32_t current_frame_in_flight,
 					  const uint64_t total_frames,
 					  const WorldRenderInfo& world_info,
-					  std::vector<Renderable>& renderables)
+					  std::vector<Renderable>& renderables,
+					  std::vector<Light>& lights)
 		-> Texture2D::Impl*
 {
 	return impl->render(current_frame_in_flight,
 						total_frames,
 						world_info,
-						renderables);
+						renderables,
+						lights);
 }
 
 Renderer::Renderer(Render::Context& context,

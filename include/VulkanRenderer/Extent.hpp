@@ -12,11 +12,22 @@ struct Extent
 	
 	constexpr Extent() = default;
 	constexpr ~Extent() = default;
-	constexpr Extent(Extent const&) = default;
-	constexpr Extent(Extent&&) = default;
-	constexpr Extent& operator=(Extent const&) = default;
-	constexpr Extent& operator=(Extent&&) = default;
-	
+
+	template <typename U>
+	requires std::convertible_to<U, ValueType>
+	constexpr Extent(Extent<U> rhs)
+	{
+		w = rhs.w;
+		h = rhs.h;
+	}
+
+	template <typename U>
+	requires std::convertible_to<U, ValueType>
+	constexpr Extent<ValueType> operator=(Extent<U> rhs)
+	{
+		w = rhs.w;
+		h = rhs.h;
+	}
 
 	constexpr Extent(ValueType w, ValueType h)
 		: w(w), h(h)

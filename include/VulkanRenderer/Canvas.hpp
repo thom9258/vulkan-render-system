@@ -29,7 +29,6 @@ struct CanvasExtent
 
 using CheckerSquareSize = StrongType<uint32_t, struct CheckerSquareSizeTag>;
 
-
 struct Canvas8bitRGBA
 {
 	Canvas8bitRGBA() = default;
@@ -103,7 +102,6 @@ auto canvas_draw_rectangle(const Pixel8bitRGBA color,
 	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>;
 
 
-#if 0
 [[nodiscard]]
 auto canvas_draw_checkerboard(const Pixel8bitRGBA color,
 							  const CheckerSquareSize size,
@@ -122,5 +120,3 @@ auto canvas_draw_coordinate_system(const CanvasExtent arrow,
 
 auto canvas_draw_coordinate_system(const CanvasExtent arrow)
 	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>;
-
-#endif

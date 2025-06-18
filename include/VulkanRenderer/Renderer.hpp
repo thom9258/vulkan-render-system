@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Renderable.hpp"
+#include "Light.hpp"
 #include "Context.hpp"
 #include "Presenter.hpp"
 #include "DescriptorPool.hpp"
@@ -30,7 +31,8 @@ public:
 	auto render(const uint32_t current_frame_in_flight,
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
-				std::vector<Renderable>& renderables)
+				std::vector<Renderable>& renderables,
+				std::vector<Light>& lights)
 		-> Texture2D::Impl*;
 
 	class Impl;

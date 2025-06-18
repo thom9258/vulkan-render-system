@@ -25,6 +25,7 @@ struct StrongType
 	}
 
 	template <typename U>
+	requires std::convertible_to<U, ValueType>
 	explicit constexpr StrongType(U&& u)
 		: value(std::forward<ValueType>(u))
 	{

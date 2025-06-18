@@ -1,7 +1,10 @@
 #pragma once 
 
-#include <iostream>
 #include <filesystem>
+#include <format>
+
+#include <VulkanRenderer/Context.hpp>
+
 #include "Utils.hpp"
 #include "VertexBufferImpl.hpp"
 #include "VertexImpl.hpp"
@@ -63,7 +66,8 @@ norm_render_pipeline_descriptorset_layout(vk::Device& device)
 }
 
 NormRenderPipeline
-create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
+create_norm_render_pipeline(Logger& logger,
+							vk::PhysicalDevice& physical_device,
 							vk::Device& device,
 							vk::RenderPass& renderpass,
 							const uint32_t frames_in_flight,
@@ -74,25 +78,26 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 	const std::string pipeline_name = "NormColor";
 	const std::filesystem::path vertexshader_name = "NormColor.vert.spv";
 	const std::filesystem::path fragmentshader_name = "NormColor.frag.spv";
-	if (debug_print) {
-		std::cout << "> " << pipeline_name << "\n"
-				  << "  -> vertexshader   " << vertexshader_name << "\n"
-				  << "  -> fragmentshader " << fragmentshader_name
-				  << std::endl;
-	}
 
-	if (debug_print) {
-		std::cout << "> norm render pipeline -> vertexshader   " << vertexshader_name << "\n"
-				  << "                       -> fragmentshader " << fragmentshader_name
-				  << std::endl;
-	}
+	logger.info(std::source_location::current(),
+				std::format("Creating Pipeline {}",
+							pipeline_name));
+	logger.info(std::source_location::current(),
+				std::format("Vertex Shader {}",
+							vertexshader_name.string()));
+	logger.info(std::source_location::current(),
+				std::format("Fragment Shader {}",
+							fragmentshader_name.string()));
 
 	NormRenderPipeline pipeline;
 
 	const auto vert =
 		read_binary_file((shader_root_path / vertexshader_name).string().c_str());
-	if (!vert)
-		throw std::runtime_error("COULD NOT LOAD VERTEX SHADER BINARY");
+	if (!vert) {
+		const auto msg = "COULD NOT LOAD VERTEX SHADER BINARY";
+		logger.fatal(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
 	
 	auto vertexShaderModuleCreateInfo = vk::ShaderModuleCreateInfo{}
 		.setFlags(vk::ShaderModuleCreateFlags())
@@ -103,9 +108,12 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 	
 	const auto frag =
 		read_binary_file((shader_root_path / fragmentshader_name).string().c_str());
-	if (!frag)
-		throw std::runtime_error("COULD NOT LOAD FRAGMENT SHADER BINARY");
-	
+	if (!frag) {
+		const auto msg = "COULD NOT LOAD FRAGMENT SHADER BINARY";
+		logger.fatal(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
+
 	auto fragmentShaderModuleCreateInfo = vk::ShaderModuleCreateInfo{}
 		.setFlags(vk::ShaderModuleCreateFlags())
 		.setCode(*frag);
@@ -126,9 +134,6 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 		.setModule(*fragment_module)
 		.setPName("main"),
 	};
-
-	if (debug_print)
-		std::cout << "> Created shaders" << std::endl;
 
     std::array<vk::DynamicState, 2> dynamicStates{
 		vk::DynamicState::eViewport,
@@ -216,15 +221,12 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 		.setSize(sizeof(NormRenderPipeline::PushConstants))
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex);
 	
-	if (debug_print)
-		std::cout << "> PushConstant size: " << sizeof(NormRenderPipeline::PushConstants) 
-				  << std::endl;
-
 	if (sizeof(NormRenderPipeline::PushConstants) > 128) {
-		std::cout << "> WARNING: PushConstant size is larger than minimum supported!"
-				  << std::endl;
+		logger.warn(std::source_location::current(), 
+					std::format("PushConstant size={} is larger than minimum supported (128)"
+								"This can cause compatability issues on some devices",
+								sizeof(NormRenderPipeline::PushConstants)));
 	}
-	
 
 	pipeline.descriptor_layout = norm_render_pipeline_descriptorset_layout(device);
 	
@@ -236,8 +238,7 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 	pipeline.layout = 
 		device.createPipelineLayoutUnique(pipelineLayoutCreateInfo);
 	
-	if (debug_print)
-		std::cout << "> Created Pipeline Layout" << std::endl;
+	logger.info(std::source_location::current(), "Created Pipeline Layout");
 	
 	auto depth_stencil_state_info = vk::PipelineDepthStencilStateCreateInfo{}
 		.setDepthTestEnable(true)
@@ -271,14 +272,16 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 	case vk::Result::eSuccess:
 		break;
 	case vk::Result::ePipelineCompileRequiredEXT:
-		throw std::runtime_error("Creating pipeline error: PipelineCompileRequiredEXT");
+		logger.error(std::source_location::current(),
+					 "Creating pipeline error: PipelineCompileRequiredEXT");
 	default: 
-		throw std::runtime_error("Invalid Result state");
+		logger.error(std::source_location::current(),
+					 "Creating pipeline error: Unknown invalid Result state");
     }
 	
 	pipeline.pipeline = std::move(result.value);
-	if (debug_print)
-		std::cout << "> created Norm Graphics Pipeline!" << std::endl;
+	logger.info(std::source_location::current(),
+				"Created Pipeline");
 	
 	std::array<vk::DescriptorPoolSize, 1> sizes {
 		vk::DescriptorPoolSize{}
@@ -292,8 +295,8 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 		.setPoolSizes(sizes);
 	
 	pipeline.descriptor_pool = device.createDescriptorPoolUnique(pool_info, nullptr);
-	if (debug_print)
-		std::cout << "> allocated descriptor pool!" << std::endl;
+	logger.info(std::source_location::current(),
+				"Created Descriptor Pool");
 	
 	for (uint32_t i = 0; i < frames_in_flight; i++) {
 		pipeline.descriptor_memories
@@ -313,10 +316,11 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 			.setSetLayouts(pipeline.descriptor_layout.get());
 		
 		auto sets = device.allocateDescriptorSetsUnique(allocate_info);
-		if (sets.size() != 1)
-			std::cout << "> WARNING: this system only allows handling 1 set per frame in flight"
-					  << "\n if you want more sets find another way to store them.."
-					  << std::endl;
+		if (sets.size() != 1) {
+			logger.error(std::source_location::current(),
+						 "This system only allows handling 1 set per frame in flight"
+						 "\n if you want more sets find another way to store them..");
+		}
 		
 		pipeline.descriptor_sets.push_back(std::move(sets[0]));
 
@@ -341,11 +345,11 @@ create_norm_render_pipeline(vk::PhysicalDevice& physical_device,
 									copy_count,
 									nullptr);
 	}
-	std::cout << std::format("> allocated {} descriptor sets for {} frames in flight",
-							 pipeline.descriptor_sets.size(),
-							 frames_in_flight) 
-			  << std::endl;
 
+	logger.info(std::source_location::current(),
+				std::format("Allocated {} descriptor sets for {} frames in flight",
+							 pipeline.descriptor_sets.size(),
+							 frames_in_flight));
 	return pipeline;
 }
 

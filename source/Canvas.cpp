@@ -112,14 +112,7 @@ auto canvas_draw_rectangle(const Pixel8bitRGBA color,
 						   Canvas8bitRGBA&& canvas)
 	-> Canvas8bitRGBA
 {
-	for (uint32_t dw = 0; dw < extent.width; dw++) {
-		for (uint32_t dh = 0; dh < extent.height; dh++) {
-			auto accessor = canvas.at(offset.x + dw, offset.y + dh);
-			if (accessor.has_value()) 
-				accessor.value().get() = color;
-		}
-	}
-	
+	canvas.draw_rectangle(color, offset, extent);
 	return canvas;
 }
 
@@ -133,7 +126,7 @@ auto canvas_draw_rectangle(const Pixel8bitRGBA color,
 		return canvas_draw_rectangle(color,
 									 offset,
 									 extent,
-									 std::forward<Canvas8bitRGBA>(canvas));
+									 std::move(canvas));
 	};
 }
 
@@ -155,6 +148,27 @@ auto Canvas8bitRGBA::draw_checkerboard(const Pixel8bitRGBA color,
 	return *this;
 }
 
+[[nodiscard]]
+auto canvas_draw_checkerboard(const Pixel8bitRGBA color,
+							  const CheckerSquareSize size,
+							  Canvas8bitRGBA&& canvas)
+	-> Canvas8bitRGBA
+{
+	canvas.draw_checkerboard(color, size);
+	return canvas;
+}
+
+auto canvas_draw_checkerboard(const Pixel8bitRGBA color,
+							  const CheckerSquareSize size)
+	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>
+{
+	return [=] (Canvas8bitRGBA&& canvas)
+	{
+		return canvas_draw_checkerboard(color,
+										size,
+										std::move(canvas));
+	};
+}
 
 auto Canvas8bitRGBA::draw_coordinate_system(const CanvasExtent arrow)
 	-> Canvas8bitRGBA&
@@ -185,4 +199,25 @@ auto Canvas8bitRGBA::draw_coordinate_system(const CanvasExtent arrow)
 				   CanvasExtent{arrow.width, arrow.width});
 
 	return *this;
+}
+
+[[nodiscard]]
+auto canvas_draw_coordinate_system(const CanvasExtent arrow_size,
+								   Canvas8bitRGBA&& canvas)
+	-> Canvas8bitRGBA
+{
+	canvas.draw_coordinate_system(arrow_size);
+	return canvas;
+}
+
+
+auto canvas_draw_coordinate_system(const CanvasExtent arrow_size)
+	-> std::function<Canvas8bitRGBA(Canvas8bitRGBA&&)>
+{
+	return [=] (Canvas8bitRGBA&& canvas)
+	{
+		return canvas_draw_coordinate_system(arrow_size,
+											 std::move(canvas));
+	};
+
 }

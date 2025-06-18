@@ -10,7 +10,9 @@
 
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/Presenter.hpp>
-#include <VulkanRenderer/GeometryPass.hpp>
+#include <VulkanRenderer/Renderable.hpp>
+#include <VulkanRenderer/Light.hpp>
+#include <VulkanRenderer/Renderer.hpp>
 #include <VulkanRenderer/DescriptorPool.hpp>
 #include <VulkanRenderer/Vertex.hpp>
 #include <VulkanRenderer/Bitmap.hpp>
@@ -49,9 +51,6 @@ auto textured_cube_vertices()
 							  texcoords.data());
 	if (status != SG_OK_RETURNED_BUFFER)
 		throw std::runtime_error("Could not get vertices");
-	
-
-
 
 	std::vector<VertexPosNormColorUV> vertices(positions.size());
 	for (size_t i = 0; i < vertices.size(); i++) {
@@ -91,7 +90,10 @@ int main()
 	//window_config.size = U32Extent{400, 300};
 
 	Logger logger;
-	logger.log = [] (std::source_location loc, Logger::Type type, std::string msg) {
+	
+	std::fstream logfile;
+	logfile.open("Engine.log", std::ios::out);
+	logger.log = [&] (std::source_location loc, Logger::Type type, std::string msg) {
 		
 		std::string typestr = "?";
 		switch (type) {
@@ -112,11 +114,23 @@ int main()
 		auto filename = std::string_view(loc.file_name());
 		filename.remove_prefix(filename.find_last_of("/") + 1);
 		
-		std::cout << std::format("[{} L{}] ({}) {}\n",
-								 filename,
-								 loc.line(),
-								 typestr,
-								 msg);
+		const auto log = std::format("[{} L{}] ({}) {}\n",
+									 filename,
+									 loc.line(),
+									 typestr,
+									 msg);
+		
+		std::vector const serious_types{
+			Logger::Type::Warn,
+			Logger::Type::Error,
+			Logger::Type::Fatal};
+
+		bool const is_serious = std::ranges::find(serious_types, type) != serious_types.end();
+		if (is_serious) {
+			std::cout << log;
+		}
+		
+		logfile << log;
 	};
 
 	Render::Context context(window_config, logger);
@@ -173,7 +187,6 @@ int main()
 		throw std::runtime_error(std::string("TinyOBJ error: ") +
 								 std::get<MeshLoadError>(loaded_monkey_mesh).msg);
 	}
-	
 	//https://opengameart.org/art-search-advanced?keys=&field_art_type_tid%5B0%5D=10&sort_by=count&sort_order=DESC&page=3
 	std::cout << "loading chest model!" << std::endl;
 	auto loaded_chest = load_obj_with_texcoords(context,
@@ -349,11 +362,22 @@ int main()
 									   glm::radians(frameInfo.total_frame_count * 1.0f),
 									   glm::vec3(-0.7, 0.7, 0));
 				renderables.push_back(d3);
+				
+				std::vector<Light> lights;
+				
+				PointLight pl;
+				pl.position = glm::vec3(1.0f, 0.0f, 1.0f);
+				lights.push_back(pl);
+
+				AreaLight al;
+				al.direction = glm::vec3(-1.0f, 0.0f, -1.0f);
+				lights.push_back(al);
 
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
 												   frameInfo.total_frame_count,
 												   world_info,
-												   renderables);
+												   renderables,
+												   lights);
 			
 				if (textureptr == nullptr)
 					return std::nullopt;

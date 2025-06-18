@@ -1,17 +1,17 @@
 #pragma once
 
 #include "glm.hpp"
-#include "Context.hpp"
 #include "Mesh.hpp"
-#include "Texture.hpp"
 #include "ShaderTexture.hpp"
 
 #include <variant>
+#include <optional>
 
 struct NormColorRenderable
 {
 	Mesh* mesh;
 	glm::mat4 model;
+	std::optional<bool> casts_shadows;
 };
 
 struct WireframeRenderable
@@ -26,6 +26,7 @@ struct BaseTextureRenderable
 	TexturedMesh* mesh;
 	TextureSamplerReadOnly* texture;
 	glm::mat4 model;
+	std::optional<bool> casts_shadows;
 };
 
 using Renderable = std::variant<NormColorRenderable,

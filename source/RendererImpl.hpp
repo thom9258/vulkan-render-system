@@ -2,7 +2,7 @@
 #ifndef _VULKANRENDERERIMPL_RENDERER_IMPL_
 #define _VULKANRENDERERIMPL_RENDERER_IMPL_
 
-#include <VulkanRenderer/GeometryPass.hpp>
+#include <VulkanRenderer/Renderer.hpp>
 #include "NormRenderPipeline.hpp"
 #include "WireframePipeline.hpp"
 #include "BaseTexturePipeline.hpp"
@@ -36,9 +36,20 @@ struct SortedRenderables
 	std::vector<WireframeRenderable> wireframes;
 };
 
-void sort_renderable(SortedRenderables* sorted,
+void sort_renderable(Logger* logger,
+					 SortedRenderables* sorted,
 					 Renderable renderable);
 
+struct SortedLights
+{
+	std::vector<AreaLight> arealights;
+	std::vector<PointLight> pointlights;
+	std::vector<SpotLight> spotlights;
+};
+
+void sort_light(Logger* logger,
+				SortedLights* sorted,
+				Light light);
 
 auto create_pipelines(Render::Context::Impl* context,
 					  Presenter::Impl* presenter,
@@ -56,11 +67,11 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 						  const bool debug_print)
 	-> GeometryPass;
 
-
 auto render_geometry_pass(GeometryPass& pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  Pipelines* pipelines,
+						  Logger* logger,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
 						  const uint64_t total_frames,
@@ -86,7 +97,8 @@ public:
 	auto render(const uint32_t current_frame_in_flight,
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
-				std::vector<Renderable>& renderables)
+				std::vector<Renderable>& renderables,
+				std::vector<Light>& lights)
 		-> Texture2D::Impl*;
 	
 	Logger logger;
