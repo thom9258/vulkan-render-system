@@ -2,44 +2,47 @@
 #include "ContextImpl.hpp"
 
 auto create_shaderstage_infos(vk::Device device,
-							  std::filesystem::path const vertex_path,
-							  std::filesystem::path const fragment_path)
-	noexcept -> std::optional<std::array<vk::PipelineShaderStageCreateInfo, 2>>
+							  VertexPath const vertex_path,
+							  FragmentPath const fragment_path)
+	noexcept -> std::optional<ShaderStageInfos>
 {
-	auto vert = read_binary_file(vertex_path.string().c_str());
+	auto vert = read_binary_file(vertex_path.get().string().c_str());
 	if (!vert)
 		return std::nullopt;
-
+	auto frag = read_binary_file(fragment_path.get().string().c_str());
+	if (!frag)
+		return std::nullopt;
+	
 	auto vertexShaderModuleCreateInfo = vk::ShaderModuleCreateInfo{}
 		.setFlags(vk::ShaderModuleCreateFlags())
 		.setCode(*vert);
 
-	vk::UniqueShaderModule vertex_module =
-		device.createShaderModuleUnique(vertexShaderModuleCreateInfo);
-	
-	auto frag = read_binary_file(fragment_path.string().c_str());
-	if (!frag)
-		return std::nullopt;
-	
 	auto fragmentShaderModuleCreateInfo = vk::ShaderModuleCreateInfo{}
 		.setFlags(vk::ShaderModuleCreateFlags())
 		.setCode(*frag);
 
-	vk::UniqueShaderModule fragment_module =
+	ShaderStageInfos shaderstage;
+
+	shaderstage.modules.vertex =
+		device.createShaderModuleUnique(vertexShaderModuleCreateInfo);
+	
+	shaderstage.modules.fragment =
 		device.createShaderModuleUnique(fragmentShaderModuleCreateInfo);
 	
-	return std::array<vk::PipelineShaderStageCreateInfo, 2>{
+	shaderstage.create_info = std::array<vk::PipelineShaderStageCreateInfo, 2>{
 		vk::PipelineShaderStageCreateInfo{}
 		.setStage(vk::ShaderStageFlagBits::eVertex)
 		.setFlags(vk::PipelineShaderStageCreateFlags())
-		.setModule(*vertex_module)
+		.setModule(*shaderstage.modules.vertex)
 		.setPName("main"),
 		vk::PipelineShaderStageCreateInfo{}
 		.setStage(vk::ShaderStageFlagBits::eFragment)
 		.setFlags(vk::PipelineShaderStageCreateFlags())
-		.setModule(*fragment_module)
+		.setModule(*shaderstage.modules.fragment)
 		.setPName("main")
 	};
+	
+	return shaderstage;
 }
 
 auto create_texture_descriptorset(vk::Device device,
@@ -81,15 +84,17 @@ auto create_texture_descriptorset(vk::Device device,
 	return sets;
 }
 
+
 auto create_texture_descriptorset_layout(vk::Device device,
-										 uint32_t binding_index)
+										 BindingIndex binding_index,
+										 TotalDescriptorCount descriptor_count)
 	-> vk::UniqueDescriptorSetLayout
 {
 	std::array<vk::DescriptorSetLayoutBinding, 1> const binding{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(binding_index)
-		.setDescriptorCount(1)
+		.setBinding(*binding_index)
+		.setDescriptorCount(*descriptor_count)
 		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
 	};
 
@@ -104,7 +109,7 @@ CachedTextureDescriptorBinder::CachedTextureDescriptorBinder(
     vk::Device device,
     vk::UniqueDescriptorSetLayout&& descriptorset_layout,
     vk::DescriptorPool descriptor_pool,
-    size_t frames_in_flight,
+	TotalFramesInFlight total_flight_frames,
     TextureSamplerReadOnly&& default_texture)
 	: m_default{std::move(default_texture)}
 	, m_layout{std::move(descriptorset_layout)}
@@ -112,18 +117,18 @@ CachedTextureDescriptorBinder::CachedTextureDescriptorBinder(
 	m_sets.insert({&m_default, create_texture_descriptorset(device,
 															m_layout.get(),
 															descriptor_pool,
-															frames_in_flight,
+															*total_flight_frames,
 															m_default)});
 }
 	
-void CachedTextureDescriptorBinder::bind_texture_descriptor(vk::Device device,
-							 vk::PipelineLayout pipeline_layout,
-							 uint32_t binding_index,
-							 vk::DescriptorPool descriptor_pool,
-							 size_t frames_in_flight,
-							 vk::CommandBuffer& commandbuffer,
-							 size_t frame_in_flight,
-							 TextureSamplerReadOnly* texture)
+void CachedTextureDescriptorBinder::bind_texture_descriptor(
+    vk::Device device,
+	vk::PipelineLayout pipeline_layout,
+	vk::DescriptorPool descriptor_pool,
+	vk::CommandBuffer& commandbuffer,
+	TotalFramesInFlight total_flight_frames,
+	CurrentFrameInFlight current_flight_frame,
+	TextureSamplerReadOnly* texture)
 {
 	if (!texture) 
 		texture = &m_default;
@@ -135,13 +140,13 @@ void CachedTextureDescriptorBinder::bind_texture_descriptor(vk::Device device,
 		m_sets.insert({texture, create_texture_descriptorset(device,
 															 m_layout.get(),
 															 descriptor_pool,
-															 frames_in_flight,
+															 *total_flight_frames,
 															 *texture)});
 	}
 
 	uint32_t const first_set = 1;
 	std::array<vk::DescriptorSet, 1> descriptorset{
-		m_sets[texture][frame_in_flight].get()
+		m_sets[texture][*current_flight_frame].get()
 	};
 	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 									 pipeline_layout,

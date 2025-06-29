@@ -22,12 +22,14 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 				std::format("  Fragment Shader {}",
 							fragmentshader_name));
 	
-	uint32_t const frames_in_flight = presenter->max_frames_in_flight;
+	auto const frames_in_flight = TotalFramesInFlight{presenter->max_frames_in_flight};
 	vk::Extent2D const render_extent = context->get_window_extent();
-
+	
+	const auto vertex_path = VertexPath{shader_root_path / vertexshader_name};
+	const auto fragment_path = FragmentPath{shader_root_path / fragmentshader_name};
 	auto shaderstage_infos = create_shaderstage_infos(context->device.get(),
-													  shader_root_path / vertexshader_name,
-													  shader_root_path / fragmentshader_name);
+													  vertex_path,
+													  fragment_path);
 
 	if (!shaderstage_infos) {
 		std::string const msg = std::format("{} could not load vertex/fragment sources {} / {}",
@@ -156,7 +158,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	global_binding_init.proj = glm::mat4(1.0f);
 
 	/*Allocate Camera Descriptor Sets*/
-	for (uint32_t i = 0; i < frames_in_flight; i++) {
+	for (uint32_t i = 0; i < *frames_in_flight; i++) {
 		m_globalbinding.buffers
 			.push_back(UniformBuffer<GlobalBinding>(&global_binding_init,
 													logger,
@@ -169,10 +171,13 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	logger.info(std::source_location::current(),
 				"created global descriptor sets");
 
-	uint32_t constexpr diffuse_binding_index = 0;
+	auto constexpr diffuse_binding_index = BindingIndex{0}; 
+	auto constexpr total_descriptor_count = TotalDescriptorCount{1}; 
+	
 	vk::UniqueDescriptorSetLayout diffuse_layout = 
 		create_texture_descriptorset_layout(context->device.get(),
-											diffuse_binding_index);
+											diffuse_binding_index,
+											total_descriptor_count);
 
 	logger.info(std::source_location::current(), "Created diffuse layout");
 
@@ -224,7 +229,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	auto graphicsPipelineCreateInfo = vk::GraphicsPipelineCreateInfo{}
 		.setFlags(vk::PipelineCreateFlags())
-		.setStages(shaderstage_infos.value())
+		.setStages(shaderstage_infos.value().create_info)
 		.setPVertexInputState(&pipelineVertexInputStateCreateInfo)
 		.setPInputAssemblyState(&pipelineInputAssemblyStateCreateInfo)
 		.setPTessellationState(nullptr)

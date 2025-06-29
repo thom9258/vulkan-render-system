@@ -1,9 +1,22 @@
 #pragma once
 
+#include <VulkanRenderer/StrongType.hpp>
+
 #include "ShaderTextureImpl.hpp"
+
 #include <vulkan/vulkan.hpp>
 
 #include <map>
+
+using BindingIndex = StrongType<uint32_t, struct BindingIndexTag>;
+using TotalDescriptorCount = StrongType<uint32_t, struct TotalDescriptorCountTag>;
+using FragmentPath = StrongType<std::filesystem::path, struct FragmentPathTag>;
+using VertexPath = StrongType<std::filesystem::path, struct VertexPathTag>;
+
+
+using TotalFramesInFlight = StrongType<uint32_t, struct TotalFramesInFlightTag>;
+using CurrentFrameInFlight = StrongType<uint32_t, struct CurrentFrameInFlightTag>;
+
 
 auto create_texture_descriptorset(vk::Device device,
 								  vk::DescriptorSetLayout descriptorset_layout,
@@ -12,15 +25,25 @@ auto create_texture_descriptorset(vk::Device device,
 								  TextureSamplerReadOnly& texture)
 	-> std::vector<vk::UniqueDescriptorSet>;
 
+struct ShaderStageInfos
+{
+	struct {
+		vk::UniqueShaderModule vertex;
+		vk::UniqueShaderModule fragment;
+	} modules;
+
+	std::array<vk::PipelineShaderStageCreateInfo, 2> create_info;
+};
 
 auto create_shaderstage_infos(vk::Device device,
-							  std::filesystem::path const vertex_path,
-							  std::filesystem::path const fragment_path)
-	noexcept -> std::optional<std::array<vk::PipelineShaderStageCreateInfo, 2>>;
+							  VertexPath const vertex_path,
+							  FragmentPath const fragment_path)
+	noexcept -> std::optional<ShaderStageInfos>;
 
 
 auto create_texture_descriptorset_layout(vk::Device device,
-										 uint32_t binding_index)
+										 BindingIndex binding_index,
+										 TotalDescriptorCount descriptor_count)
 	-> vk::UniqueDescriptorSetLayout;
 
 
@@ -36,16 +59,15 @@ struct CachedTextureDescriptorBinder
 	CachedTextureDescriptorBinder(vk::Device device,
 								  vk::UniqueDescriptorSetLayout&& descriptorset_layout,
 								  vk::DescriptorPool descriptor_pool,
-								  size_t frames_in_flight,
+								  TotalFramesInFlight total_flight_frames,
 								  TextureSamplerReadOnly&& default_texture);
 
 	void bind_texture_descriptor(vk::Device device,
 								 vk::PipelineLayout pipeline_layout,
-								 uint32_t binding_index,
 								 vk::DescriptorPool descriptor_pool,
-								 size_t frames_in_flight,
 								 vk::CommandBuffer& commandbuffer,
-								 size_t frame_in_flight,
+								 TotalFramesInFlight total_flight_frames,
+								 CurrentFrameInFlight current_flight_frame,
 								 TextureSamplerReadOnly* texture);
 	
 
