@@ -1,6 +1,4 @@
 #pragma once
-#ifndef _VULKANRENDERERIMPL_RENDERER_IMPL_
-#define _VULKANRENDERERIMPL_RENDERER_IMPL_
 
 #include <VulkanRenderer/Renderer.hpp>
 #include "NormRenderPipeline.hpp"
@@ -10,6 +8,8 @@
 #include "PresenterImpl.hpp"
 #include "ContextImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
+
+#include "MaterialPipeline.hpp"
 
 struct GeometryPass
 {
@@ -34,6 +34,7 @@ struct SortedRenderables
 	std::vector<BaseTextureRenderable> basetextures;
 	std::vector<NormColorRenderable> normcolors;
 	std::vector<WireframeRenderable> wireframes;
+	std::vector<MaterialRenderable> materialrenderables;
 };
 
 void sort_renderable(Logger* logger,
@@ -110,6 +111,5 @@ public:
 
 	GeometryPass geometry_pass;
 	Pipelines pipelines;
+	MaterialPipeline material_pipeline;
 };
-
-#endif //_VULKANRENDERERIMPL_RENDERER_IMPL_

@@ -109,8 +109,8 @@ create_base_texture_pipeline(Logger& logger,
 							 bool debug_print) noexcept
 {
 	const std::string pipeline_name = "BaseTexture";
-	const std::filesystem::path vertexshader_name = "Texture.vert.spv";
-	const std::filesystem::path fragmentshader_name = "Texture.frag.spv";
+	const std::filesystem::path vertexshader_name = "Diffuse.vert.spv";
+	const std::filesystem::path fragmentshader_name = "Diffuse.frag.spv";
 	logger.info(std::source_location::current(),
 				std::format("Creating Pipeline {}",
 							pipeline_name));
@@ -249,7 +249,7 @@ create_base_texture_pipeline(Logger& logger,
 	
 	const auto push_constant_range = vk::PushConstantRange{}
 		.setOffset(0)
-		.setSize(sizeof(NormRenderPipeline::PushConstants))
+		.setSize(sizeof(BaseTexturePipeline::PushConstants))
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex);
 	
 	if (sizeof(BaseTexturePipeline::PushConstants) > 128) {
@@ -351,7 +351,7 @@ create_base_texture_pipeline(Logger& logger,
 		pipeline.camera_descriptor.memories
 			.push_back(allocate_memory(context->physical_device,
 									   context->device.get(),
-									   sizeof(NormRenderPipeline::Camera),
+									   sizeof(BaseTexturePipeline::Camera),
 									   vk::BufferUsageFlagBits::eTransferSrc
 									   | vk::BufferUsageFlagBits::eUniformBuffer,
 									   // Host Visible and Coherent allows direct
@@ -376,7 +376,7 @@ create_base_texture_pipeline(Logger& logger,
 		const auto buffer_info = vk::DescriptorBufferInfo{}
 			.setBuffer(pipeline.camera_descriptor.memories[i].buffer.get())
 			.setOffset(0)
-			.setRange(sizeof(NormRenderPipeline::Camera));
+			.setRange(sizeof(BaseTexturePipeline::Camera));
 	
 		const std::array<vk::WriteDescriptorSet, 1> camera_write{
 			vk::WriteDescriptorSet{}
@@ -388,7 +388,7 @@ create_base_texture_pipeline(Logger& logger,
 			.setBufferInfo(buffer_info),
 		};
 		
-		NormRenderPipeline::Camera camera{};	
+		BaseTexturePipeline::Camera camera{};	
 		camera.view = glm::mat4(1.0f);
 		camera.proj = glm::mat4(1.0f);
 		
@@ -461,7 +461,7 @@ void draw_base_texture_renderables(BaseTexturePipeline& pipeline,
 	/* Bind the pipeline and the descriptor sets
 	 */
 		
-	NormRenderPipeline::Camera camera{};	
+	BaseTexturePipeline::Camera camera{};	
 	camera.view = info.view;
 	camera.proj = info.proj;
 	
@@ -518,7 +518,7 @@ void draw_base_texture_renderables(BaseTexturePipeline& pipeline,
 			last_bound_texture = texture;
 		}
 
-		NormRenderPipeline::PushConstants push{};
+		BaseTexturePipeline::PushConstants push{};
 		push.model = renderable.model;
 		const uint32_t push_offset = 0;
 		commandbuffer.pushConstants(pipeline.layout.get(),

@@ -38,6 +38,8 @@ void sort_renderable(Logger* logger,
 		sorted->wireframes.push_back(*p);
 	else if (auto p = std::get_if<BaseTextureRenderable>(&renderable))
 		sorted->basetextures.push_back(*p);
+	else if (auto p = std::get_if<MaterialRenderable>(&renderable))
+		sorted->materialrenderables.push_back(*p);
 	else {
 		logger->warn(std::source_location::current(),
 					 "Found unknown Renderable that can not be sorted and drawn");
@@ -375,6 +377,13 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 										 //TODO: Allow debug print to be set externally
 										 true
 										 );
+	
+	material_pipeline = MaterialPipeline(logger,
+										 context,
+										 presenter,
+										 descriptor_pool,
+										 geometry_pass.renderpass.get(),
+										 shaders_root);
 	
 	pipelines = create_pipelines(context,
 								 presenter,

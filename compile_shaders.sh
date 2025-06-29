@@ -15,4 +15,5 @@ function compile_vert_frag ()
 
 compile_vert_frag "NormColor"
 compile_vert_frag "Wireframe"
-compile_vert_frag "Texture"
+compile_vert_frag "Diffuse"
+compile_vert_frag "Material"

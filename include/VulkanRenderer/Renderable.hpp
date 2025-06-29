@@ -11,7 +11,6 @@ struct NormColorRenderable
 {
 	Mesh* mesh;
 	glm::mat4 model;
-	std::optional<bool> casts_shadows;
 };
 
 struct WireframeRenderable
@@ -26,9 +25,24 @@ struct BaseTextureRenderable
 	TexturedMesh* mesh;
 	TextureSamplerReadOnly* texture;
 	glm::mat4 model;
-	std::optional<bool> casts_shadows;
 };
+
+struct MaterialRenderable
+{
+	TexturedMesh* mesh;
+	struct {
+		TextureSamplerReadOnly* diffuse;
+		TextureSamplerReadOnly* normal;
+		TextureSamplerReadOnly* specular;
+		TextureSamplerReadOnly* shininess;
+	} texture;
+	glm::mat4 model;
+	bool casts_shadow;
+};
+
+
 
 using Renderable = std::variant<NormColorRenderable,
 								WireframeRenderable,
-								BaseTextureRenderable>;
+								BaseTextureRenderable,
+								MaterialRenderable>;

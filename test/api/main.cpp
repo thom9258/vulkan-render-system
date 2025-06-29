@@ -22,9 +22,11 @@
 #define SIMPLE_GEOMETRY_IMPLEMENTATION
 #include <simple_geometry.h>
 
-const std::string root = "../../../";
-const std::string shaders_root = root + "compiled_shaders/";
-const std::string assets_root = root + "assets/";
+std::filesystem::path root = "../../../";
+std::filesystem::path shaders_root = root / "compiled_shaders/";
+std::filesystem::path assets_root = root / "assets/";
+std::filesystem::path models_root = assets_root / "models/";
+std::filesystem::path textures_root = assets_root / "textures/";
 
 auto textured_cube_vertices()
 	-> std::vector<VertexPosNormColorUV> 
@@ -91,8 +93,9 @@ int main()
 
 	Logger logger;
 	
-	std::fstream logfile;
-	logfile.open("Engine.log", std::ios::out);
+	std::ofstream logfile;
+	logfile.open("./Engine.log");
+
 	logger.log = [&] (std::source_location loc, Logger::Type type, std::string msg) {
 		
 		std::string typestr = "?";
@@ -120,7 +123,10 @@ int main()
 									 typestr,
 									 msg);
 		
+		logfile << log;
+		
 		std::vector const serious_types{
+			Logger::Type::Info,
 			Logger::Type::Warn,
 			Logger::Type::Error,
 			Logger::Type::Fatal};
@@ -129,8 +135,6 @@ int main()
 		if (is_serious) {
 			std::cout << log;
 		}
-		
-		logfile << log;
 	};
 
 	Render::Context context(window_config, logger);
@@ -207,7 +211,7 @@ int main()
 	std::cout << "loading chest texture!" << std::endl;
 	TextureSamplerReadOnly chest_texture;
 	auto loaded_chest_texture = 
-		load_bitmap(assets_root + "models/ChestWowStyle/diffuse.tga", 
+		load_bitmap(models_root / "ChestWowStyle/diffuse.tga", 
 					BitmapPixelFormat::RGBA,
 					VerticalFlipOnLoad::Yes);
 
@@ -225,11 +229,51 @@ int main()
 	else if (std::get_if<InvalidNativePixels>(&loaded_chest_texture)) {
 		std::cout << "Texture has invalid native pixels" << std::endl;
 	}
+	
+	std::cout << "loading smg model!" << std::endl;
+	auto loaded_smg = load_obj_with_texcoords(context,
+											  models_root,
+											  "smg/smg.obj");
+	TexturedMesh smg_mesh;
+	if (auto p = std::get_if<TexturedMesh>(&loaded_smg)) {
+		smg_mesh = std::move(*p);
+	}
+	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_smg)) {
+		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
+		smg_mesh = std::move(p->mesh);
+	}
+	else if (auto p = std::get_if<MeshLoadError>(&loaded_smg)) {
+		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
+	}
+
+	std::cout << "loading smg texture!" << std::endl;
+	TextureSamplerReadOnly smg_diffuse;
+	auto loaded_smg_diffuse = 
+		load_bitmap(models_root / "smg/D.tga", 
+					BitmapPixelFormat::RGBA,
+					VerticalFlipOnLoad::Yes);
+
+	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_smg_diffuse)) {
+		smg_diffuse = std::move(*p) 
+			| move_bitmap_to_gpu(&context)
+			| make_shader_readonly(&context, InterpolationType::Linear);
+	}
+	else if (auto p = std::get_if<InvalidPath>(&loaded_smg_diffuse)) {
+		std::cout << "Invalid texture path: " << p->path << std::endl;
+	}
+	else if (auto p = std::get_if<LoadError>(&loaded_smg_diffuse)) {
+		std::cout << "Texture Load Error: " << p->why << std::endl;
+	}
+	else if (std::get_if<InvalidNativePixels>(&loaded_smg_diffuse)) {
+		std::cout << "Texture has invalid native pixels" << std::endl;
+	}
+
+
 
 	std::cout << "loading statue jpg!" << std::endl;
 	TextureSamplerReadOnly statue;
 	auto loaded_statue =
-		load_bitmap(assets_root + "textures/texture.jpg",
+		load_bitmap(textures_root / "texture.jpg",
 					BitmapPixelFormat::RGBA,
 					VerticalFlipOnLoad::No);
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_statue)) {
@@ -249,7 +293,7 @@ int main()
 
 	std::cout << "loading lulu jpg!" << std::endl;
 	TextureSamplerReadOnly lulu;
-	auto loaded_lulu = load_bitmap(assets_root + "textures/lulu.jpg",
+	auto loaded_lulu = load_bitmap(textures_root / "lulu.jpg",
 								   BitmapPixelFormat::RGBA,
 								   VerticalFlipOnLoad::No);
 	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_lulu)) {
@@ -317,7 +361,7 @@ int main()
 			-> std::optional<Texture2D::Impl*>
 			{
 				std::vector<Renderable> renderables{};
-			
+#if 0			
 				BaseTextureRenderable chest{};
 				chest.mesh = &chest_mesh;
 				chest.texture = &chest_texture;
@@ -328,7 +372,7 @@ int main()
 										  glm::radians(frameInfo.total_frame_count * 1.0f),
 										  glm::normalize(glm::vec3(0, 1, 0)));
 				renderables.push_back(chest);
-
+				
 				BaseTextureRenderable t{};
 				t.mesh = &cube_mesh;
 				t.texture = &lulu;
@@ -357,14 +401,39 @@ int main()
 				WireframeRenderable d3{};
 				d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 				d3.mesh = &monkey_mesh;
-				d3.model = glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, -0.5f, 0.0f));
+				d3.model = glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.5f, 0.0f));
 				d3.model = glm::rotate(d3.model,
 									   glm::radians(frameInfo.total_frame_count * 1.0f),
 									   glm::vec3(-0.7, 0.7, 0));
 				renderables.push_back(d3);
+#endif				
 				
+#if 1
+				BaseTextureRenderable smg{};
+				smg.mesh = &smg_mesh;
+				smg.texture = &smg_diffuse;
+				smg.model = glm::mat4(1.0f);
+				smg.model = glm::translate(smg.model, glm::vec3(0.0f, 0.0f, 0.0f));
+				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
+				smg.model = glm::rotate(smg.model,
+										glm::radians(frameInfo.total_frame_count * 1.0f),
+										glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(smg);
+#else
+				MaterialRenderable smg{};
+				smg.mesh = &smg_mesh;
+				smg.casts_shadow = true;
+				smg.texture.diffuse = &smg_diffuse;
+				smg.model = glm::mat4(1.0f);
+				smg.model = glm::translate(smg.model, glm::vec3(0.0f, 0.0f, 0.0f));
+				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
+				smg.model = glm::rotate(smg.model,
+										glm::radians(frameInfo.total_frame_count * 1.0f),
+										glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(smg);
+#endif
+
 				std::vector<Light> lights;
-				
 				PointLight pl;
 				pl.position = glm::vec3(1.0f, 0.0f, 1.0f);
 				lights.push_back(pl);
@@ -407,5 +476,6 @@ int main()
 	}
 	
 	context.wait_until_idle();
+	logfile.close();
 	return 0;
 }
