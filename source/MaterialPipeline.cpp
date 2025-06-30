@@ -1,4 +1,5 @@
 #include "MaterialPipeline.hpp"
+#include "VertexBufferImpl.hpp"
 
 #include <format>
 
@@ -199,7 +200,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 
 	Pixel8bitRGBA const diffuse_blue{0, 0, 170, 255};
 	Pixel8bitRGBA const diffuse_red{170, 0, 0, 255};
-	TextureSamplerReadOnly diffuse = 
+	m_default_textures.diffuse = 
 		create_canvas(diffuse_blue, CanvasExtent{64, 64})
 		| canvas_draw_checkerboard(diffuse_red, CheckerSquareSize{4})
 		| move_canvas_to_gpu(context)
@@ -211,9 +212,40 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 									  std::move(diffuse_layout),
 									  descriptor_pool->descriptor_pool.get(),
 									  frames_in_flight,
-									  std::move(diffuse));
+									  &m_default_textures.diffuse);
 
 	logger.info(std::source_location::current(), "Created diffuse descriptor cache");
+	
+#if 0
+	Pixel8bitRGBA const normal_default(128, 128, 255, 255);
+	TextureSamplerReadOnly normal = 
+		create_canvas(normal_default, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+	m_descriptor_binders.normal =
+		CachedTextureDescriptorBinder(context->device.get(),
+									  m_layout.get(),
+									  2,
+									  descriptor_pool->descriptor_pool.get(),
+									  frames_in_flight,
+									  std::move(normal));
+
+
+	
+	Pixel8bitRGBA const specular_default(128, 128, 128, 255);
+	TextureSamplerReadOnly specular = 
+		create_canvas(specular_default, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+	m_descriptor_binders.specular =
+		CachedTextureDescriptorBinder(context->device.get(),
+									  m_layout.get(),
+									  3,
+									  descriptor_pool->descriptor_pool.get(),
+									  frames_in_flight,
+									  std::move(specular));
+#endif
+
 
 	logger.info(std::source_location::current(),
 				"Created caching texture descriptor binders");
@@ -260,7 +292,6 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	m_pipeline = std::move(result.value);
 
 	logger.info(std::source_location::current(), "Created Pipeline");
-	
 }
 
 
@@ -277,6 +308,7 @@ MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_globalbinding, rhs.m_globalbinding);
+	std::swap(m_default_textures, rhs.m_default_textures);
 	std::swap(m_descriptor_binders, rhs.m_descriptor_binders);
 	return *this;
 }
@@ -286,34 +318,88 @@ MaterialPipeline::~MaterialPipeline()
 
 }
 
-#if 0
-	Pixel8bitRGBA const normal_default(128, 128, 255, 255);
-	TextureSamplerReadOnly normal = 
-		create_canvas(normal_default, CanvasExtent{64, 64})
-		| move_canvas_to_gpu(context)
-		| make_shader_readonly(context, InterpolationType::Point);
-	m_descriptor_binders.normal =
-		CachedTextureDescriptorBinder(context->device.get(),
-									  m_layout.get(),
-									  2,
-									  descriptor_pool->descriptor_pool.get(),
-									  frames_in_flight,
-									  std::move(normal));
 
-
+void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
+							  Logger& logger,
+							  vk::Device& device,
+							  vk::DescriptorPool descriptor_pool,
+							  vk::CommandBuffer& commandbuffer,
+							  CurrentFrameInFlight const current_flightframe,
+							  TotalFramesInFlight const max_frames_in_flight,
+							  std::vector<MaterialRenderable>& renderables)
+{
+	copy_to_allocated_memory(device,
+							 m_globalbinding.buffers[*current_flightframe].m_memory,
+							 reinterpret_cast<void*>(global_binding),
+							 sizeof(GlobalBinding));
 	
-	Pixel8bitRGBA const specular_default(128, 128, 128, 255);
-	TextureSamplerReadOnly specular = 
-		create_canvas(specular_default, CanvasExtent{64, 64})
-		| move_canvas_to_gpu(context)
-		| make_shader_readonly(context, InterpolationType::Point);
-	m_descriptor_binders.specular =
-		CachedTextureDescriptorBinder(context->device.get(),
-									  m_layout.get(),
-									  3,
-									  descriptor_pool->descriptor_pool.get(),
-									  frames_in_flight,
-									  std::move(specular));
-#endif
+	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+							   m_pipeline.get());
+	
+	auto diffuse_init = 
+		m_descriptor_binders.diffuse.get_default_descriptor(current_flightframe);
+	if (!diffuse_init) {
+		logger.error(std::source_location::current(),
+					 "Could not find initializer texture for diffuse");
+		return;
+	}
+		
+	
+	/*Bind GlobalBinding Get Once before rendering*/
+	std::array<vk::DescriptorSet, 2> init_sets{
+		m_globalbinding.buffers[*current_flightframe].m_set.get(),
+		*diffuse_init,
+	};
 
+	const uint32_t first_set = 0;
+	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+									 m_layout.get(),
+									 first_set,
+									 init_sets.size(),
+									 init_sets.data(),
+									 0,
+									 nullptr);
 
+	int i = 0;
+	for (MaterialRenderable& renderable: renderables) {
+
+		m_descriptor_binders.diffuse
+			.bind_texture_descriptor(logger,
+									 device,
+									 m_layout.get(),
+									 descriptor_pool,
+									 commandbuffer,
+									 max_frames_in_flight,
+									 current_flightframe,
+									 renderable.texture.diffuse);
+		
+		PushConstants push{};
+		push.model = renderable.model;
+		push.basecolor = renderable.basecolor;
+		const uint32_t push_offset = 0;
+		commandbuffer.pushConstants(m_layout.get(),
+									vk::ShaderStageFlagBits::eVertex,
+									push_offset,
+									sizeof(push),
+									&push);
+
+		const uint32_t firstBinding = 0;
+		const uint32_t bindingCount = 1;
+		std::array<vk::DeviceSize, bindingCount> offsets = {0};
+		std::array<vk::Buffer, bindingCount> buffers {
+			renderable.mesh->vertexbuffer.impl->buffer.get(),
+		};
+		commandbuffer.bindVertexBuffers(firstBinding,
+										bindingCount,
+										buffers.data(),
+										offsets.data());
+
+		const uint32_t instanceCount = 1;
+		const uint32_t firstVertex = 0;
+		const uint32_t firstInstance = 0;
+		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+						   instanceCount,
+						   firstVertex,
+						   firstInstance);
+	}
+}

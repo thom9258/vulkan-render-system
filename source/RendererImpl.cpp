@@ -260,6 +260,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  Pipelines* pipelines,
+						  MaterialPipeline& material_pipeline,
 						  Logger* logger,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
@@ -348,6 +349,19 @@ auto render_geometry_pass(GeometryPass& pass,
 									  texture_info,
 									  sorted.basetextures);
 
+		
+		MaterialPipeline::GlobalBinding material_global_binding{};
+		material_global_binding.view = world_info.view;
+		material_global_binding.proj = world_info.projection;
+		material_pipeline.render(&material_global_binding,
+								 *logger,
+								 device,
+								 descriptor_pool,
+								 commandbuffer,
+								 CurrentFrameInFlight{current_frame_in_flight},
+								 TotalFramesInFlight{max_frames_in_flight},
+								 sorted.materialrenderables);
+
 		commandbuffer.endRenderPass();
 	};
 
@@ -407,6 +421,7 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 {
 	return render_geometry_pass(geometry_pass,
 								&pipelines,
+								material_pipeline,
 								&logger,
 								current_frame_in_flight,
 								presenter->max_frames_in_flight,

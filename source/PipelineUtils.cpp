@@ -110,43 +110,62 @@ CachedTextureDescriptorBinder::CachedTextureDescriptorBinder(
     vk::UniqueDescriptorSetLayout&& descriptorset_layout,
     vk::DescriptorPool descriptor_pool,
 	TotalFramesInFlight total_flight_frames,
-    TextureSamplerReadOnly&& default_texture)
-	: m_default{std::move(default_texture)}
+    TextureSamplerReadOnly* default_texture)
+	: m_default{default_texture}
 	, m_layout{std::move(descriptorset_layout)}
 {
-	m_sets.insert({&m_default, create_texture_descriptorset(device,
-															m_layout.get(),
-															descriptor_pool,
-															*total_flight_frames,
-															m_default)});
+	if (default_texture)
+		m_sets.insert({m_default, create_texture_descriptorset(device,
+															   m_layout.get(),
+															   descriptor_pool,
+															   *total_flight_frames,
+															   *m_default)});
+}
+
+
+auto CachedTextureDescriptorBinder::get_default_descriptor(CurrentFrameInFlight current_flightframe)
+	noexcept -> std::optional<vk::DescriptorSet>
+{
+	auto found = m_sets.find(m_default);
+	if (found == m_sets.end()) return std::nullopt;
+	
+	//TODO: this is technically a hack, we just happen to know that if we get
+	//      the default texture we are starting a new rendering iteration,
+	//      thus we require a reset of the last bound texture.
+	m_last_bound = m_default;
+	return found->second.at(*current_flightframe).get();
 }
 	
 void CachedTextureDescriptorBinder::bind_texture_descriptor(
+    Logger& logger,
     vk::Device device,
 	vk::PipelineLayout pipeline_layout,
 	vk::DescriptorPool descriptor_pool,
 	vk::CommandBuffer& commandbuffer,
-	TotalFramesInFlight total_flight_frames,
-	CurrentFrameInFlight current_flight_frame,
+	TotalFramesInFlight total_flightframes,
+	CurrentFrameInFlight current_flightframe,
 	TextureSamplerReadOnly* texture)
 {
 	if (!texture) 
-		texture = &m_default;
-
-	if (texture == m_last_bound)
-		return;
+		texture = m_default;
 
 	if (!m_sets.contains(texture)) {
 		m_sets.insert({texture, create_texture_descriptorset(device,
 															 m_layout.get(),
 															 descriptor_pool,
-															 *total_flight_frames,
+															 *total_flightframes,
 															 *texture)});
+
+		logger.info(std::source_location::current(),
+					"Created descriptorset for new texture");
 	}
+	
+	if (texture == m_last_bound)
+		return;
 
 	uint32_t const first_set = 1;
 	std::array<vk::DescriptorSet, 1> descriptorset{
-		m_sets[texture][*current_flight_frame].get()
+		m_sets[texture][*current_flightframe].get()
 	};
 	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 									 pipeline_layout,
@@ -158,23 +177,16 @@ void CachedTextureDescriptorBinder::bind_texture_descriptor(
 	m_last_bound = texture;
 }
 
-
-#if 0
-auto CachedTextureDescriptorBinder::layout()
-	const noexcept -> vk::DescriptorSetLayout
-{
-	return m_layout.get();
-}
-
 void CachedTextureDescriptorBinder::flush_cache(vk::Device device,
 												vk::DescriptorPool descriptor_pool,
-												size_t frames_in_flight);
+												TotalFramesInFlight total_flightframes,
+												TextureSamplerReadOnly* texture)
 {
 	m_sets.clear();
-	m_sets.insert({&base, create_texture_descriptorset(device,
+	m_sets.insert({texture, create_texture_descriptorset(device,
 													   m_layout.get(),
 													   descriptor_pool,
-													   frames_in_flight,
-													   m_base)});
+													   *total_flightframes,
+													   *texture)});
+	m_default = texture;
 }
-#endif

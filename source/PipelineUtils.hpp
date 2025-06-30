@@ -49,7 +49,7 @@ auto create_texture_descriptorset_layout(vk::Device device,
 
 struct CachedTextureDescriptorBinder
 {	
-	TextureSamplerReadOnly m_default;
+	TextureSamplerReadOnly* m_default{nullptr};
 	TextureSamplerReadOnly* m_last_bound{nullptr};
 	vk::UniqueDescriptorSetLayout m_layout;
 	std::map<TextureSamplerReadOnly*, std::vector<vk::UniqueDescriptorSet>> m_sets;
@@ -60,24 +60,24 @@ struct CachedTextureDescriptorBinder
 								  vk::UniqueDescriptorSetLayout&& descriptorset_layout,
 								  vk::DescriptorPool descriptor_pool,
 								  TotalFramesInFlight total_flight_frames,
-								  TextureSamplerReadOnly&& default_texture);
+								  TextureSamplerReadOnly* default_texture);
 
-	void bind_texture_descriptor(vk::Device device,
+	void bind_texture_descriptor(Logger& logger,
+								 vk::Device device,
 								 vk::PipelineLayout pipeline_layout,
 								 vk::DescriptorPool descriptor_pool,
 								 vk::CommandBuffer& commandbuffer,
 								 TotalFramesInFlight total_flight_frames,
 								 CurrentFrameInFlight current_flight_frame,
 								 TextureSamplerReadOnly* texture);
-	
 
-#if 0
-	//auto layout()
-	//const noexcept -> vk::DescriptorSetLayout;
+	auto get_default_descriptor(CurrentFrameInFlight current_flightframe)
+		noexcept -> std::optional<vk::DescriptorSet>;
+	
 	void flush_cache(vk::Device device,
 					 vk::DescriptorPool descriptor_pool,
-					 size_t frames_in_flight);
-#endif					 
+					 TotalFramesInFlight total_flightframes,
+					 TextureSamplerReadOnly* texture);
 };
 
 template<typename Data>

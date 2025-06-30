@@ -460,7 +460,6 @@ void draw_base_texture_renderables(BaseTexturePipeline& pipeline,
 	
 	/* Bind the pipeline and the descriptor sets
 	 */
-		
 	BaseTexturePipeline::Camera camera{};	
 	camera.view = info.view;
 	camera.proj = info.proj;

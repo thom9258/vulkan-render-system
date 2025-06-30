@@ -30,6 +30,7 @@ struct BaseTextureRenderable
 struct MaterialRenderable
 {
 	TexturedMesh* mesh;
+	glm::vec4 basecolor;
 	struct {
 		TextureSamplerReadOnly* diffuse;
 		TextureSamplerReadOnly* normal;

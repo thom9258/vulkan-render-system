@@ -361,7 +361,7 @@ int main()
 			-> std::optional<Texture2D::Impl*>
 			{
 				std::vector<Renderable> renderables{};
-#if 0			
+#if 1
 				BaseTextureRenderable chest{};
 				chest.mesh = &chest_mesh;
 				chest.texture = &chest_texture;
@@ -408,20 +408,9 @@ int main()
 				renderables.push_back(d3);
 #endif				
 				
-#if 1
-				BaseTextureRenderable smg{};
-				smg.mesh = &smg_mesh;
-				smg.texture = &smg_diffuse;
-				smg.model = glm::mat4(1.0f);
-				smg.model = glm::translate(smg.model, glm::vec3(0.0f, 0.0f, 0.0f));
-				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
-				smg.model = glm::rotate(smg.model,
-										glm::radians(frameInfo.total_frame_count * 1.0f),
-										glm::normalize(glm::vec3(0, 1, 0)));
-				renderables.push_back(smg);
-#else
 				MaterialRenderable smg{};
 				smg.mesh = &smg_mesh;
+				smg.basecolor = glm::vec4(1.0f);
 				smg.casts_shadow = true;
 				smg.texture.diffuse = &smg_diffuse;
 				smg.model = glm::mat4(1.0f);
@@ -431,7 +420,21 @@ int main()
 										glm::radians(frameInfo.total_frame_count * 1.0f),
 										glm::normalize(glm::vec3(0, 1, 0)));
 				renderables.push_back(smg);
-#endif
+				
+				MaterialRenderable smg2{};
+				smg2.mesh = &smg_mesh;
+				smg2.basecolor = glm::vec4(1.0f);
+				smg2.casts_shadow = true;
+				smg2.texture.diffuse = &smg_diffuse;
+				smg2.model = glm::mat4(1.0f);
+				smg2.model = glm::translate(smg2.model, glm::vec3(2.0f, 0.0f, 0.0f));
+				smg2.model = glm::scale(smg2.model, glm::vec3(0.4f));
+				smg2.model = glm::rotate(smg2.model,
+										glm::radians(frameInfo.total_frame_count * 1.0f),
+										glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(smg2);
+
+
 
 				std::vector<Light> lights;
 				PointLight pl;

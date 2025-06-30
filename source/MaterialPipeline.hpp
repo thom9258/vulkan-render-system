@@ -2,6 +2,8 @@
 
 #include <filesystem>
 
+#include <VulkanRenderer/Renderable.hpp>
+
 #include "VertexImpl.hpp"
 #include "VertexBuffer.hpp"
 #include "Mesh.hpp"
@@ -34,19 +36,6 @@ struct MaterialPipeline
 
 	~MaterialPipeline();
 	
-
-	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
-	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
-	
-private:
-	struct PushConstants {
-		glm::mat4 model;
-		glm::vec4 basecolor;
-	};
-	
-	vk::UniquePipelineLayout m_layout;
-    vk::UniquePipeline m_pipeline;
-
 	/* The Camera descriptor loads persistent perspective
 	 * data, and should happen as a single descriptor load
 	 * every frame.
@@ -57,13 +46,39 @@ private:
 		glm::mat4 proj;
 	};
 	
+	void render(GlobalBinding* global_binding,
+				Logger& logger,
+				vk::Device& device,
+				vk::DescriptorPool descriptor_pool,
+				vk::CommandBuffer& commandbuffer,
+				CurrentFrameInFlight const current_flightframe,
+				TotalFramesInFlight const max_frames_in_flight,
+				std::vector<MaterialRenderable>& renderables);
+
+	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
+	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
+	
+
+private:
+	struct PushConstants {
+		glm::mat4 model;
+		glm::vec4 basecolor;
+	};
+	
+	vk::UniquePipelineLayout m_layout;
+    vk::UniquePipeline m_pipeline;
+
 	struct {
 		vk::UniqueDescriptorSetLayout layout;
 		std::vector<UniformBuffer<GlobalBinding>> buffers;
 	} m_globalbinding;
 	
+	struct {
+		TextureSamplerReadOnly diffuse;
+	} m_default_textures;
 	
 	struct {
+
 		CachedTextureDescriptorBinder diffuse;
 		CachedTextureDescriptorBinder normal;
 		CachedTextureDescriptorBinder specular;
