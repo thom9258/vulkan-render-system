@@ -209,27 +209,15 @@ int main()
 	}
 
 	std::cout << "loading chest texture!" << std::endl;
-	TextureSamplerReadOnly chest_texture;
-	auto loaded_chest_texture = 
+	TextureSamplerReadOnly chest_texture =
 		load_bitmap(models_root / "ChestWowStyle/diffuse.tga", 
 					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes);
+					VerticalFlipOnLoad::Yes)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Linear);
 
-	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_chest_texture)) {
-		chest_texture = std::move(*p) 
-			| move_bitmap_to_gpu(&context)
-			| make_shader_readonly(&context, InterpolationType::Linear);
-	}
-	else if (auto p = std::get_if<InvalidPath>(&loaded_chest_texture)) {
-		std::cout << "Invalid texture path: " << p->path << std::endl;
-	}
-	else if (auto p = std::get_if<LoadError>(&loaded_chest_texture)) {
-		std::cout << "Texture Load Error: " << p->why << std::endl;
-	}
-	else if (std::get_if<InvalidNativePixels>(&loaded_chest_texture)) {
-		std::cout << "Texture has invalid native pixels" << std::endl;
-	}
-	
 	std::cout << "loading smg model!" << std::endl;
 	auto loaded_smg = load_obj_with_texcoords(context,
 											  models_root,
@@ -247,69 +235,35 @@ int main()
 	}
 
 	std::cout << "loading smg texture!" << std::endl;
-	TextureSamplerReadOnly smg_diffuse;
-	auto loaded_smg_diffuse = 
+
+	TextureSamplerReadOnly smg_diffuse =
 		load_bitmap(models_root / "smg/D.tga", 
 					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes);
-
-	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_smg_diffuse)) {
-		smg_diffuse = std::move(*p) 
-			| move_bitmap_to_gpu(&context)
-			| make_shader_readonly(&context, InterpolationType::Linear);
-	}
-	else if (auto p = std::get_if<InvalidPath>(&loaded_smg_diffuse)) {
-		std::cout << "Invalid texture path: " << p->path << std::endl;
-	}
-	else if (auto p = std::get_if<LoadError>(&loaded_smg_diffuse)) {
-		std::cout << "Texture Load Error: " << p->why << std::endl;
-	}
-	else if (std::get_if<InvalidNativePixels>(&loaded_smg_diffuse)) {
-		std::cout << "Texture has invalid native pixels" << std::endl;
-	}
-
-
+					VerticalFlipOnLoad::Yes)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Point);
 
 	std::cout << "loading statue jpg!" << std::endl;
-	TextureSamplerReadOnly statue;
-	auto loaded_statue =
+	TextureSamplerReadOnly statue = 
 		load_bitmap(textures_root / "texture.jpg",
 					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::No);
-	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_statue)) {
-		statue = std::move(*p) 
-			| move_bitmap_to_gpu(&context)
-			| make_shader_readonly(&context, InterpolationType::Point);
-	}
-	else if (auto p = std::get_if<InvalidPath>(&loaded_statue)) {
-		std::cout << "Invalid texture path: " << p->path << std::endl;
-	}
-	else if (auto p = std::get_if<LoadError>(&loaded_statue)) {
-		std::cout << "Texture Load Error: " << p->why << std::endl;
-	}
-	else if (std::get_if<InvalidNativePixels>(&loaded_statue)) {
-		std::cout << "Texture has invalid native pixels" << std::endl;
-	}
-
+					VerticalFlipOnLoad::No)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Point);
+	
 	std::cout << "loading lulu jpg!" << std::endl;
-	TextureSamplerReadOnly lulu;
-	auto loaded_lulu = load_bitmap(textures_root / "lulu.jpg",
-								   BitmapPixelFormat::RGBA,
-								   VerticalFlipOnLoad::No);
-	if (auto p = std::get_if<LoadedBitmap2D>(&loaded_lulu)) {
-		lulu = std::move(*p) 
-			| move_bitmap_to_gpu(&context)
-			| make_shader_readonly(&context, InterpolationType::Linear);
-	}
-	else if (auto p = std::get_if<InvalidPath>(&loaded_lulu)) {
-		std::cout << "Invalid texture path: " << p->path << std::endl;
-	}
-	else if (auto p = std::get_if<LoadError>(&loaded_lulu)) {
-		std::cout << "Texture Load Error: " << p->why << std::endl;
-	}
-	else if (std::get_if<InvalidNativePixels>(&loaded_lulu)) {
-		std::cout << "Texture has invalid native pixels" << std::endl;
-	}
+	TextureSamplerReadOnly lulu = 
+		load_bitmap(textures_root / "lulu.jpg",
+					BitmapPixelFormat::RGBA,
+					VerticalFlipOnLoad::No)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Linear);
 
 	std::cout << "STARTING DRAW LOOP" << std::endl;
 	/** ************************************************************************
@@ -361,7 +315,7 @@ int main()
 			-> std::optional<Texture2D::Impl*>
 			{
 				std::vector<Renderable> renderables{};
-#if 1
+#if 0
 				BaseTextureRenderable chest{};
 				chest.mesh = &chest_mesh;
 				chest.texture = &chest_texture;
@@ -414,27 +368,23 @@ int main()
 				smg.casts_shadow = true;
 				smg.texture.diffuse = &smg_diffuse;
 				smg.model = glm::mat4(1.0f);
-				smg.model = glm::translate(smg.model, glm::vec3(0.0f, 0.0f, 0.0f));
+				smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
 				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
 				smg.model = glm::rotate(smg.model,
 										glm::radians(frameInfo.total_frame_count * 1.0f),
 										glm::normalize(glm::vec3(0, 1, 0)));
 				renderables.push_back(smg);
-				
-				MaterialRenderable smg2{};
-				smg2.mesh = &smg_mesh;
-				smg2.basecolor = glm::vec4(1.0f);
-				smg2.casts_shadow = true;
-				smg2.texture.diffuse = &smg_diffuse;
-				smg2.model = glm::mat4(1.0f);
-				smg2.model = glm::translate(smg2.model, glm::vec3(2.0f, 0.0f, 0.0f));
-				smg2.model = glm::scale(smg2.model, glm::vec3(0.4f));
-				smg2.model = glm::rotate(smg2.model,
-										glm::radians(frameInfo.total_frame_count * 1.0f),
-										glm::normalize(glm::vec3(0, 1, 0)));
-				renderables.push_back(smg2);
 
-
+				BaseTextureRenderable basesmg{};
+				basesmg.mesh = &smg_mesh;
+				basesmg.texture = &smg_diffuse;
+				basesmg.model = glm::mat4(1.0f);
+				basesmg.model = glm::translate(basesmg.model, glm::vec3(1.5f, 0.0f, 0.0f));
+				basesmg.model = glm::scale(basesmg.model, glm::vec3(0.4f));
+				basesmg.model = glm::rotate(basesmg.model,
+											glm::radians(frameInfo.total_frame_count * 1.0f),
+											glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(basesmg);
 
 				std::vector<Light> lights;
 				PointLight pl;

@@ -2,6 +2,8 @@
 
 #include "stb_image.h"
 
+#include <VulkanRenderer/Exception.hpp>
+
 #include <filesystem>
 #include <functional>
 #include <variant>
@@ -35,28 +37,26 @@ decltype(auto) operator|(LoadedBitmap2D&& bitmap, F&& f)
 	return std::invoke(std::forward<F>(f), std::move(bitmap));
 }
 
-struct InvalidPath
+struct BitmapLoadError : public Exception
 {
-	std::filesystem::path path;
+	BitmapLoadError(const char* what) : Exception(what) {}
 };
 
-struct LoadError
+struct BitmapInvalidNativePixels : public Exception
 {
-	const char* why{nullptr};
+	BitmapInvalidNativePixels() : Exception("Invalid Native Pixels") {}
 };
-
-struct InvalidNativePixels
-{
-};
-
-using LoadBitmapError = std::variant<InvalidPath,
-									 InvalidNativePixels,
-									 LoadError>;
 
 using LoadBitmapResult = std::variant<LoadedBitmap2D,
 									  InvalidPath,
-									  InvalidNativePixels,
-									  LoadError>;
+									  BitmapInvalidNativePixels,
+									  BitmapLoadError>;
+
+template <typename F>
+decltype(auto) operator|(LoadBitmapResult&& result, F&& f)
+{
+	return std::invoke(std::forward<F>(f), std::move(result));
+}
 
 enum class VerticalFlipOnLoad
 {
@@ -73,6 +73,8 @@ auto load_bitmap(const std::filesystem::path path,
 auto get_pixels(LoadedBitmap2D const& bitmap)
 	-> uint8_t*;
 
+auto throw_on_bitmap_error()
+	-> std::function<LoadBitmapResult(LoadBitmapResult&& result)>;
 
-auto get_bitmap_or_throw(LoadBitmapResult&& result)
-	-> LoadedBitmap2D;
+auto get_bitmap()
+	-> std::function<LoadedBitmap2D(LoadBitmapResult&& result)>;

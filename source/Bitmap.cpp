@@ -64,7 +64,7 @@ auto load_bitmap(const std::filesystem::path path,
 							  BitmapPixelFormatToSTBIFormat(format));
 	
     if (!bitmap.pixels)
-		return LoadError{stbi_failure_reason()};
+		return BitmapLoadError{stbi_failure_reason()};
 
 	return bitmap;
 }
@@ -76,20 +76,30 @@ auto get_pixels(LoadedBitmap2D const& bitmap)
 	return bitmap.pixels;
 }
 
-auto get_bitmap_or_throw(LoadBitmapResult&& result)
-	-> LoadedBitmap2D
+auto throw_on_bitmap_error()
+	-> std::function<LoadBitmapResult(LoadBitmapResult&& result)>
 {
-	if (std::holds_alternative<LoadedBitmap2D>(result))
+	return [] (LoadBitmapResult&& result) 
+		-> LoadBitmapResult
+	{
+		if (std::holds_alternative<LoadedBitmap2D>(result))
+			return std::move(result);
+		if (auto p = std::get_if<InvalidPath>(&result))
+			throw *p;
+		if (auto p = std::get_if<BitmapInvalidNativePixels>(&result))
+			throw *p;
+		if (auto p = std::get_if<BitmapLoadError>(&result))
+			throw *p;
+		throw Exception("Unknown variant in LoadBitmapResult");
+	};
+}
+
+auto get_bitmap()
+	-> std::function<LoadedBitmap2D(LoadBitmapResult&& result)>
+{
+	return [] (LoadBitmapResult&& result)
+		-> LoadedBitmap2D
+	{
 		return std::move(std::get<LoadedBitmap2D>(result));
-
-	if (std::holds_alternative<InvalidPath>(result))
-		throw LoadBitmapError{std::get<InvalidPath>(result)};
-
-	if (std::holds_alternative<InvalidNativePixels>(result))
-		throw LoadBitmapError{std::get<InvalidNativePixels>(result)};
-
-	if (std::holds_alternative<LoadError>(result))
-		throw LoadBitmapError{std::get<LoadError>(result)};
-	
-	throw std::runtime_error("");
+	};
 }
