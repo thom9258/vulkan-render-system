@@ -153,40 +153,59 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 															  nullptr);
 	
 	logger.info(std::source_location::current(), "Created globalbindings layout");
+
+	auto constexpr total_descriptor_count = TotalDescriptorCount{3};
 	
-	GlobalBinding global_binding_init{};	
-	global_binding_init.view = glm::mat4(1.0f);
-	global_binding_init.proj = glm::mat4(1.0f);
-
-	/*Allocate Camera Descriptor Sets*/
-	for (uint32_t i = 0; i < *frames_in_flight; i++) {
-		m_globalbinding.buffers
-			.push_back(UniformBuffer<GlobalBinding>(&global_binding_init,
-													logger,
-													context->physical_device,
-													context->device.get(),
-													descriptor_pool->descriptor_pool.get(),
-													m_globalbinding.layout.get()));
-	}
-
-	logger.info(std::source_location::current(),
-				"created global descriptor sets");
-
-	auto constexpr diffuse_binding_index = BindingIndex{0}; 
-	auto constexpr total_descriptor_count = TotalDescriptorCount{1}; 
-	
+#ifdef USE_TEXTURE_CACHER_OBJ
 	vk::UniqueDescriptorSetLayout diffuse_layout = 
 		create_texture_descriptorset_layout(context->device.get(),
-											diffuse_binding_index,
+											BindingIndex{0},
 											total_descriptor_count);
 
-	logger.info(std::source_location::current(), "Created diffuse layout");
+	vk::UniqueDescriptorSetLayout normal_layout = 
+		create_texture_descriptorset_layout(context->device.get(),
+											BindingIndex{0},
+											total_descriptor_count);
 
-	std::array<vk::DescriptorSetLayout, 2> const descriptorset_layouts{
+	vk::UniqueDescriptorSetLayout specular_layout = 
+		create_texture_descriptorset_layout(context->device.get(),
+											BindingIndex{0},
+											total_descriptor_count);
+#else
+	m_diffuse.layout = 
+		create_texture_descriptorset_layout(context->device.get(),
+											BindingIndex{0},
+											total_descriptor_count);
+
+	m_normal.layout = 
+		create_texture_descriptorset_layout(context->device.get(),
+											BindingIndex{0},
+											total_descriptor_count);
+
+	m_specular.layout = 
+		create_texture_descriptorset_layout(context->device.get(),
+											BindingIndex{0},
+											total_descriptor_count);
+#endif
+	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
+
+#ifdef USE_TEXTURE_CACHER_OBJ
+	std::array<vk::DescriptorSetLayout, 4> const descriptorset_layouts{
 		m_globalbinding.layout.get(),
 		diffuse_layout.get(),
+		normal_layout.get(),
+		specular_layout.get(),
 	};
-	
+#else	
+	std::array<vk::DescriptorSetLayout, 4> const descriptorset_layouts{
+		m_globalbinding.layout.get(),
+		m_diffuse.layout.get(),
+		m_normal.layout.get(),
+		m_specular.layout.get(),
+	};
+
+#endif	
+
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
 		.setFlags(vk::PipelineLayoutCreateFlags())
 		.setSetLayouts(descriptorset_layouts)
@@ -196,60 +215,76 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		context->device.get().createPipelineLayoutUnique(pipelineLayoutCreateInfo);
 
 	logger.info(std::source_location::current(), "Created Pipeline Layout");
-	
 
 	Pixel8bitRGBA const diffuse_blue{0, 0, 170, 255};
 	Pixel8bitRGBA const diffuse_red{170, 0, 0, 255};
+	Pixel8bitRGBA const normal_default(128, 128, 255, 255);
+	Pixel8bitRGBA const specular_default(128, 128, 128, 255);
+
+#ifdef USE_TEXTURE_CACHER_OBJ	
 	m_default_textures.diffuse = 
 		create_canvas(diffuse_blue, CanvasExtent{64, 64})
 		| canvas_draw_checkerboard(diffuse_red, CheckerSquareSize{4})
 		| move_canvas_to_gpu(context)
 		| make_shader_readonly(context, InterpolationType::Point);
+	
+	m_default_textures.normal = 
+		create_canvas(normal_default, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
 
-	logger.info(std::source_location::current(), "Created diffuse default texture");
+	m_default_textures.specular = 
+		create_canvas(specular_default, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+#else
+	m_diffuse.default_texture = 
+		create_canvas(diffuse_blue, CanvasExtent{64, 64})
+		| canvas_draw_checkerboard(diffuse_red, CheckerSquareSize{4})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+	
+	m_normal.default_texture = 
+		create_canvas(normal_default, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+	
+	m_specular.default_texture = 
+		create_canvas(specular_default, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+#endif
+	logger.info(std::source_location::current(), "Created default textures");
+
+
+#ifdef USE_TEXTURE_CACHER_OBJ
 	m_descriptor_binders.diffuse =
 		CachedTextureDescriptorBinder(context->device.get(),
 									  std::move(diffuse_layout),
 									  descriptor_pool->descriptor_pool.get(),
 									  frames_in_flight,
 									  &m_default_textures.diffuse);
-
-	logger.info(std::source_location::current(), "Created diffuse descriptor cache");
 	
-#if 0
-	Pixel8bitRGBA const normal_default(128, 128, 255, 255);
-	TextureSamplerReadOnly normal = 
-		create_canvas(normal_default, CanvasExtent{64, 64})
-		| move_canvas_to_gpu(context)
-		| make_shader_readonly(context, InterpolationType::Point);
+	logger.info(std::source_location::current(), "Created diffuse cache");
+
 	m_descriptor_binders.normal =
 		CachedTextureDescriptorBinder(context->device.get(),
-									  m_layout.get(),
-									  2,
+									  std::move(normal_layout),
 									  descriptor_pool->descriptor_pool.get(),
 									  frames_in_flight,
-									  std::move(normal));
+									  &m_default_textures.normal);
 
+	logger.info(std::source_location::current(), "Created normal cache");
 
-	
-	Pixel8bitRGBA const specular_default(128, 128, 128, 255);
-	TextureSamplerReadOnly specular = 
-		create_canvas(specular_default, CanvasExtent{64, 64})
-		| move_canvas_to_gpu(context)
-		| make_shader_readonly(context, InterpolationType::Point);
 	m_descriptor_binders.specular =
 		CachedTextureDescriptorBinder(context->device.get(),
-									  m_layout.get(),
-									  3,
+									  std::move(specular_layout),
 									  descriptor_pool->descriptor_pool.get(),
 									  frames_in_flight,
-									  std::move(specular));
+									  &m_default_textures.specular);
+	logger.info(std::source_location::current(), "Created specular cache");
 #endif
 
-
-	logger.info(std::source_location::current(),
-				"Created caching texture descriptor binders");
-	
 	auto depth_stencil_state_info = vk::PipelineDepthStencilStateCreateInfo{}
 		.setDepthTestEnable(true)
 		.setDepthWriteEnable(true)
@@ -290,8 +325,26 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
     }
 	
 	m_pipeline = std::move(result.value);
-
 	logger.info(std::source_location::current(), "Created Pipeline");
+
+	
+	GlobalBinding global_binding_init{};	
+	global_binding_init.view = glm::mat4(1.0f);
+	global_binding_init.proj = glm::mat4(1.0f);
+
+	/*Allocate Camera Descriptor Sets*/
+	for (uint32_t i = 0; i < *frames_in_flight; i++) {
+		m_globalbinding.buffers
+			.push_back(UniformBuffer<GlobalBinding>(&global_binding_init,
+													logger,
+													context->physical_device,
+													context->device.get(),
+													descriptor_pool->descriptor_pool.get(),
+													m_globalbinding.layout.get()));
+	}
+
+	logger.info(std::source_location::current(),
+				"created global descriptor sets");
 }
 
 
@@ -300,7 +353,14 @@ MaterialPipeline::MaterialPipeline(MaterialPipeline&& rhs) noexcept
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_globalbinding, rhs.m_globalbinding);
+#ifdef USE_TEXTURE_CACHER_OBJ
+	std::swap(m_default_textures, rhs.m_default_textures);
 	std::swap(m_descriptor_binders, rhs.m_descriptor_binders);
+#else
+	std::swap(m_diffuse, rhs.m_diffuse);
+	std::swap(m_normal, rhs.m_normal);
+	std::swap(m_specular, rhs.m_specular);
+#endif
 }
 
 MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
@@ -308,8 +368,15 @@ MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_globalbinding, rhs.m_globalbinding);
+#ifdef USE_TEXTURE_CACHER_OBJ
 	std::swap(m_default_textures, rhs.m_default_textures);
 	std::swap(m_descriptor_binders, rhs.m_descriptor_binders);
+#else
+	std::swap(m_diffuse, rhs.m_diffuse);
+	std::swap(m_normal, rhs.m_normal);
+	std::swap(m_specular, rhs.m_specular);
+#endif
+
 	return *this;
 }
 
@@ -328,6 +395,39 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 							  TotalFramesInFlight const max_frames_in_flight,
 							  std::vector<MaterialRenderable>& renderables)
 {
+	
+#ifndef USE_TEXTURE_CACHER_OBJ
+	if (!m_diffuse.sets.contains(&m_diffuse.default_texture)) {
+		m_diffuse.sets.insert({&m_diffuse.default_texture,
+							  create_texture_descriptorset(device,
+														   m_diffuse.layout.get(),
+														   descriptor_pool,
+														   *max_frames_in_flight,
+														   m_diffuse.default_texture)});
+		logger.info(std::source_location::current(), "Created diffuse default");
+	}
+			
+	if (!m_normal.sets.contains(&m_normal.default_texture)) {
+		m_normal.sets.insert({&m_normal.default_texture,
+							  create_texture_descriptorset(device,
+														   m_normal.layout.get(),
+														   descriptor_pool,
+														   *max_frames_in_flight,
+														   m_normal.default_texture)});
+		logger.info(std::source_location::current(), "Created normal default");
+	}
+
+	if (!m_specular.sets.contains(&m_specular.default_texture)) {
+		m_specular.sets.insert({&m_specular.default_texture,
+							  create_texture_descriptorset(device,
+														   m_specular.layout.get(),
+														   descriptor_pool,
+														   *max_frames_in_flight,
+														   m_specular.default_texture)});
+		logger.info(std::source_location::current(), "Created specular default");
+	}
+#endif
+
 	copy_to_allocated_memory(device,
 							 m_globalbinding.buffers[*current_flightframe].m_memory,
 							 reinterpret_cast<void*>(global_binding),
@@ -336,20 +436,50 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
 	
+
+#ifdef USE_TEXTURE_CACHER_OBJ
 	auto diffuse_init = 
 		m_descriptor_binders.diffuse.get_default_descriptor(current_flightframe);
 	if (!diffuse_init) {
 		logger.error(std::source_location::current(),
-					 "Could not find initializer texture for diffuse");
+					 "Could not find initializer texture for diffuse texture");
 		return;
 	}
-		
-	
+	auto normal_init = 
+		m_descriptor_binders.normal.get_default_descriptor(current_flightframe);
+	if (!normal_init) {
+		logger.error(std::source_location::current(),
+					 "Could not find initializer texture for normal texture");
+		return;
+	}
+	auto specular_init = 
+		m_descriptor_binders.specular.get_default_descriptor(current_flightframe);
+	if (!specular_init) {
+		logger.error(std::source_location::current(),
+					 "Could not find initializer texture for specular texture");
+		return;
+	}
+
 	/*Bind GlobalBinding Get Once before rendering*/
-	std::array<vk::DescriptorSet, 2> init_sets{
+	std::array<vk::DescriptorSet, 4> init_sets{
 		m_globalbinding.buffers[*current_flightframe].m_set.get(),
 		*diffuse_init,
+		*normal_init,
+		*specular_init,
 	};
+#else	
+	std::array<vk::DescriptorSet, 4> init_sets{
+		m_globalbinding.buffers[*current_flightframe].m_set.get(),
+		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
+		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
+		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
+	};
+
+	
+	TextureSamplerReadOnly* last_diffuse_texture = &m_diffuse.default_texture;
+	TextureSamplerReadOnly* last_normal_texture = &m_normal.default_texture;
+	TextureSamplerReadOnly* last_specular_texture = &m_specular.default_texture;
+#endif
 
 	const uint32_t first_set = 0;
 	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
@@ -363,16 +493,125 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 	int i = 0;
 	for (MaterialRenderable& renderable: renderables) {
 
+#ifdef USE_TEXTURE_CACHER_OBJ
 		m_descriptor_binders.diffuse
 			.bind_texture_descriptor(logger,
 									 device,
 									 m_layout.get(),
 									 descriptor_pool,
 									 commandbuffer,
+									 DescriptorSetIndex{1},
 									 max_frames_in_flight,
 									 current_flightframe,
 									 renderable.texture.diffuse);
+
+		m_descriptor_binders.normal
+			.bind_texture_descriptor(logger,
+									 device,
+									 m_layout.get(),
+									 descriptor_pool,
+									 commandbuffer,
+									 DescriptorSetIndex{2},
+									 max_frames_in_flight,
+									 current_flightframe,
+									 renderable.texture.normal);
+
+		m_descriptor_binders.specular
+			.bind_texture_descriptor(logger,
+									 device,
+									 m_layout.get(),
+									 descriptor_pool,
+									 commandbuffer,
+									 DescriptorSetIndex{3},
+									 max_frames_in_flight,
+									 current_flightframe,
+									 renderable.texture.specular);
+#else
+		TextureSamplerReadOnly* diffuse_texture = renderable.texture.diffuse 
+			? renderable.texture.diffuse 
+			: &m_diffuse.default_texture;
 		
+		if (diffuse_texture != last_diffuse_texture) {
+			if (!m_diffuse.sets.contains(diffuse_texture)) {
+				m_diffuse.sets.insert({diffuse_texture,
+									  create_texture_descriptorset(device,
+																   m_diffuse.layout.get(),
+																   descriptor_pool,
+																   *max_frames_in_flight,
+																   *diffuse_texture)});
+				
+				std::array<vk::DescriptorSet, 1> descriptorset{
+					m_diffuse.sets[diffuse_texture][*current_flightframe].get()
+				};
+				commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+												 m_layout.get(),
+												 *m_diffuse.set_index,
+												 descriptorset.size(),
+												 descriptorset.data(),
+												 0,
+												 nullptr);
+				last_diffuse_texture = diffuse_texture;
+				logger.info(std::source_location::current(), "Added diffuse texture to cache");
+			}
+		}
+	
+		TextureSamplerReadOnly* normal_texture = renderable.texture.normal 
+			? renderable.texture.normal 
+			: &m_normal.default_texture;
+		
+		if (normal_texture != last_normal_texture) {
+			if (!m_normal.sets.contains(normal_texture)) {
+				m_normal.sets.insert({normal_texture,
+									  create_texture_descriptorset(device,
+																   m_normal.layout.get(),
+																   descriptor_pool,
+																   *max_frames_in_flight,
+																   *normal_texture)});
+				
+				std::array<vk::DescriptorSet, 1> descriptorset{
+					m_normal.sets[normal_texture][*current_flightframe].get()
+				};
+				commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+												 m_layout.get(),
+												 *m_normal.set_index,
+												 descriptorset.size(),
+												 descriptorset.data(),
+												 0,
+												 nullptr);
+				last_normal_texture = normal_texture;
+				logger.info(std::source_location::current(), "Added normal texture to cache");
+			}
+		}
+	
+		TextureSamplerReadOnly* specular_texture = renderable.texture.specular 
+			? renderable.texture.specular 
+			: &m_specular.default_texture;
+		
+		if (specular_texture != last_specular_texture) {
+			if (!m_specular.sets.contains(specular_texture)) {
+				m_specular.sets.insert({specular_texture,
+									  create_texture_descriptorset(device,
+																   m_specular.layout.get(),
+																   descriptor_pool,
+																   *max_frames_in_flight,
+																   *specular_texture)});
+				
+				std::array<vk::DescriptorSet, 1> descriptorset{
+					m_specular.sets[specular_texture][*current_flightframe].get()
+				};
+				commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+												 m_layout.get(),
+												 *m_specular.set_index,
+												 descriptorset.size(),
+												 descriptorset.data(),
+												 0,
+												 nullptr);
+				last_specular_texture = specular_texture;
+				logger.info(std::source_location::current(), "Added specular texture to cache");
+			}
+		}
+	
+#endif	
 		PushConstants push{};
 		push.model = renderable.model;
 		push.basecolor = renderable.basecolor;

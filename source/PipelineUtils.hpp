@@ -13,9 +13,9 @@ using TotalDescriptorCount = StrongType<uint32_t, struct TotalDescriptorCountTag
 using FragmentPath = StrongType<std::filesystem::path, struct FragmentPathTag>;
 using VertexPath = StrongType<std::filesystem::path, struct VertexPathTag>;
 
-
 using TotalFramesInFlight = StrongType<uint32_t, struct TotalFramesInFlightTag>;
 using CurrentFrameInFlight = StrongType<uint32_t, struct CurrentFrameInFlightTag>;
+using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
 
 
 auto create_texture_descriptorset(vk::Device device,
@@ -67,6 +67,7 @@ struct CachedTextureDescriptorBinder
 								 vk::PipelineLayout pipeline_layout,
 								 vk::DescriptorPool descriptor_pool,
 								 vk::CommandBuffer& commandbuffer,
+								 DescriptorSetIndex set,
 								 TotalFramesInFlight total_flight_frames,
 								 CurrentFrameInFlight current_flight_frame,
 								 TextureSamplerReadOnly* texture);
@@ -119,32 +120,33 @@ struct UniformBuffer
 			}
 			m_set = std::move(sets.at(0));
 
-			const auto buffer_info = vk::DescriptorBufferInfo{}
-				.setBuffer(m_memory.buffer.get())
-				.setOffset(0)
-				.setRange(sizeof(UniformDataType));
-
-			const std::array<vk::WriteDescriptorSet, 1> writes{
-				vk::WriteDescriptorSet{}
-				.setDstBinding(0)
-				.setDstArrayElement(0)
-				.setDstSet(m_set.get())
-				.setDescriptorCount(1)
-				.setDescriptorType(vk::DescriptorType::eUniformBuffer)
-				.setBufferInfo(buffer_info),
-			};
-
-			copy_to_allocated_memory(device,
-									m_memory,
-									reinterpret_cast<void*>(init),
-									sizeof(UniformDataType));
-
-			device.updateDescriptorSets(writes.size(),
-										writes.data(),
-										0,
-										nullptr);
-
-			logger.info(std::source_location::current(),
-						"Created UniformBuffer");
+		const auto buffer_info = vk::DescriptorBufferInfo{}
+			.setBuffer(m_memory.buffer.get())
+			.setOffset(0)
+			.setRange(sizeof(UniformDataType));
+		
+		const std::array<vk::WriteDescriptorSet, 1> writes{
+			vk::WriteDescriptorSet{}
+			.setDstBinding(0)
+			.setDstArrayElement(0)
+			.setDstSet(m_set.get())
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(buffer_info),
+		};
+		
+		copy_to_allocated_memory(device,
+								 m_memory,
+								 reinterpret_cast<void*>(init),
+								 sizeof(UniformDataType));
+		
+		device.updateDescriptorSets(writes.size(),
+									writes.data(),
+									0,
+									nullptr);
+		
+		logger.info(std::source_location::current(),
+					"Created UniformBuffer");
+		
 	}
 };

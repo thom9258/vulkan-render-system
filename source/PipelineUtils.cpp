@@ -142,6 +142,7 @@ void CachedTextureDescriptorBinder::bind_texture_descriptor(
 	vk::PipelineLayout pipeline_layout,
 	vk::DescriptorPool descriptor_pool,
 	vk::CommandBuffer& commandbuffer,
+	DescriptorSetIndex set,
 	TotalFramesInFlight total_flightframes,
 	CurrentFrameInFlight current_flightframe,
 	TextureSamplerReadOnly* texture)
@@ -163,7 +164,7 @@ void CachedTextureDescriptorBinder::bind_texture_descriptor(
 	if (texture == m_last_bound)
 		return;
 
-	uint32_t const first_set = 1;
+	uint32_t const first_set = *set;
 	std::array<vk::DescriptorSet, 1> descriptorset{
 		m_sets[texture][*current_flightframe].get()
 	};

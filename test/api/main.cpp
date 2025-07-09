@@ -234,7 +234,7 @@ int main()
 		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
 	}
 
-	std::cout << "loading smg texture!" << std::endl;
+	std::cout << "loading smg textures!" << std::endl;
 
 	TextureSamplerReadOnly smg_diffuse =
 		load_bitmap(models_root / "smg/D.tga", 
@@ -243,7 +243,34 @@ int main()
 		| throw_on_bitmap_error()
 		| get_bitmap()
 		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Point);
+		| make_shader_readonly(&context, InterpolationType::Linear);
+	
+	TextureSamplerReadOnly smg_specular =
+		load_bitmap(models_root / "smg/S.tga", 
+					BitmapPixelFormat::RGBA,
+					VerticalFlipOnLoad::Yes)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Linear);
+
+	TextureSamplerReadOnly smg_normal =
+		load_bitmap(models_root / "smg/N.tga", 
+					BitmapPixelFormat::RGBA,
+					VerticalFlipOnLoad::Yes)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Linear);
+
+	TextureSamplerReadOnly smg_glossiness =
+		load_bitmap(models_root / "smg/G.tga", 
+					BitmapPixelFormat::RGBA,
+					VerticalFlipOnLoad::Yes)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Linear);
 
 	std::cout << "loading statue jpg!" << std::endl;
 	TextureSamplerReadOnly statue = 
@@ -367,6 +394,8 @@ int main()
 				smg.basecolor = glm::vec4(1.0f);
 				smg.casts_shadow = true;
 				smg.texture.diffuse = &smg_diffuse;
+				smg.texture.specular = &smg_specular;
+				smg.texture.normal = &smg_normal;
 				smg.model = glm::mat4(1.0f);
 				smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
 				smg.model = glm::scale(smg.model, glm::vec3(0.4f));

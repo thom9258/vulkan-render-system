@@ -24,6 +24,11 @@
 // TODO: We dont want a combined image sampler, we want them seperated to be able to swap them
 // https://docs.vulkan.org/samples/latest/samples/api/separate_image_sampler/README.html
 
+//#define USE_TEXTURE_CACHER_OBJ
+
+
+using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
+
 struct MaterialPipeline
 {
 	MaterialPipeline() = default;
@@ -58,7 +63,6 @@ struct MaterialPipeline
 	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
 	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
 	
-
 private:
 	struct PushConstants {
 		glm::mat4 model;
@@ -72,9 +76,12 @@ private:
 		vk::UniqueDescriptorSetLayout layout;
 		std::vector<UniformBuffer<GlobalBinding>> buffers;
 	} m_globalbinding;
-	
+
+#ifdef USE_TEXTURE_CACHER_OBJ
 	struct {
 		TextureSamplerReadOnly diffuse;
+		TextureSamplerReadOnly normal;
+		TextureSamplerReadOnly specular;
 	} m_default_textures;
 	
 	struct {
@@ -83,4 +90,19 @@ private:
 		CachedTextureDescriptorBinder normal;
 		CachedTextureDescriptorBinder specular;
 	} m_descriptor_binders;
+#else
+
+	template <DescriptorSetIndex t_set_index>
+	struct TextureDescriptor
+	{
+		DescriptorSetIndex static constexpr set_index = t_set_index;
+		TextureSamplerReadOnly default_texture;
+		vk::UniqueDescriptorSetLayout layout;
+		std::map<TextureSamplerReadOnly*, std::vector<vk::UniqueDescriptorSet>> sets;
+	};
+	
+	TextureDescriptor<DescriptorSetIndex{1}> m_diffuse;
+	TextureDescriptor<DescriptorSetIndex{2}> m_normal;
+	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
+#endif
 };
