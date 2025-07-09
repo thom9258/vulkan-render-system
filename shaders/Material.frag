@@ -13,5 +13,5 @@ void main() {
     vec4 diffuse_color = texture(diffuse, texcoord);
     vec4 normal_color = texture(normal, texcoord);
     vec4 specular_color = texture(specular, texcoord);
-	outColor = diffuse_color * normal_color * specular_color * baseColor;
+	outColor = diffuse_color * baseColor;
 }
