@@ -3,6 +3,7 @@
 #include <VulkanRenderer/StrongType.hpp>
 
 #include "ShaderTextureImpl.hpp"
+#include "FlightFrames.hpp"
 
 #include <vulkan/vulkan.hpp>
 
@@ -13,17 +14,14 @@ using TotalDescriptorCount = StrongType<uint32_t, struct TotalDescriptorCountTag
 using FragmentPath = StrongType<std::filesystem::path, struct FragmentPathTag>;
 using VertexPath = StrongType<std::filesystem::path, struct VertexPathTag>;
 
-using TotalFramesInFlight = StrongType<uint32_t, struct TotalFramesInFlightTag>;
-using CurrentFrameInFlight = StrongType<uint32_t, struct CurrentFrameInFlightTag>;
 using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
 
 
 auto create_texture_descriptorset(vk::Device device,
 								  vk::DescriptorSetLayout descriptorset_layout,
 								  vk::DescriptorPool descriptor_pool,
-								  size_t frames_in_flight,
 								  TextureSamplerReadOnly& texture)
-	-> std::vector<vk::UniqueDescriptorSet>;
+	-> FlightFramesArray<vk::UniqueDescriptorSet>;
 
 struct ShaderStageInfos
 {
@@ -41,46 +39,6 @@ auto create_shaderstage_infos(vk::Device device,
 	noexcept -> std::optional<ShaderStageInfos>;
 
 
-auto create_texture_descriptorset_layout(vk::Device device,
-										 BindingIndex binding_index,
-										 TotalDescriptorCount descriptor_count)
-	-> vk::UniqueDescriptorSetLayout;
-
-
-struct CachedTextureDescriptorBinder
-{	
-	TextureSamplerReadOnly* m_default{nullptr};
-	TextureSamplerReadOnly* m_last_bound{nullptr};
-	vk::UniqueDescriptorSetLayout m_layout;
-	std::map<TextureSamplerReadOnly*, std::vector<vk::UniqueDescriptorSet>> m_sets;
-
-	CachedTextureDescriptorBinder() = default;
-
-	CachedTextureDescriptorBinder(vk::Device device,
-								  vk::UniqueDescriptorSetLayout&& descriptorset_layout,
-								  vk::DescriptorPool descriptor_pool,
-								  TotalFramesInFlight total_flight_frames,
-								  TextureSamplerReadOnly* default_texture);
-
-	void bind_texture_descriptor(Logger& logger,
-								 vk::Device device,
-								 vk::PipelineLayout pipeline_layout,
-								 vk::DescriptorPool descriptor_pool,
-								 vk::CommandBuffer& commandbuffer,
-								 DescriptorSetIndex set,
-								 TotalFramesInFlight total_flight_frames,
-								 CurrentFrameInFlight current_flight_frame,
-								 TextureSamplerReadOnly* texture);
-
-	auto get_default_descriptor(CurrentFrameInFlight current_flightframe)
-		noexcept -> std::optional<vk::DescriptorSet>;
-	
-	void flush_cache(vk::Device device,
-					 vk::DescriptorPool descriptor_pool,
-					 TotalFramesInFlight total_flightframes,
-					 TextureSamplerReadOnly* texture);
-};
-
 template<typename Data>
 struct UniformBuffer
 {
@@ -88,6 +46,8 @@ struct UniformBuffer
 
 	AllocatedMemory m_memory;
 	vk::UniqueDescriptorSet m_set;
+	
+	UniformBuffer() = default;
 
 	explicit UniformBuffer(UniformDataType* init,
 						   Logger& logger,
@@ -149,4 +109,25 @@ struct UniformBuffer
 					"Created UniformBuffer");
 		
 	}
+};
+
+template <DescriptorSetIndex t_set_index,
+		  typename TUniformBufferLayout>
+struct Uniform {
+	using BufferLayoutType = std::remove_cvref_t<TUniformBufferLayout>;
+	using BufferType = UniformBuffer<BufferLayoutType>;
+	DescriptorSetIndex static constexpr set_index = t_set_index;
+	size_t static constexpr data_memsize = sizeof(BufferLayoutType);
+	BufferLayoutType data;
+	vk::UniqueDescriptorSetLayout set_layout;
+	FlightFramesArray<BufferType> buffers;
+};
+
+template <DescriptorSetIndex t_set_index>
+struct TextureDescriptor
+{
+	DescriptorSetIndex static constexpr set_index = t_set_index;
+	TextureSamplerReadOnly default_texture;
+	vk::UniqueDescriptorSetLayout layout;
+	std::map<TextureSamplerReadOnly*, FlightFramesArray<vk::UniqueDescriptorSet>> sets;
 };

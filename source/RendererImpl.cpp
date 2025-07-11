@@ -46,22 +46,6 @@ void sort_renderable(Logger* logger,
 	}
 }
 
-void sort_light(Logger* logger,
-				SortedLights* sorted,
-				Light light)
-{
-	if (auto p = std::get_if<AreaLight>(&light))
-		sorted->arealights.push_back(*p);
-	else if (auto p = std::get_if<PointLight>(&light))
-		sorted->pointlights.push_back(*p);
-	else if (auto p = std::get_if<SpotLight>(&light))
-		sorted->spotlights.push_back(*p);
-	else {
-		logger->warn(std::source_location::current(),
-					 "Found unknown Light that can not be sorted and used for drawing");
-	}
-}
-
 auto create_pipelines(Render::Context::Impl* context,
 					  Presenter::Impl* presenter,
 					  DescriptorPool::Impl* descriptor_pool,
@@ -270,7 +254,8 @@ auto render_geometry_pass(GeometryPass& pass,
 						  vk::CommandPool& command_pool,
 						  vk::Queue& queue,
 						  const WorldRenderInfo& world_info,
-						  std::vector<Renderable>& renderables)
+						  std::vector<Renderable>& renderables,
+						  std::vector<Light>& lights)
 	-> Texture2D::Impl*
 {
 	//TODO: Pull clearvalues out!
@@ -350,17 +335,19 @@ auto render_geometry_pass(GeometryPass& pass,
 									  sorted.basetextures);
 
 		
-		MaterialPipeline::GlobalBinding material_global_binding{};
-		material_global_binding.view = world_info.view;
-		material_global_binding.proj = world_info.projection;
-		material_pipeline.render(&material_global_binding,
+		MaterialPipeline::FrameInfo material_frame_info{};
+		material_frame_info.view = world_info.view;
+		material_frame_info.proj = world_info.projection;
+		material_frame_info.camera_position = world_info.camera_position;
+		material_pipeline.render(material_frame_info,
 								 *logger,
 								 device,
 								 descriptor_pool,
 								 commandbuffer,
-								 CurrentFrameInFlight{current_frame_in_flight},
-								 TotalFramesInFlight{max_frames_in_flight},
-								 sorted.materialrenderables);
+								 CurrentFlightFrame{current_frame_in_flight},
+								 MaxFlightFrames{max_frames_in_flight},
+								 sorted.materialrenderables,
+								 lights);
 
 		commandbuffer.endRenderPass();
 	};
@@ -431,7 +418,8 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 								presenter->command_pool(),
 								context->graphics_queue(),
 								world_info,
-								renderables);
+								renderables,
+								lights);
 }
 
 auto Renderer::render(const uint32_t current_frame_in_flight,

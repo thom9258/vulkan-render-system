@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include <VulkanRenderer/Renderable.hpp>
+#include <VulkanRenderer/Light.hpp>
 
 #include "VertexImpl.hpp"
 #include "VertexBuffer.hpp"
@@ -26,6 +27,17 @@
 
 using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
 
+struct SortedLights
+{
+	std::vector<DirectionalLight> directionals;
+	std::vector<PointLight> points;
+	std::vector<SpotLight> spots;
+};
+
+void sort_light(Logger* logger,
+				SortedLights* sorted,
+				Light light);
+
 struct MaterialPipeline
 {
 	MaterialPipeline() = default;
@@ -42,20 +54,22 @@ struct MaterialPipeline
 	 * data, and should happen as a single descriptor load
 	 * every frame.
 	 */
-	struct GlobalBinding
+	struct FrameInfo
 	{
 		glm::mat4 view;
 		glm::mat4 proj;
+		glm::vec3 camera_position;
 	};
 	
-	void render(GlobalBinding* global_binding,
+	void render(FrameInfo& frame_info,
 				Logger& logger,
 				vk::Device& device,
 				vk::DescriptorPool descriptor_pool,
 				vk::CommandBuffer& commandbuffer,
-				CurrentFrameInFlight const current_flightframe,
-				TotalFramesInFlight const max_frames_in_flight,
-				std::vector<MaterialRenderable>& renderables);
+				CurrentFlightFrame const current_flightframe,
+				MaxFlightFrames const max_frames_in_flight,
+				std::vector<MaterialRenderable>& renderables,
+				std::vector<Light>& lights);
 
 	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
 	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
@@ -63,27 +77,53 @@ struct MaterialPipeline
 private:
 	struct PushConstants {
 		glm::mat4 model;
-		glm::vec4 basecolor;
 	};
 	
 	vk::UniquePipelineLayout m_layout;
     vk::UniquePipeline m_pipeline;
-
-	struct {
-		vk::UniqueDescriptorSetLayout layout;
-		std::vector<UniformBuffer<GlobalBinding>> buffers;
-	} m_globalbinding;
-
-	template <DescriptorSetIndex t_set_index>
-	struct TextureDescriptor
+	
+	struct FrameUniformLayout
 	{
-		DescriptorSetIndex static constexpr set_index = t_set_index;
-		TextureSamplerReadOnly default_texture;
-		vk::UniqueDescriptorSetLayout layout;
-		std::map<TextureSamplerReadOnly*, std::vector<vk::UniqueDescriptorSet>> sets;
+		glm::mat4 view;
+		glm::mat4 proj;
+		glm::vec3 camera_position;
+		float _padding1{1.0f};
+	};
+
+	struct DirectionalLightUniformLayout
+	{
+		glm::vec3 direction;
+		float _padding1{1.0f};
+		glm::vec3 ambient;
+		float _padding2{1.0f};
+		glm::vec3 diffuse;
+		float _padding3{1.0f};
+		glm::vec3 specular;
+		float _padding4{1.0f};
 	};
 	
-	TextureDescriptor<DescriptorSetIndex{1}> m_diffuse;
-	TextureDescriptor<DescriptorSetIndex{2}> m_normal;
+	struct PointLightUniformLayout
+	{
+		glm::vec3 position;
+		float _padding1{1.0f};
+		glm::vec3 ambient;
+		float _padding2{1.0f};
+		glm::vec3 diffuse;
+		float _padding3{1.0f};
+		glm::vec3 specular;
+		float _padding4{1.0f};
+		struct {
+			float constant;
+			float linear;
+			float quadratic;
+		}attenuation;
+		float _padding5{1.0f};
+	};
+
+	Uniform<DescriptorSetIndex{0}, FrameUniformLayout> m_frame_uniform;
+	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;
+	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
 	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
+	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
+	Uniform<DescriptorSetIndex{5}, PointLightUniformLayout> m_pointlight_uniform;
 };

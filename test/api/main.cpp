@@ -28,7 +28,7 @@ std::filesystem::path assets_root = root / "assets/";
 std::filesystem::path models_root = assets_root / "models/";
 std::filesystem::path textures_root = assets_root / "textures/";
 
-auto textured_cube_vertices()
+auto get_textured_cube_vertices()
 	-> std::vector<VertexPosNormColorUV> 
 {
 	sg_status status;
@@ -60,6 +60,41 @@ auto textured_cube_vertices()
 		vertices[i].norm = {normals[i].x, normals[i].y, normals[i].z};
 		vertices[i].color = {1.0f, 1.0f, 1.0f};
 		vertices[i].uv = {texcoords[i].u, texcoords[i].v};
+	}
+
+	return vertices;
+}
+
+auto get_cube_vertices()
+	-> std::vector<VertexPosNormColor> 
+{
+	sg_status status;
+	size_t vertices_length{0};
+	
+	sg_cube_info cube_info{};
+	cube_info.width = 0.5f;
+	cube_info.height = 0.5f;
+	cube_info.depth = 0.5f;
+	
+	status = sg_cube_vertices(&cube_info, &vertices_length, nullptr, nullptr, nullptr);
+	if (status != SG_OK_RETURNED_LENGTH)
+		throw std::runtime_error("Could not get positions size");
+
+	std::vector<sg_position> positions(vertices_length);
+	std::vector<sg_normal> normals(vertices_length);
+	status = sg_cube_vertices(&cube_info,
+							  &vertices_length,
+							  positions.data(),
+							  normals.data(), 
+							  nullptr);
+	if (status != SG_OK_RETURNED_BUFFER)
+		throw std::runtime_error("Could not get vertices");
+
+	std::vector<VertexPosNormColor> vertices(positions.size());
+	for (size_t i = 0; i < vertices.size(); i++) {
+		vertices[i].pos = {positions[i].x, positions[i].y, positions[i].z};
+		vertices[i].norm = {normals[i].x, normals[i].y, normals[i].z};
+		vertices[i].color = {1.0f, 1.0f, 1.0f};
 	}
 
 	return vertices;
@@ -144,7 +179,8 @@ int main()
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
 	
 	WorldRenderInfo world_info{};
-    world_info.view = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -4.f));
+	world_info.camera_position = glm::vec3(0.f, 0.f, -4.f);
+    world_info.view = glm::translate(glm::mat4(1.f), world_info.camera_position);
     world_info.projection = glm::perspective(glm::radians(70.f), aspect, 0.1f, 200.0f);
     world_info.projection[1][1] *= -1;
 
@@ -163,9 +199,14 @@ int main()
 	
 	Mesh triangle_mesh{VertexBuffer::create(context, triangle_vertices)};
 
-	const std::vector<VertexPosNormColorUV> cube_vertices = textured_cube_vertices();
-	TexturedMesh cube_mesh{
-		VertexBuffer::create<VertexPosNormColorUV>(context, cube_vertices)
+	const std::vector<VertexPosNormColorUV> textured_cube_vertices = get_textured_cube_vertices();
+	TexturedMesh textured_cube_mesh{
+		VertexBuffer::create<VertexPosNormColorUV>(context, textured_cube_vertices)
+	};
+	
+	const std::vector<VertexPosNormColor> cube_vertices = get_cube_vertices();
+	Mesh cube_mesh{
+		VertexBuffer::create<VertexPosNormColor>(context, cube_vertices)
 	};
 
 	auto loaded_monkey_mesh = load_obj(context,
@@ -219,18 +260,33 @@ int main()
 		| make_shader_readonly(&context, InterpolationType::Linear);
 
 	std::cout << "loading smg model!" << std::endl;
-	auto loaded_smg = load_obj_with_texcoords(context,
-											  models_root,
-											  "smg/smg.obj");
-	TexturedMesh smg_mesh;
-	if (auto p = std::get_if<TexturedMesh>(&loaded_smg)) {
+	auto loaded_smg = load_obj(context,
+							   models_root,
+							   "smg/smg.obj");
+	Mesh smg_mesh;
+	if (auto p = std::get_if<Mesh>(&loaded_smg)) {
 		smg_mesh = std::move(*p);
 	}
-	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_smg)) {
+	else if (auto p = std::get_if<MeshWithWarning>(&loaded_smg)) {
 		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
 		smg_mesh = std::move(p->mesh);
 	}
 	else if (auto p = std::get_if<MeshLoadError>(&loaded_smg)) {
+		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
+	}
+	
+	auto loaded_textured_smg = load_obj_with_texcoords(context,
+													   models_root,
+													   "smg/smg.obj");
+	TexturedMesh textured_smg_mesh;
+	if (auto p = std::get_if<TexturedMesh>(&loaded_textured_smg)) {
+		textured_smg_mesh = std::move(*p);
+	}
+	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_textured_smg)) {
+		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
+		textured_smg_mesh = std::move(p->mesh);
+	}
+	else if (auto p = std::get_if<MeshLoadError>(&loaded_textured_smg)) {
 		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
 	}
 
@@ -380,30 +436,15 @@ int main()
 				renderables.push_back(d2);
 				
 				WireframeRenderable d3{};
-				d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+				//d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+				d3.basecolor = glm::vec4(1.0f);
 				d3.mesh = &monkey_mesh;
 				d3.model = glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.5f, 0.0f));
 				d3.model = glm::rotate(d3.model,
 									   glm::radians(frameInfo.total_frame_count * 1.0f),
 									   glm::vec3(-0.7, 0.7, 0));
 				renderables.push_back(d3);
-#endif				
 				
-				MaterialRenderable smg{};
-				smg.mesh = &smg_mesh;
-				smg.basecolor = glm::vec4(1.0f);
-				smg.casts_shadow = true;
-				smg.texture.diffuse = &smg_diffuse;
-				smg.texture.specular = &smg_specular;
-				smg.texture.normal = &smg_normal;
-				smg.model = glm::mat4(1.0f);
-				smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
-				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
-				smg.model = glm::rotate(smg.model,
-										glm::radians(frameInfo.total_frame_count * 1.0f),
-										glm::normalize(glm::vec3(0, 1, 0)));
-				renderables.push_back(smg);
-
 				BaseTextureRenderable basesmg{};
 				basesmg.mesh = &smg_mesh;
 				basesmg.texture = &smg_diffuse;
@@ -415,14 +456,58 @@ int main()
 											glm::normalize(glm::vec3(0, 1, 0)));
 				renderables.push_back(basesmg);
 
+				DirectionalLight dl;
+				dl.direction = glm::vec3(-1.0f, 0.0f, -1.0f);
+				lights.push_back(dl);
+#endif				
+				
 				std::vector<Light> lights;
 				PointLight pl;
-				pl.position = glm::vec3(1.0f, 0.0f, 1.0f);
-				lights.push_back(pl);
+				pl.position = glm::vec3(0.0f, 0.0f, 0.2f);
+				pl.ambient = glm::vec3(0.2f);
+				pl.diffuse = glm::vec3(0.8f);
+				pl.specular = glm::vec3(1.0f);
+				pl.attenuation.constant = 1.0f;
+				pl.attenuation.linear = 0.09f;
+				pl.attenuation.quadratic = 0.032f;
 
-				AreaLight al;
-				al.direction = glm::vec3(-1.0f, 0.0f, -1.0f);
-				lights.push_back(al);
+				lights.push_back(pl);
+				
+				WireframeRenderable d3{};
+				//d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+				d3.basecolor = glm::vec4(1.0f);
+				d3.mesh = &cube_mesh;
+				d3.model = glm::translate(glm::mat4(1.0f), pl.position);
+				d3.model = glm::scale(d3.model, glm::vec3(0.1f));
+				renderables.push_back(d3);
+
+				
+				MaterialRenderable smg{};
+				smg.mesh = &textured_smg_mesh;
+				smg.casts_shadow = true;
+				smg.texture.ambient = nullptr;
+				smg.texture.diffuse = &smg_diffuse;
+				smg.texture.specular = &smg_specular;
+				smg.texture.normal = &smg_normal;
+				smg.model = glm::mat4(1.0f);
+				smg.model = glm::translate(smg.model, glm::vec3(-1.5f, -0.8f, 0.0f));
+				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
+				smg.model = glm::rotate(smg.model,
+										glm::radians(frameInfo.total_frame_count * 1.0f),
+										glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(smg);
+
+#if 0				
+				NormColorRenderable d2{};
+				d2.mesh = &smg_mesh;
+				d2.model = glm::mat4(1.0f);
+				d2.model = glm::translate(d2.model, glm::vec3(1.5f, -0.8f, 0.0f));
+				d2.model = glm::scale(d2.model, glm::vec3(0.4f));
+				d2.model = glm::rotate(d2.model,
+									   glm::radians(frameInfo.total_frame_count * 1.0f),
+									   glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(d2);
+#endif	
 
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
 												   frameInfo.total_frame_count,

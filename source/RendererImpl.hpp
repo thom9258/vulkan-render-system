@@ -41,17 +41,6 @@ void sort_renderable(Logger* logger,
 					 SortedRenderables* sorted,
 					 Renderable renderable);
 
-struct SortedLights
-{
-	std::vector<AreaLight> arealights;
-	std::vector<PointLight> pointlights;
-	std::vector<SpotLight> spotlights;
-};
-
-void sort_light(Logger* logger,
-				SortedLights* sorted,
-				Light light);
-
 auto create_pipelines(Render::Context::Impl* context,
 					  Presenter::Impl* presenter,
 					  const vk::Extent2D render_extent,

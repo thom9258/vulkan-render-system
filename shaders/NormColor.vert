@@ -21,5 +21,7 @@ layout (set = 0, binding = 0) uniform Camera
 void main() {
     mat4 transform = camera.proj * camera.view * push.model;
     gl_Position = transform * vec4(inPosition, 1.0);
-    fragColor = inColor;
+    //fragColor = inColor;
+	// convert to world space instead of model space
+	fragColor = mat3(transpose(inverse(push.model))) * inNormal;   
 }

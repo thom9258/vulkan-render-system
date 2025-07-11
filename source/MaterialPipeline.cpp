@@ -3,6 +3,22 @@
 
 #include <format>
 
+void sort_light(Logger* logger,
+				SortedLights* sorted,
+				Light light)
+{
+	if (auto p = std::get_if<DirectionalLight>(&light))
+		sorted->directionals.push_back(*p);
+	else if (auto p = std::get_if<PointLight>(&light))
+		sorted->points.push_back(*p);
+	else if (auto p = std::get_if<SpotLight>(&light))
+		sorted->spots.push_back(*p);
+	else {
+		logger->warn(std::source_location::current(),
+					 "Found unknown Light that can not be sorted and used for drawing");
+	}
+}
+
 MaterialPipeline::MaterialPipeline(Logger& logger,
 								   Render::Context::Impl* context,
 								   Presenter::Impl* presenter,
@@ -23,7 +39,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 				std::format("  Fragment Shader {}",
 							fragmentshader_name));
 	
-	auto const frames_in_flight = TotalFramesInFlight{presenter->max_frames_in_flight};
+	auto const frames_in_flight = MaxFlightFrames{presenter->max_frames_in_flight};
 	vk::Extent2D const render_extent = context->get_window_extent();
 	
 	const auto vertex_path = VertexPath{shader_root_path / vertexshader_name};
@@ -133,7 +149,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 								sizeof(PushConstants)));
 	}
 
-	std::array<vk::DescriptorSetLayoutBinding, 1> globalbindings{
+	std::array<vk::DescriptorSetLayoutBinding, 1> frame_uniform_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
 		.setBinding(0)
@@ -141,16 +157,49 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 	};
 
-	const auto globalbindings_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+	const auto frame_uniform_setinfo = vk::DescriptorSetLayoutCreateInfo{}
 		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(globalbindings);
+		.setBindings(frame_uniform_bindings);
 	
-	m_globalbinding.layout =
-		context->device.get().createDescriptorSetLayoutUnique(globalbindings_setinfo,
+	m_frame_uniform.set_layout =
+		context->device.get().createDescriptorSetLayoutUnique(frame_uniform_setinfo,
 															  nullptr);
 	
-	logger.info(std::source_location::current(), "Created globalbindings layout");
+	logger.info(std::source_location::current(), "Created frame uniform layout");
 	
+	// create pointlight uniform
+	std::array<vk::DescriptorSetLayoutBinding, 1> pointlight_uniform_layout_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+	};
+
+	const auto pointlight_uniform_bindings_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(pointlight_uniform_layout_bindings);
+	
+	m_pointlight_uniform.set_layout =
+		context->device.get().createDescriptorSetLayoutUnique(pointlight_uniform_bindings_setinfo,
+															  nullptr);
+	
+	logger.info(std::source_location::current(), "Created point light uniform layout");
+	
+	std::array<vk::DescriptorSetLayoutBinding, 1> ambient_texture_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+	};
+	auto ambient_texture_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(ambient_texture_bindings);
+	
+	m_ambient.layout =
+		context->device.get().createDescriptorSetLayoutUnique(ambient_texture_setinfo,
+															  nullptr);
 
 	std::array<vk::DescriptorSetLayoutBinding, 1> diffuse_texture_bindings{
 		vk::DescriptorSetLayoutBinding{}
@@ -197,29 +246,15 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		context->device.get().createDescriptorSetLayoutUnique(specular_texture_setinfo,
 															  nullptr);
 	
-#if 0
-	auto constexpr total_descriptor_count = TotalDescriptorCount{3};
-	m_diffuse.layout = 
-		create_texture_descriptorset_layout(context->device.get(),
-											BindingIndex{0},
-											total_descriptor_count);
-	m_normal.layout = 
-		create_texture_descriptorset_layout(context->device.get(),
-											BindingIndex{0},
-											total_descriptor_count);
-
-	m_specular.layout = 
-		create_texture_descriptorset_layout(context->device.get(),
-											BindingIndex{0},
-											total_descriptor_count);
-#endif
 	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
 
-	std::array<vk::DescriptorSetLayout, 4> const descriptorset_layouts{
-		m_globalbinding.layout.get(),
+	std::array<vk::DescriptorSetLayout, 6> const descriptorset_layouts{
+		m_frame_uniform.set_layout.get(),
+		m_ambient.layout.get(),
 		m_diffuse.layout.get(),
-		m_normal.layout.get(),
 		m_specular.layout.get(),
+		m_normal.layout.get(),
+		m_pointlight_uniform.set_layout.get(),
 	};
 
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
@@ -231,15 +266,28 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		context->device.get().createPipelineLayoutUnique(pipelineLayoutCreateInfo);
 
 	logger.info(std::source_location::current(), "Created Pipeline Layout");
+	
 
-	Pixel8bitRGBA const diffuse_blue{0, 0, 170, 255};
-	Pixel8bitRGBA const diffuse_red{170, 0, 0, 255};
-	Pixel8bitRGBA const normal_default(128, 128, 255, 255);
-	Pixel8bitRGBA const specular_default(128, 128, 128, 255);
+	Pixel8bitRGBA::PixelType constexpr ambient_color = 51;
+	Pixel8bitRGBA constexpr ambient_basic{ambient_color, ambient_color, ambient_color, 255};
+	Pixel8bitRGBA constexpr diffuse_blue{0, 0, 170, 255};
+	Pixel8bitRGBA constexpr diffuse_red{170, 0, 0, 255};
+	Pixel8bitRGBA constexpr normal_default(128, 128, 255, 255);
+	Pixel8bitRGBA constexpr specular_default(128, 128, 128, 255);
+	
+	m_ambient.default_texture = 
+		create_canvas(ambient_basic, CanvasExtent{64, 64})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
 
 	m_diffuse.default_texture = 
 		create_canvas(diffuse_blue, CanvasExtent{64, 64})
 		| canvas_draw_checkerboard(diffuse_red, CheckerSquareSize{4})
+		| move_canvas_to_gpu(context)
+		| make_shader_readonly(context, InterpolationType::Point);
+	
+	m_specular.default_texture = 
+		create_canvas(specular_default, CanvasExtent{64, 64})
 		| move_canvas_to_gpu(context)
 		| make_shader_readonly(context, InterpolationType::Point);
 	
@@ -248,10 +296,6 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		| move_canvas_to_gpu(context)
 		| make_shader_readonly(context, InterpolationType::Point);
 	
-	m_specular.default_texture = 
-		create_canvas(specular_default, CanvasExtent{64, 64})
-		| move_canvas_to_gpu(context)
-		| make_shader_readonly(context, InterpolationType::Point);
 	logger.info(std::source_location::current(), "Created default textures");
 
 	auto depth_stencil_state_info = vk::PipelineDepthStencilStateCreateInfo{}
@@ -296,24 +340,47 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	m_pipeline = std::move(result.value);
 	logger.info(std::source_location::current(), "Created Pipeline");
 
-	
-	GlobalBinding global_binding_init{};	
-	global_binding_init.view = glm::mat4(1.0f);
-	global_binding_init.proj = glm::mat4(1.0f);
+	/*Allocate Per-Frame Uniform Descriptor Sets*/
+	m_frame_uniform.data.view = glm::mat4(1.0f);
+	m_frame_uniform.data.proj = glm::mat4(1.0f);
+	m_frame_uniform.data.camera_position = glm::vec3(1.0f);
 
-	/*Allocate Camera Descriptor Sets*/
-	for (uint32_t i = 0; i < *frames_in_flight; i++) {
-		m_globalbinding.buffers
-			.push_back(UniformBuffer<GlobalBinding>(&global_binding_init,
-													logger,
-													context->physical_device,
-													context->device.get(),
-													descriptor_pool->descriptor_pool.get(),
-													m_globalbinding.layout.get()));
+	for (uint32_t i = 0; i < m_frame_uniform.buffers.size(); i++) {
+		m_frame_uniform.buffers[i] =
+			decltype(m_frame_uniform)::BufferType(&m_frame_uniform.data,
+												  logger,
+												  context->physical_device,
+												  context->device.get(),
+												  descriptor_pool->descriptor_pool.get(),
+												  m_frame_uniform.set_layout.get());
 	}
 
 	logger.info(std::source_location::current(),
-				"created global descriptor sets");
+				"created frame uniform descriptor sets");
+	
+	#if 0
+	m_pointlight_uniform.data.position = glm::vec3(0.0f, -2.0f, 0.0f);
+	//m_pointlight_uniform.data.ambient = glm::vec3(0.2f);
+	m_pointlight_uniform.data.ambient = glm::vec3(1.0f);
+	m_pointlight_uniform.data.diffuse = glm::vec3(0.5f);
+	m_pointlight_uniform.data.specular = glm::vec3(1.0f);
+	m_pointlight_uniform.data.attenuation.constant = 1.0f;
+	m_pointlight_uniform.data.attenuation.linear = 0.09f;
+	m_pointlight_uniform.data.attenuation.quadratic = 0.032f;
+#endif
+
+	for (uint32_t i = 0; i < m_pointlight_uniform.buffers.size(); i++) {
+		m_pointlight_uniform.buffers[i] =
+			decltype(m_pointlight_uniform)::BufferType(&m_pointlight_uniform.data,
+													   logger,
+													   context->physical_device,
+													   context->device.get(),
+													   descriptor_pool->descriptor_pool.get(),
+													   m_pointlight_uniform.set_layout.get());
+	}
+
+	logger.info(std::source_location::current(),
+				"created pointlight uniform descriptor sets");
 }
 
 
@@ -321,88 +388,115 @@ MaterialPipeline::MaterialPipeline(MaterialPipeline&& rhs) noexcept
 {
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
-	std::swap(m_globalbinding, rhs.m_globalbinding);
+	std::swap(m_frame_uniform, rhs.m_frame_uniform);
+	std::swap(m_ambient, rhs.m_ambient);
 	std::swap(m_diffuse, rhs.m_diffuse);
-	std::swap(m_normal, rhs.m_normal);
 	std::swap(m_specular, rhs.m_specular);
+	std::swap(m_normal, rhs.m_normal);
+	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
 }
 
 MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 {
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
-	std::swap(m_globalbinding, rhs.m_globalbinding);
+	std::swap(m_frame_uniform, rhs.m_frame_uniform);
+	std::swap(m_ambient, rhs.m_ambient);
 	std::swap(m_diffuse, rhs.m_diffuse);
-	std::swap(m_normal, rhs.m_normal);
 	std::swap(m_specular, rhs.m_specular);
+	std::swap(m_normal, rhs.m_normal);
+	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
 	return *this;
 }
 
 MaterialPipeline::~MaterialPipeline()
 {
-
 }
 
-
-void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
+void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							  Logger& logger,
 							  vk::Device& device,
 							  vk::DescriptorPool descriptor_pool,
 							  vk::CommandBuffer& commandbuffer,
-							  CurrentFrameInFlight const current_flightframe,
-							  TotalFramesInFlight const max_frames_in_flight,
-							  std::vector<MaterialRenderable>& renderables)
+							  CurrentFlightFrame const current_flightframe,
+							  MaxFlightFrames const max_frames_in_flight,
+							  std::vector<MaterialRenderable>& renderables,
+							  std::vector<Light>& lights)
 {
+	if (!m_ambient.sets.contains(&m_ambient.default_texture)) {
+		m_ambient.sets.insert({&m_ambient.default_texture,
+							  create_texture_descriptorset(device,
+														   m_ambient.layout.get(),
+														   descriptor_pool,
+														   m_ambient.default_texture)});
+		logger.info(std::source_location::current(), "Created ambient default");
+	}
 	
 	if (!m_diffuse.sets.contains(&m_diffuse.default_texture)) {
 		m_diffuse.sets.insert({&m_diffuse.default_texture,
 							  create_texture_descriptorset(device,
 														   m_diffuse.layout.get(),
 														   descriptor_pool,
-														   *max_frames_in_flight,
 														   m_diffuse.default_texture)});
 		logger.info(std::source_location::current(), "Created diffuse default");
 	}
 			
-	if (!m_normal.sets.contains(&m_normal.default_texture)) {
-		m_normal.sets.insert({&m_normal.default_texture,
-							  create_texture_descriptorset(device,
-														   m_normal.layout.get(),
-														   descriptor_pool,
-														   *max_frames_in_flight,
-														   m_normal.default_texture)});
-		logger.info(std::source_location::current(), "Created normal default");
-	}
-
 	if (!m_specular.sets.contains(&m_specular.default_texture)) {
 		m_specular.sets.insert({&m_specular.default_texture,
 							  create_texture_descriptorset(device,
 														   m_specular.layout.get(),
 														   descriptor_pool,
-														   *max_frames_in_flight,
 														   m_specular.default_texture)});
 		logger.info(std::source_location::current(), "Created specular default");
 	}
-
+	
+	if (!m_normal.sets.contains(&m_normal.default_texture)) {
+		m_normal.sets.insert({&m_normal.default_texture,
+							  create_texture_descriptorset(device,
+														   m_normal.layout.get(),
+														   descriptor_pool,
+														   m_normal.default_texture)});
+		logger.info(std::source_location::current(), "Created normal default");
+	}
+	
+	m_frame_uniform.data.view = frame_info.view;
+	m_frame_uniform.data.proj = frame_info.proj;
+	m_frame_uniform.data.camera_position = frame_info.camera_position;
 	copy_to_allocated_memory(device,
-							 m_globalbinding.buffers[*current_flightframe].m_memory,
-							 reinterpret_cast<void*>(global_binding),
-							 sizeof(GlobalBinding));
+							 m_frame_uniform.buffers[*current_flightframe].m_memory,
+							 reinterpret_cast<void*>(&m_frame_uniform.data),
+							 m_frame_uniform.data_memsize);
+	
+	SortedLights sorted_lights;
+	std::ranges::for_each(lights, std::bind_front(sort_light, &logger, &sorted_lights));
+	
+	if (!sorted_lights.points.empty()) {
+		PointLight& p = sorted_lights.points.front();
+		m_pointlight_uniform.data.position = p.position;
+		m_pointlight_uniform.data.ambient = p.ambient;
+		m_pointlight_uniform.data.diffuse = p.diffuse;
+		m_pointlight_uniform.data.specular = p.specular;
+		m_pointlight_uniform.data.attenuation.constant = p.attenuation.constant;
+		m_pointlight_uniform.data.attenuation.linear = p.attenuation.linear;
+		m_pointlight_uniform.data.attenuation.quadratic = p.attenuation.quadratic;
+	}
+	
+	copy_to_allocated_memory(device,
+							 m_pointlight_uniform.buffers[*current_flightframe].m_memory,
+							 reinterpret_cast<void*>(&m_pointlight_uniform.data),
+							 m_pointlight_uniform.data_memsize);
 	
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
 	
-	std::array<vk::DescriptorSet, 4> init_sets{
-		m_globalbinding.buffers[*current_flightframe].m_set.get(),
+	std::array<vk::DescriptorSet, 6> init_sets{
+		m_frame_uniform.buffers[*current_flightframe].m_set.get(),
+		m_ambient.sets[&m_ambient.default_texture][*current_flightframe].get(),
 		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
-		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
 		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
+		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
+		m_pointlight_uniform.buffers[*current_flightframe].m_set.get(),
 	};
-
-	
-	TextureSamplerReadOnly* last_diffuse_texture = &m_diffuse.default_texture;
-	TextureSamplerReadOnly* last_normal_texture = &m_normal.default_texture;
-	TextureSamplerReadOnly* last_specular_texture = &m_specular.default_texture;
 
 	const uint32_t first_set = 0;
 	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
@@ -412,9 +506,43 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 									 init_sets.data(),
 									 0,
 									 nullptr);
+	
+	TextureSamplerReadOnly* last_ambient_texture = &m_ambient.default_texture;
+	TextureSamplerReadOnly* last_diffuse_texture = &m_diffuse.default_texture;
+	TextureSamplerReadOnly* last_specular_texture = &m_specular.default_texture;
+	TextureSamplerReadOnly* last_normal_texture = &m_normal.default_texture;
 
 	int i = 0;
 	for (MaterialRenderable& renderable: renderables) {
+		
+		TextureSamplerReadOnly* ambient_texture = renderable.texture.ambient 
+			? renderable.texture.ambient 
+			: &m_ambient.default_texture;
+		
+		if (ambient_texture != last_ambient_texture) {
+			if (!m_ambient.sets.contains(ambient_texture)) {
+				m_ambient.sets.insert({ambient_texture,
+									  create_texture_descriptorset(device,
+																   m_ambient.layout.get(),
+																   descriptor_pool,
+																   *ambient_texture)});
+
+				logger.info(std::source_location::current(),
+							"Added new ambient texture to cache");
+			}	
+
+			std::array<vk::DescriptorSet, 1> descriptorset{
+				m_ambient.sets[ambient_texture][*current_flightframe].get()
+			};
+			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+											 m_layout.get(),
+											 *m_ambient.set_index,
+											 descriptorset.size(),
+											 descriptorset.data(),
+											 0,
+											 nullptr);
+			last_ambient_texture = ambient_texture;
+		}
 
 		TextureSamplerReadOnly* diffuse_texture = renderable.texture.diffuse 
 			? renderable.texture.diffuse 
@@ -426,7 +554,6 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 									  create_texture_descriptorset(device,
 																   m_diffuse.layout.get(),
 																   descriptor_pool,
-																   *max_frames_in_flight,
 																   *diffuse_texture)});
 
 				logger.info(std::source_location::current(),
@@ -446,6 +573,36 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 			last_diffuse_texture = diffuse_texture;
 		}
 	
+
+		TextureSamplerReadOnly* specular_texture = renderable.texture.specular 
+			? renderable.texture.specular 
+			: &m_specular.default_texture;
+		
+		if (specular_texture != last_specular_texture) {
+			if (!m_specular.sets.contains(specular_texture)) {
+				m_specular.sets.insert({specular_texture,
+									  create_texture_descriptorset(device,
+																   m_specular.layout.get(),
+																   descriptor_pool,
+																   *specular_texture)});
+
+				logger.info(std::source_location::current(),
+							"Added new specular texture to cache");
+			}	
+
+			std::array<vk::DescriptorSet, 1> descriptorset{
+				m_specular.sets[specular_texture][*current_flightframe].get()
+			};
+			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+											 m_layout.get(),
+											 *m_specular.set_index,
+											 descriptorset.size(),
+											 descriptorset.data(),
+											 0,
+											 nullptr);
+			last_specular_texture = specular_texture;
+		}
+		
 		TextureSamplerReadOnly* normal_texture = renderable.texture.normal 
 			? renderable.texture.normal 
 			: &m_normal.default_texture;
@@ -456,7 +613,6 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 									  create_texture_descriptorset(device,
 																   m_normal.layout.get(),
 																   descriptor_pool,
-																   *max_frames_in_flight,
 																   *normal_texture)});
 
 				logger.info(std::source_location::current(),
@@ -476,39 +632,8 @@ void MaterialPipeline::render(MaterialPipeline::GlobalBinding* global_binding,
 			last_normal_texture = normal_texture;
 		}
 	
-		TextureSamplerReadOnly* specular_texture = renderable.texture.specular 
-			? renderable.texture.specular 
-			: &m_specular.default_texture;
-		
-		if (specular_texture != last_specular_texture) {
-			if (!m_specular.sets.contains(specular_texture)) {
-				m_specular.sets.insert({specular_texture,
-									  create_texture_descriptorset(device,
-																   m_specular.layout.get(),
-																   descriptor_pool,
-																   *max_frames_in_flight,
-																   *specular_texture)});
-
-				logger.info(std::source_location::current(),
-							"Added new specular texture to cache");
-			}	
-
-			std::array<vk::DescriptorSet, 1> descriptorset{
-				m_specular.sets[specular_texture][*current_flightframe].get()
-			};
-			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-											 m_layout.get(),
-											 *m_specular.set_index,
-											 descriptorset.size(),
-											 descriptorset.data(),
-											 0,
-											 nullptr);
-			last_specular_texture = specular_texture;
-		}
-	
 		PushConstants push{};
 		push.model = renderable.model;
-		push.basecolor = renderable.basecolor;
 		const uint32_t push_offset = 0;
 		commandbuffer.pushConstants(m_layout.get(),
 									vk::ShaderStageFlagBits::eVertex,

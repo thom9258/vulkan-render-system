@@ -30,12 +30,11 @@ struct BaseTextureRenderable
 struct MaterialRenderable
 {
 	TexturedMesh* mesh;
-	glm::vec4 basecolor;
 	struct {
+		TextureSamplerReadOnly* ambient;
 		TextureSamplerReadOnly* diffuse;
-		TextureSamplerReadOnly* normal;
 		TextureSamplerReadOnly* specular;
-		TextureSamplerReadOnly* shininess;
+		TextureSamplerReadOnly* normal;
 	} texture;
 	glm::mat4 model;
 	bool casts_shadow;

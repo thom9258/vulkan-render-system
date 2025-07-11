@@ -5,7 +5,7 @@
 
 #include <variant>
 
-struct AreaLight
+struct DirectionalLight
 {
 	glm::vec3 direction;
 	glm::vec3 ambient;
@@ -39,6 +39,6 @@ struct SpotLight
 	}cutoff;
 };
 
-using Light = std::variant<AreaLight,
+using Light = std::variant<DirectionalLight,
 						   PointLight,
 						   SpotLight>;

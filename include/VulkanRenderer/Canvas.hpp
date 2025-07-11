@@ -9,10 +9,11 @@
 
 struct Pixel8bitRGBA
 {
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-	uint8_t a;
+	using PixelType = uint8_t;
+	PixelType r;
+	PixelType g;
+	PixelType b;
+	PixelType a;
 };
 
 struct CanvasOffset
