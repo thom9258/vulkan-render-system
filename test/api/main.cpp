@@ -19,6 +19,8 @@
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/ShaderTexture.hpp>
 
+#include "LoadResources.hpp"
+
 #define SIMPLE_GEOMETRY_IMPLEMENTATION
 #include <simple_geometry.h>
 
@@ -178,9 +180,16 @@ int main()
 	const auto window = context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
 	
+	glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 0.0f, -3.0f);
+	glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 constexpr camera_init_up = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::mat4 camera = glm::inverse(glm::lookAt(camera_init_position,
+												camera_init_target,
+												camera_init_up));
+
 	WorldRenderInfo world_info{};
-	world_info.camera_position = glm::vec3(0.f, 0.f, -4.f);
-    world_info.view = glm::translate(glm::mat4(1.f), world_info.camera_position);
+	world_info.camera_position = camera[3];
+    world_info.view = glm::inverse(camera);
     world_info.projection = glm::perspective(glm::radians(70.f), aspect, 0.1f, 200.0f);
     world_info.projection[1][1] *= -1;
 
@@ -209,144 +218,9 @@ int main()
 		VertexBuffer::create<VertexPosNormColor>(context, cube_vertices)
 	};
 
-	auto loaded_monkey_mesh = load_obj(context,
-									   assets_root,
-									   "models/monkey/monkey_flat.obj");
-	
-	Mesh monkey_mesh;
-	if (std::holds_alternative<Mesh>(loaded_monkey_mesh)) {
-		monkey_mesh = std::move(std::get<Mesh>(loaded_monkey_mesh));
-	}
-	else if (std::holds_alternative<MeshWithWarning>(loaded_monkey_mesh)) {
-		std::cout << "TinyOBJ Warning: " 
-				  << std::get<MeshWithWarning>(loaded_monkey_mesh).warning
-				  << std::endl;
-		monkey_mesh = std::move(std::get<MeshWithWarning>(loaded_monkey_mesh).mesh);
-	}
-	else if (std::holds_alternative<MeshInvalidPath>(loaded_monkey_mesh)) {
-		auto error = std::get<MeshInvalidPath>(loaded_monkey_mesh);
-		throw std::runtime_error(std::string("InvalidPath: ")
-								 + (error.path / error.filename).string());
-	}
-	else if (std::holds_alternative<MeshLoadError>(loaded_monkey_mesh)) {
-		throw std::runtime_error(std::string("TinyOBJ error: ") +
-								 std::get<MeshLoadError>(loaded_monkey_mesh).msg);
-	}
-	//https://opengameart.org/art-search-advanced?keys=&field_art_type_tid%5B0%5D=10&sort_by=count&sort_order=DESC&page=3
-	std::cout << "loading chest model!" << std::endl;
-	auto loaded_chest = load_obj_with_texcoords(context,
-												assets_root,
-												"models/ChestWowStyle/Chest.obj");
-	TexturedMesh chest_mesh;
-	if (auto p = std::get_if<TexturedMesh>(&loaded_chest)) {
-		chest_mesh = std::move(*p);
-	}
-	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_chest)) {
-		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
-		chest_mesh = std::move(p->mesh);
-	}
-	else if (auto p = std::get_if<MeshLoadError>(&loaded_chest)) {
-		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
-	}
+	Resources resources{context, assets_root};
 
-	std::cout << "loading chest texture!" << std::endl;
-	TextureSamplerReadOnly chest_texture =
-		load_bitmap(models_root / "ChestWowStyle/diffuse.tga", 
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Linear);
 
-	std::cout << "loading smg model!" << std::endl;
-	auto loaded_smg = load_obj(context,
-							   models_root,
-							   "smg/smg.obj");
-	Mesh smg_mesh;
-	if (auto p = std::get_if<Mesh>(&loaded_smg)) {
-		smg_mesh = std::move(*p);
-	}
-	else if (auto p = std::get_if<MeshWithWarning>(&loaded_smg)) {
-		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
-		smg_mesh = std::move(p->mesh);
-	}
-	else if (auto p = std::get_if<MeshLoadError>(&loaded_smg)) {
-		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
-	}
-	
-	auto loaded_textured_smg = load_obj_with_texcoords(context,
-													   models_root,
-													   "smg/smg.obj");
-	TexturedMesh textured_smg_mesh;
-	if (auto p = std::get_if<TexturedMesh>(&loaded_textured_smg)) {
-		textured_smg_mesh = std::move(*p);
-	}
-	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_textured_smg)) {
-		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
-		textured_smg_mesh = std::move(p->mesh);
-	}
-	else if (auto p = std::get_if<MeshLoadError>(&loaded_textured_smg)) {
-		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
-	}
-
-	std::cout << "loading smg textures!" << std::endl;
-
-	TextureSamplerReadOnly smg_diffuse =
-		load_bitmap(models_root / "smg/D.tga", 
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Linear);
-	
-	TextureSamplerReadOnly smg_specular =
-		load_bitmap(models_root / "smg/S.tga", 
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Linear);
-
-	TextureSamplerReadOnly smg_normal =
-		load_bitmap(models_root / "smg/N.tga", 
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Linear);
-
-	TextureSamplerReadOnly smg_glossiness =
-		load_bitmap(models_root / "smg/G.tga", 
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::Yes)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Linear);
-
-	std::cout << "loading statue jpg!" << std::endl;
-	TextureSamplerReadOnly statue = 
-		load_bitmap(textures_root / "texture.jpg",
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::No)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Point);
-	
-	std::cout << "loading lulu jpg!" << std::endl;
-	TextureSamplerReadOnly lulu = 
-		load_bitmap(textures_root / "lulu.jpg",
-					BitmapPixelFormat::RGBA,
-					VerticalFlipOnLoad::No)
-		| throw_on_bitmap_error()
-		| get_bitmap()
-		| move_bitmap_to_gpu(&context)
-		| make_shader_readonly(&context, InterpolationType::Linear);
 
 	std::cout << "STARTING DRAW LOOP" << std::endl;
 	/** ************************************************************************
@@ -360,6 +234,32 @@ int main()
 		/** ************************************************************************
 		 * Handle Inputs
 		 */
+		glm::vec3 constexpr world_right = glm::vec3(1.0f, 0.0f, 0.0f);
+		glm::vec3 constexpr world_up = glm::vec3(0.0f, 1.0f, 0.0f);
+		glm::vec3 constexpr world_forward = glm::vec3(0.0f, 0.0f, 1.0f);
+#if 0
+		glm::vec3 const camera_right = glm::vec3(glm::normalize(camera[0]));
+		glm::vec3 const camera_up = glm::vec3(glm::normalize(camera[1]));
+		glm::vec3 const camera_forward = glm::vec3(glm::normalize(camera[2]));
+#else 
+		glm::vec3 const camera_right = glm::vec3(camera[0][0], 
+																camera[0][1],
+																camera[0][2]
+																);
+		glm::vec3 const camera_up = glm::vec3(camera[1][0], 
+															 camera[1][1],
+															 camera[1][2]
+															 );
+		glm::vec3 const camera_forward = glm::vec3(camera[2][0], 
+																  camera[2][1],
+																  camera[2][2]
+																  );
+
+#endif		
+
+		float constexpr move_speed = 0.5f;
+		float constexpr rotate_speed = 2.0f;
+
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
 			case SDL_QUIT: 
@@ -371,13 +271,41 @@ int main()
 				case SDLK_ESCAPE:
 					exit = true;
 					break;
+				case SDLK_w:
+					camera = glm::translate(camera, camera_forward * move_speed);
+					break;
+				case SDLK_s:
+					camera = glm::translate(camera, camera_forward * -move_speed);
+					break;
+				case SDLK_d:
+					camera = glm::translate(camera, camera_right * -move_speed);
+					break;
+				case SDLK_a:
+					camera = glm::translate(camera, camera_right * move_speed);
+					break;
+				case SDLK_e:
+					camera = glm::translate(camera, camera_up * -move_speed);
+					break;
+				case SDLK_q:
+					camera = glm::translate(camera, camera_up * move_speed);
+					break;
+					
+				case SDLK_LEFT:
+					camera = glm::rotate(camera,
+										 glm::radians(rotate_speed),
+										 world_up);
+					break;
+				case SDLK_RIGHT:
+					camera = glm::rotate(camera,
+										 glm::radians(-rotate_speed),
+										 world_up);
+					break;
+
 				}
-				
 				break;
 				
 			case SDL_WINDOWEVENT: {
-				const SDL_WindowEvent& wev = event.window;
-				switch (wev.event) {
+				switch (event.window.event) {
 				case SDL_WINDOWEVENT_RESIZED:
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 					context.window_resize_event_triggered();
@@ -390,6 +318,28 @@ int main()
 			} break;
 			}
 		}
+		world_info.camera_position = camera[3];
+		world_info.view = glm::inverse(camera);
+		
+		std::cout << std::format("Camera forward  {} {} {}\n"
+								 "       right    {} {} {}\n"
+								 "       up       {} {} {}\n"
+								 "       position {} {} {}",
+								 camera_forward[0],
+								 camera_forward[1],
+								 camera_forward[2],
+								 camera_right[0],
+								 camera_right[1],
+								 camera_right[2],
+								 camera_up[0],
+								 camera_up[1],
+								 camera_up[2],
+								 world_info.camera_position[0],
+								 world_info.camera_position[1],
+								 world_info.camera_position[2]
+								 )
+			<< std::endl;
+		
 			
 		/** ************************************************************************
 		 * Render Loop
@@ -400,8 +350,8 @@ int main()
 				std::vector<Renderable> renderables{};
 #if 0
 				BaseTextureRenderable chest{};
-				chest.mesh = &chest_mesh;
-				chest.texture = &chest_texture;
+				chest.mesh = &resources.chest.mesh;
+				chest.texture = &resources.chest.diffuse;
 				chest.model = glm::mat4(1.0f);
 				chest.model = glm::translate(chest.model, glm::vec3(0.0f, -1.0f, 0.0f));
 				chest.model = glm::scale(chest.model, glm::vec3(0.02f));
@@ -428,7 +378,7 @@ int main()
 				renderables.push_back(t);
 				
 				NormColorRenderable d2{};
-				d2.mesh = &monkey_mesh;
+				d2.mesh = &resources.monkey.mesh;
 				d2.model = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
 				d2.model = glm::rotate(d2.model,
 									   glm::radians(frameInfo.total_frame_count * 1.0f),
@@ -438,7 +388,7 @@ int main()
 				WireframeRenderable d3{};
 				//d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 				d3.basecolor = glm::vec4(1.0f);
-				d3.mesh = &monkey_mesh;
+				d2.mesh = &resources.monkey.mesh;
 				d3.model = glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.5f, 0.0f));
 				d3.model = glm::rotate(d3.model,
 									   glm::radians(frameInfo.total_frame_count * 1.0f),
@@ -446,8 +396,8 @@ int main()
 				renderables.push_back(d3);
 				
 				BaseTextureRenderable basesmg{};
-				basesmg.mesh = &smg_mesh;
-				basesmg.texture = &smg_diffuse;
+				basesmg.mesh = &smg.textured_mesh;
+				basesmg.texture = &smg.diffuse;
 				basesmg.model = glm::mat4(1.0f);
 				basesmg.model = glm::translate(basesmg.model, glm::vec3(1.5f, 0.0f, 0.0f));
 				basesmg.model = glm::scale(basesmg.model, glm::vec3(0.4f));
@@ -464,14 +414,29 @@ int main()
 				std::vector<Light> lights;
 				PointLight pl;
 				pl.position = glm::vec3(0.0f, 0.0f, 0.2f);
-				pl.ambient = glm::vec3(0.2f);
-				pl.diffuse = glm::vec3(0.8f);
+				pl.ambient = glm::vec3(0.4f);
+				pl.diffuse = glm::vec3(1.0f);
 				pl.specular = glm::vec3(1.0f);
 				pl.attenuation.constant = 1.0f;
 				pl.attenuation.linear = 0.09f;
 				pl.attenuation.quadratic = 0.032f;
 
 				lights.push_back(pl);
+				
+				MaterialRenderable chest{};
+				chest.mesh = &resources.chest.mesh;
+				chest.casts_shadow = true;
+				chest.texture.ambient = nullptr;
+				chest.texture.diffuse = &resources.chest.diffuse;
+				chest.model = glm::mat4(1.0f);
+				chest.model = glm::translate(chest.model, glm::vec3(1.5f, -1.0f, 1.5f));
+				chest.model = glm::scale(chest.model, glm::vec3(0.02f));
+				chest.model = glm::rotate(chest.model,
+										  //glm::radians(3.14f/2),
+										  glm::radians(frameInfo.total_frame_count * 0.5f),
+										  glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(chest);
+	
 				
 				WireframeRenderable d3{};
 				//d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
@@ -480,26 +445,51 @@ int main()
 				d3.model = glm::translate(glm::mat4(1.0f), pl.position);
 				d3.model = glm::scale(d3.model, glm::vec3(0.1f));
 				renderables.push_back(d3);
-
 				
 				MaterialRenderable smg{};
-				smg.mesh = &textured_smg_mesh;
+				smg.mesh = &resources.smg.textured_mesh;
 				smg.casts_shadow = true;
 				smg.texture.ambient = nullptr;
-				smg.texture.diffuse = &smg_diffuse;
-				smg.texture.specular = &smg_specular;
-				smg.texture.normal = &smg_normal;
+				smg.texture.diffuse = &resources.smg.diffuse;
+				smg.texture.specular = &resources.smg.specular;
+				smg.texture.normal = &resources.smg.normal;
 				smg.model = glm::mat4(1.0f);
-				smg.model = glm::translate(smg.model, glm::vec3(-1.5f, -0.8f, 0.0f));
-				smg.model = glm::scale(smg.model, glm::vec3(0.4f));
+				smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
+				smg.model = glm::scale(smg.model, glm::vec3(0.2f));
 				smg.model = glm::rotate(smg.model,
 										glm::radians(frameInfo.total_frame_count * 1.0f),
 										glm::normalize(glm::vec3(0, 1, 0)));
 				renderables.push_back(smg);
-
+				
+				MaterialRenderable box{};
+				box.mesh = &textured_cube_mesh;
+				box.casts_shadow = true;
+				box.texture.ambient = nullptr;
+				box.texture.diffuse = &resources.box.diffuse;
+				box.texture.specular = &resources.box.specular;
+				//box.texture.normal = &box_normal;
+				box.model = glm::mat4(1.0f);
+				box.model = glm::translate(box.model, glm::vec3(1.5f, 0.8f, 0.0f));
+				box.model = glm::rotate(box.model,
+										glm::radians(frameInfo.total_frame_count * 1.0f),
+										glm::normalize(glm::vec3(0, 1, 0)));
+				renderables.push_back(box);
+				
+				MaterialRenderable floor{};
+				floor.mesh = &textured_cube_mesh;
+				floor.casts_shadow = true;
+				floor.texture.diffuse = &resources.brickwall.diffuse;
+				floor.texture.specular = &resources.brickwall.specular;
+				floor.texture.normal = &resources.brickwall.normal;
+				floor.model = glm::mat4(1.0f);
+				floor.model = glm::translate(floor.model, glm::vec3(0.0f, -1.0f, 0.0f));
+				floor.model = glm::scale(floor.model, glm::vec3(10.0f, 0.1f, 10.0f));
+				renderables.push_back(floor);
+	
+				
 #if 0				
 				NormColorRenderable d2{};
-				d2.mesh = &smg_mesh;
+				d2.mesh = &smg.mesh;
 				d2.model = glm::mat4(1.0f);
 				d2.model = glm::translate(d2.model, glm::vec3(1.5f, -0.8f, 0.0f));
 				d2.model = glm::scale(d2.model, glm::vec3(0.4f));
