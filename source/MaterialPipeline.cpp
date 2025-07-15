@@ -186,6 +186,26 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	logger.info(std::source_location::current(), "Created point light uniform layout");
 	
+	// create directionallight uniform
+	std::array<vk::DescriptorSetLayoutBinding, 1> directionallight_uniform_layout_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+	};
+
+	const auto directionallight_uniform_bindings_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(directionallight_uniform_layout_bindings);
+	
+	m_directionallight_uniform.set_layout =
+		context->device.get().createDescriptorSetLayoutUnique(directionallight_uniform_bindings_setinfo,
+															  nullptr);
+	
+	logger.info(std::source_location::current(), "Created point light uniform layout");
+	
+	
 	std::array<vk::DescriptorSetLayoutBinding, 1> ambient_texture_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
@@ -248,13 +268,14 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
 
-	std::array<vk::DescriptorSetLayout, 6> const descriptorset_layouts{
+	std::array<vk::DescriptorSetLayout, 7> const descriptorset_layouts{
 		m_frame_uniform.set_layout.get(),
 		m_ambient.layout.get(),
 		m_diffuse.layout.get(),
 		m_specular.layout.get(),
 		m_normal.layout.get(),
 		m_pointlight_uniform.set_layout.get(),
+		m_directionallight_uniform.set_layout.get(),
 	};
 
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
@@ -358,17 +379,6 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	logger.info(std::source_location::current(),
 				"created frame uniform descriptor sets");
 	
-	#if 0
-	m_pointlight_uniform.data.position = glm::vec3(0.0f, -2.0f, 0.0f);
-	//m_pointlight_uniform.data.ambient = glm::vec3(0.2f);
-	m_pointlight_uniform.data.ambient = glm::vec3(1.0f);
-	m_pointlight_uniform.data.diffuse = glm::vec3(0.5f);
-	m_pointlight_uniform.data.specular = glm::vec3(1.0f);
-	m_pointlight_uniform.data.attenuation.constant = 1.0f;
-	m_pointlight_uniform.data.attenuation.linear = 0.09f;
-	m_pointlight_uniform.data.attenuation.quadratic = 0.032f;
-#endif
-
 	for (uint32_t i = 0; i < m_pointlight_uniform.buffers.size(); i++) {
 		m_pointlight_uniform.buffers[i] =
 			decltype(m_pointlight_uniform)::BufferType(&m_pointlight_uniform.data,
@@ -381,6 +391,19 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 
 	logger.info(std::source_location::current(),
 				"created pointlight uniform descriptor sets");
+
+	for (uint32_t i = 0; i < m_directionallight_uniform.buffers.size(); i++) {
+		m_directionallight_uniform.buffers[i] =
+			decltype(m_directionallight_uniform)::BufferType(&m_directionallight_uniform.data,
+															 logger,
+															 context->physical_device,
+															 context->device.get(),
+															 descriptor_pool->descriptor_pool.get(),
+															 m_directionallight_uniform.set_layout.get());
+	}
+
+	logger.info(std::source_location::current(),
+				"created directionallight uniform descriptor sets");
 }
 
 
@@ -394,6 +417,7 @@ MaterialPipeline::MaterialPipeline(MaterialPipeline&& rhs) noexcept
 	std::swap(m_specular, rhs.m_specular);
 	std::swap(m_normal, rhs.m_normal);
 	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
+	std::swap(m_directionallight_uniform, rhs.m_directionallight_uniform);
 }
 
 MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
@@ -406,6 +430,7 @@ MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 	std::swap(m_specular, rhs.m_specular);
 	std::swap(m_normal, rhs.m_normal);
 	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
+	std::swap(m_directionallight_uniform, rhs.m_directionallight_uniform);
 	return *this;
 }
 
@@ -486,16 +511,31 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							 reinterpret_cast<void*>(&m_pointlight_uniform.data),
 							 m_pointlight_uniform.data_memsize);
 	
+	if (!sorted_lights.directionals.empty()) {
+		DirectionalLight& p = sorted_lights.directionals.front();
+		m_directionallight_uniform.data.direction = p.direction;
+		m_directionallight_uniform.data.ambient = p.ambient;
+		m_directionallight_uniform.data.diffuse = p.diffuse;
+		m_directionallight_uniform.data.specular = p.specular;
+	}
+	
+	copy_to_allocated_memory(device,
+							 m_directionallight_uniform.buffers[*current_flightframe].m_memory,
+							 reinterpret_cast<void*>(&m_directionallight_uniform.data),
+							 m_directionallight_uniform.data_memsize);
+	
+	
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
 	
-	std::array<vk::DescriptorSet, 6> init_sets{
+	std::array<vk::DescriptorSet, 7> init_sets{
 		m_frame_uniform.buffers[*current_flightframe].m_set.get(),
 		m_ambient.sets[&m_ambient.default_texture][*current_flightframe].get(),
 		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
 		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
 		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
 		m_pointlight_uniform.buffers[*current_flightframe].m_set.get(),
+		m_directionallight_uniform.buffers[*current_flightframe].m_set.get(),
 	};
 
 	const uint32_t first_set = 0;
