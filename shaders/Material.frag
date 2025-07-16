@@ -145,8 +145,8 @@ vec3 calculate_spot_light(SpotLight light)
 void main() 
 {
 	 vec3 total_lighting = vec3(0.0);
-	 //total_lighting += calculate_point_light(pointlight);
-	 //total_lighting += calculate_directional_light(directionallight);
+	 total_lighting += calculate_point_light(pointlight);
+	 total_lighting += calculate_directional_light(directionallight);
 	 total_lighting += calculate_spot_light(spotlight);
 	 
 	 final_color = vec4(total_lighting, 1.0);

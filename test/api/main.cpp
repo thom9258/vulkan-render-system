@@ -101,27 +101,34 @@ auto mixed_light_scene(Resources& resources,
 	Scene scene;
 	
 	PointLight pl;
-	pl.position = glm::vec3(0.0f, 0.2f, 0.0f);
-	pl.ambient = glm::vec3(0.05f);
+	pl.position = glm::vec3(-2.5f, 1.0f, 0.7f);
 	pl.diffuse = glm::vec3(3.0f, 1.0f, 1.0f);
+	pl.ambient = pl.diffuse * 0.05f;
 	pl.specular = glm::vec3(1.0f) * 0.1f;
 	pl.attenuation.constant = 1.0f;
 	pl.attenuation.linear = 0.09f;
 	pl.attenuation.quadratic = 0.032f;
 	scene.lights.push_back(pl);
+
+	WireframeRenderable plbox{};
+	plbox.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
+	plbox.mesh = &resources.cube.mesh;
+	plbox.model = glm::translate(glm::mat4(1.0f), pl.position);
+	plbox.model = glm::scale(plbox.model, glm::vec3(0.1f));
+	scene.renderables.push_back(plbox);
+
 	
 	DirectionalLight dl;
 	dl.direction = glm::vec3(-0.1f, -0.2f, -0.0f);
-	dl.ambient = glm::vec3(0.1f);
-	dl.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
-	dl.specular = glm::vec3(1.0f) * 0.1f;
+	dl.diffuse = glm::vec3(1.0f, 1.0f, 0.4f);
+	dl.ambient = dl.diffuse * 0.01f;
+	dl.specular = glm::vec3(0.1f);
 	scene.lights.push_back(dl);
 	
 	SpotLight s1;
 	s1.position = glm::vec3(-1.0f, 0.0f, -1.0f);
 	s1.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-	//s1.direction = s1.position + glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-	s1.ambient = glm::vec3(0.1f);
+	s1.ambient = glm::vec3(0.0f);
 	s1.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
 	s1.specular = glm::vec3(1.0f);
 	s1.attenuation.constant = 1.0f;
@@ -131,18 +138,18 @@ auto mixed_light_scene(Resources& resources,
 	s1.cutoff.outer = glm::cos(glm::radians(35.0f));
 	scene.lights.push_back(s1);
 	
-	WireframeRenderable d3{};
-	d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	d3.mesh = &resources.cube.mesh;
-	d3.model = glm::translate(glm::mat4(1.0f), s1.position);
-	d3.model = glm::scale(d3.model, glm::vec3(0.1f));
-	scene.renderables.push_back(d3);
-	WireframeRenderable d4{};
-	d4.basecolor = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-	d4.mesh = &resources.cube.mesh;
-	d4.model = glm::translate(glm::mat4(1.0f), s1.position + s1.direction);
-	d4.model = glm::scale(d4.model, glm::vec3(0.4f));
-	scene.renderables.push_back(d4);
+	WireframeRenderable spotpos{};
+	spotpos.basecolor = glm::vec4(glm::normalize(s1.diffuse), 1.0f);
+	spotpos.mesh = &resources.cube.mesh;
+	spotpos.model = glm::translate(glm::mat4(1.0f), s1.position);
+	spotpos.model = glm::scale(spotpos.model, glm::vec3(0.1f));
+	scene.renderables.push_back(spotpos);
+	WireframeRenderable spotdir{};
+	spotdir.basecolor = glm::vec4(glm::normalize(s1.diffuse), 1.0f);
+	spotdir.mesh = &resources.cube.mesh;
+	spotdir.model = glm::translate(glm::mat4(1.0f), s1.position + s1.direction);
+	spotdir.model = glm::scale(spotdir.model, glm::vec3(0.4f));
+	scene.renderables.push_back(spotdir);
 	
 	
 	MaterialRenderable chest{};
