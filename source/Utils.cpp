@@ -64,10 +64,17 @@ PhysicalDevice_string(const vk::PhysicalDevice& physicaldevice)
 	
 	auto properties = physicaldevice.getProperties();
 	auto features = physicaldevice.getFeatures();
+
 	ss << "> wireframe mode supported: " 
 	   << std::boolalpha << features.fillModeNonSolid 
-	   << "> max Anisotrophy supported: " 
-	   << properties.limits.maxSamplerAnisotropy;
+	   << "\n> max Anisotrophy supported: " 
+	   << properties.limits.maxSamplerAnisotropy
+	   << "\n> max descriptorset samplers: " 
+	   << properties.limits.maxDescriptorSetSamplers
+	   << "\n> max descriptorsets bound: " 
+	   << properties.limits.maxBoundDescriptorSets;
+	
+	return ss.str();
 	
 	return ss.str();
 }

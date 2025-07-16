@@ -84,10 +84,16 @@ struct SpotLightUniformLayout
 	glm::vec3 specular;
 	float _padding5{1.0f};
 	struct {
+		float constant;
+		float linear;
+		float quadratic;
+	}attenuation;
+	float _padding6{1.0f};
+	struct {
 		float inner;
 		float outer;
 	}cutoff;
-	float _padding6[2]{1.0f, 1.0f};
+	float _padding7[2]{1.0f, 1.0f};
 };
 
 
@@ -150,6 +156,6 @@ private:
 	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
 	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
 	Uniform<DescriptorSetIndex{5}, PointLightUniformLayout> m_pointlight_uniform;
-	Uniform<DescriptorSetIndex{6}, DirectionalLightUniformLayout> m_directionallight_uniform;
-	//Uniform<DescriptorSetIndex{7}, SpotLightUniformLayout> m_spotlight_uniform;
+	Uniform<DescriptorSetIndex{6}, SpotLightUniformLayout> m_spotlight_uniform;
+	Uniform<DescriptorSetIndex{7}, DirectionalLightUniformLayout> m_directionallight_uniform;
 };

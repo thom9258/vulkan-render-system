@@ -56,18 +56,55 @@ struct Scene
 	std::vector<Light> lights;
 };
 
-auto mixed_light_scene(Resources& resources, CurrentFrameInfo frameInfo)
+auto normcolor_scene(Resources& resources,
+					 CurrentFrameInfo frameInfo)
 	-> Scene
 {
 	Scene scene;
 	
-	std::vector<Light> lights;
+	NormColorRenderable box{};
+	box.mesh = &resources.cube.mesh;
+	box.model = glm::mat4(1.0f);
+	box.model = glm::translate(box.model, glm::vec3(1.5f, 0.8f, 0.0f));
+	box.model = glm::rotate(box.model,
+							glm::radians(frameInfo.total_frame_count * 1.0f),
+							glm::normalize(glm::vec3(0, 1, 0)));
+	scene.renderables.push_back(box);
+	
+	NormColorRenderable floor{};
+	floor.mesh = &resources.cube.mesh;
+	floor.model = glm::mat4(1.0f);
+	floor.model = glm::translate(floor.model, glm::vec3(0.0f, -1.0f, 0.0f));
+	floor.model = glm::scale(floor.model, glm::vec3(10.0f, 0.1f, 10.0f));
+	scene.renderables.push_back(floor);
+		
+	NormColorRenderable smg{};
+	smg.mesh = &resources.smg.mesh;
+	smg.model = glm::mat4(1.0f);
+	smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
+	smg.model = glm::scale(smg.model, glm::vec3(0.2f));
+	smg.model = glm::rotate(smg.model,
+						   glm::radians(frameInfo.total_frame_count * 1.0f),
+						   glm::normalize(glm::vec3(0, 1, 0)));
+	scene.renderables.push_back(smg);
+	return scene;
+}
 
+
+
+auto mixed_light_scene(Resources& resources,
+					   CurrentFrameInfo frameInfo,
+					   glm::vec3 campos,
+					   glm::vec3 camfront)
+	-> Scene
+{
+	Scene scene;
+	
 	PointLight pl;
 	pl.position = glm::vec3(0.0f, 0.2f, 0.0f);
 	pl.ambient = glm::vec3(0.05f);
 	pl.diffuse = glm::vec3(3.0f, 1.0f, 1.0f);
-	pl.specular = glm::vec3(1.0f);
+	pl.specular = glm::vec3(1.0f) * 0.1f;
 	pl.attenuation.constant = 1.0f;
 	pl.attenuation.linear = 0.09f;
 	pl.attenuation.quadratic = 0.032f;
@@ -75,10 +112,38 @@ auto mixed_light_scene(Resources& resources, CurrentFrameInfo frameInfo)
 	
 	DirectionalLight dl;
 	dl.direction = glm::vec3(-0.1f, -0.2f, -0.0f);
-	dl.ambient = glm::vec3(0.05f);
+	dl.ambient = glm::vec3(0.1f);
 	dl.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
-	dl.specular = glm::vec3(1.0f);
+	dl.specular = glm::vec3(1.0f) * 0.1f;
 	scene.lights.push_back(dl);
+	
+	SpotLight s1;
+	s1.position = glm::vec3(-1.0f, 0.0f, -1.0f);
+	s1.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
+	//s1.direction = s1.position + glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
+	s1.ambient = glm::vec3(0.1f);
+	s1.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
+	s1.specular = glm::vec3(1.0f);
+	s1.attenuation.constant = 1.0f;
+	s1.attenuation.linear = 0.09f;
+	s1.attenuation.quadratic = 0.032f;
+	s1.cutoff.inner = glm::cos(glm::radians(30.0f));
+	s1.cutoff.outer = glm::cos(glm::radians(35.0f));
+	scene.lights.push_back(s1);
+	
+	WireframeRenderable d3{};
+	d3.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	d3.mesh = &resources.cube.mesh;
+	d3.model = glm::translate(glm::mat4(1.0f), s1.position);
+	d3.model = glm::scale(d3.model, glm::vec3(0.1f));
+	scene.renderables.push_back(d3);
+	WireframeRenderable d4{};
+	d4.basecolor = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+	d4.mesh = &resources.cube.mesh;
+	d4.model = glm::translate(glm::mat4(1.0f), s1.position + s1.direction);
+	d4.model = glm::scale(d4.model, glm::vec3(0.4f));
+	scene.renderables.push_back(d4);
+	
 	
 	MaterialRenderable chest{};
 	chest.mesh = &resources.chest.mesh;
@@ -94,13 +159,7 @@ auto mixed_light_scene(Resources& resources, CurrentFrameInfo frameInfo)
 							  glm::normalize(glm::vec3(0, 1, 0)));
 	scene.renderables.push_back(chest);
 	
-	WireframeRenderable d3{};
-	d3.basecolor = glm::vec4(1.0f);
-	d3.mesh = &resources.cube.mesh;
-	d3.model = glm::translate(glm::mat4(1.0f), pl.position);
-	d3.model = glm::scale(d3.model, glm::vec3(0.1f));
-	scene.renderables.push_back(d3);
-	
+
 	MaterialRenderable smg{};
 	smg.mesh = &resources.smg.textured_mesh;
 	smg.casts_shadow = true;
@@ -228,8 +287,8 @@ int main()
     world_info.projection[1][1] *= -1;
 
 	DescriptorPoolCreateInfo descriptor_pool_info;
-	descriptor_pool_info.uniform_buffer_count = 100;
-	descriptor_pool_info.combined_image_sampler_count = 100;
+	descriptor_pool_info.uniform_buffer_count = 1000;
+	descriptor_pool_info.combined_image_sampler_count = 1000;
 
 	DescriptorPool descriptor_pool(descriptor_pool_info,
 								   context);
@@ -425,20 +484,16 @@ int main()
 				lights.push_back(dl);
 #endif				
 			
-#if 0				
-				NormColorRenderable d2{};
-				d2.mesh = &smg.mesh;
-				d2.model = glm::mat4(1.0f);
-				d2.model = glm::translate(d2.model, glm::vec3(1.5f, -0.8f, 0.0f));
-				d2.model = glm::scale(d2.model, glm::vec3(0.4f));
-				d2.model = glm::rotate(d2.model,
-									   glm::radians(frameInfo.total_frame_count * 1.0f),
-									   glm::normalize(glm::vec3(0, 1, 0)));
-				renderables.push_back(d2);
-#endif	
-
 				Scene scene;
-				scene = mixed_light_scene(resources, frameInfo);
+
+#if 1 
+				scene = mixed_light_scene(resources,
+										  frameInfo,
+										  camera.position,
+										  camera.position + camera_forward);
+#else
+				scene = normcolor_scene(resources, frameInfo);
+#endif
 
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
 												   frameInfo.total_frame_count,

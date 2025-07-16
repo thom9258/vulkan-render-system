@@ -34,6 +34,11 @@ struct SpotLight
 	glm::vec3 diffuse;
 	glm::vec3 specular;
 	struct {
+		float constant;
+		float linear;
+		float quadratic;
+	}attenuation;
+	struct {
 		float inner;
 		float outer;
 	}cutoff;
