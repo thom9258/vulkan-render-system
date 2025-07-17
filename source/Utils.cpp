@@ -71,10 +71,12 @@ PhysicalDevice_string(const vk::PhysicalDevice& physicaldevice)
 	   << properties.limits.maxSamplerAnisotropy
 	   << "\n> max descriptorset samplers: " 
 	   << properties.limits.maxDescriptorSetSamplers
+	   << "\n> max descriptorset uniform buffers: " 
+	   << properties.limits.maxDescriptorSetUniformBuffers
 	   << "\n> max descriptorsets bound: " 
-	   << properties.limits.maxBoundDescriptorSets;
-	
-	return ss.str();
+	   << properties.limits.maxBoundDescriptorSets
+	   << "\n> max descriptorset vertex bindings: " 
+	   << properties.limits.maxVertexInputBindings;
 	
 	return ss.str();
 }

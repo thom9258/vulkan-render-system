@@ -100,5 +100,5 @@ public:
 
 	GeometryPass geometry_pass;
 	Pipelines pipelines;
-	MaterialPipeline material_pipeline;
+	MaterialPipeline2 material_pipeline;
 };

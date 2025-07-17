@@ -71,6 +71,7 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShaderTextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PipelineUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline2.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp
