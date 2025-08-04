@@ -83,36 +83,31 @@ private:
 	vk::UniquePipelineLayout m_layout;
     vk::UniquePipeline m_pipeline;
 	
-	struct CameraUniformLayout
+	struct CameraUniformData
 	{
 		glm::mat4 view;
 		glm::mat4 proj;
 		glm::vec3 position;
 		float _padding1{1.0f};
 	};
-	
 
-	//struct FrameUniform 
-	//{
-	//DescriptorSetIndex static constexpr set_index = DescriptorSetIndex{0};
-	//vk::UniqueDescriptorSetLayout set_layout;
-	//FlightFramesArray<UniformBuffer<CameraUniformLayout>> camera_binding; 
-	//FlightFramesArray<UniformBuffer<PointLightUniformLayout>> pointlight_binding; 
-	//FlightFramesArray<UniformBuffer<SpotLightUniformLayout>> spotlight_binding; 
-	//FlightFramesArray<UniformBuffer<DirectionalLightUniformLayout>> directionallight_binding; 
-//};
-	//
-	//FrameUniform m_frame_uniform;
+	DescriptorSetIndex static constexpr frame_set_index = DescriptorSetIndex{0};
+	struct
+	{
+		vk::UniqueDescriptorSetLayout set_layout;
+		FlightFramesArray<vk::UniqueDescriptorSet> sets;
+	    struct 
+		{
+			FlightFramesArray<UniformMemoryDirectWrite<CameraUniformData>> camera; 
+			FlightFramesArray<UniformMemoryDirectWrite<PointLightUniformData>> pointlight; 
+			FlightFramesArray<UniformMemoryDirectWrite<SpotLightUniformData>> spotlight; 
+			FlightFramesArray<UniformMemoryDirectWrite<DirectionalLightUniformData>> directionallight; 
+		} memories;
+	} m_frame_uniform;
 
-
-
-	Uniform<DescriptorSetIndex{0}, CameraUniformLayout> m_frame_uniform;
-	Uniform<DescriptorSetIndex{1}, PointLightUniformLayout> m_pointlight_uniform;
-	Uniform<DescriptorSetIndex{2}, SpotLightUniformLayout> m_spotlight_uniform;
-	Uniform<DescriptorSetIndex{3}, DirectionalLightUniformLayout> m_directionallight_uniform;
-	TextureDescriptor<DescriptorSetIndex{4}> m_ambient;
-	TextureDescriptor<DescriptorSetIndex{5}> m_diffuse;
-	TextureDescriptor<DescriptorSetIndex{6}> m_specular;
-	TextureDescriptor<DescriptorSetIndex{7}> m_normal;
+	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;
+	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
+	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
+	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
 };
 

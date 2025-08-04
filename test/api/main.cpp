@@ -294,11 +294,10 @@ int main()
     world_info.projection[1][1] *= -1;
 
 	DescriptorPoolCreateInfo descriptor_pool_info;
-	descriptor_pool_info.uniform_buffer_count = 1000;
-	descriptor_pool_info.combined_image_sampler_count = 1000;
+	descriptor_pool_info.uniform_buffer_count = 5000;
+	descriptor_pool_info.combined_image_sampler_count = 5000;
 
-	DescriptorPool descriptor_pool(descriptor_pool_info,
-								   context);
+	DescriptorPool descriptor_pool(descriptor_pool_info, context);
 
 	Renderer renderer(context,
 					  presenter,

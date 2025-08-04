@@ -41,6 +41,65 @@ auto create_shaderstage_infos(vk::Device device,
 	noexcept -> std::optional<ShaderStageInfos>;
 
 
+template<typename TData>
+struct UniformMemoryDirectWrite
+{
+	using Data = std::remove_cvref_t<TData>;
+	AllocatedMemory m_memory;
+	
+	UniformMemoryDirectWrite() = default;
+
+	UniformMemoryDirectWrite(const UniformMemoryDirectWrite& rhs) = delete;
+	UniformMemoryDirectWrite(UniformMemoryDirectWrite&& rhs)
+	{
+		std::swap(m_memory, rhs.m_memory);
+	}
+
+	UniformMemoryDirectWrite& operator=(const UniformMemoryDirectWrite&) = delete;
+	UniformMemoryDirectWrite& operator=(UniformMemoryDirectWrite&& rhs)
+	{
+		std::swap(m_memory, rhs.m_memory);
+		return *this;
+	}
+
+	explicit UniformMemoryDirectWrite(vk::PhysicalDevice physical_device,
+									  vk::Device device,
+									  Data* init)
+	{
+		m_memory = allocate_memory(physical_device,
+								   device,
+								   sizeof(Data),
+								   vk::BufferUsageFlagBits::eTransferSrc
+								   | vk::BufferUsageFlagBits::eUniformBuffer,
+								   // Host Visible and Coherent allows direct
+								   // writes into the buffers without sync issues.
+								   // but it can be slower overall
+								   vk::MemoryPropertyFlagBits::eHostVisible
+								   | vk::MemoryPropertyFlagBits::eHostCoherent);
+		
+		write(device, init);
+	}
+	
+	void write(vk::Device device, Data* data)
+	{
+		copy_to_allocated_memory(device,
+								 m_memory,
+								 reinterpret_cast<void*>(data),
+								 sizeof(Data));
+	}
+	
+	vk::DescriptorBufferInfo& buffer_info() const
+	{
+		static auto info = vk::DescriptorBufferInfo{}
+			.setBuffer(m_memory.buffer.get())
+			.setOffset(0)
+			.setRange(sizeof(Data));
+		return info;
+	}
+	
+};
+
+
 template<typename Data>
 struct UniformBuffer
 {
@@ -87,6 +146,11 @@ struct UniformBuffer
 			.setOffset(0)
 			.setRange(sizeof(UniformDataType));
 		
+		copy_to_allocated_memory(device,
+								 m_memory,
+								 reinterpret_cast<void*>(init),
+								 sizeof(UniformDataType));
+		
 		const std::array<vk::WriteDescriptorSet, 1> writes{
 			vk::WriteDescriptorSet{}
 			.setDstBinding(0)
@@ -96,11 +160,6 @@ struct UniformBuffer
 			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
 			.setBufferInfo(buffer_info),
 		};
-		
-		copy_to_allocated_memory(device,
-								 m_memory,
-								 reinterpret_cast<void*>(init),
-								 sizeof(UniformDataType));
 		
 		device.updateDescriptorSets(writes.size(),
 									writes.data(),

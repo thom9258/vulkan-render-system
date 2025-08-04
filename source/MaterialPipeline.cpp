@@ -149,36 +149,28 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 								sizeof(PushConstants)));
 	}
 	
-	std::array<vk::DescriptorSetLayoutBinding, 1> frame_uniform_bindings{
+	std::array<vk::DescriptorSetLayoutBinding, 4> frame_uniform_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
 		.setBinding(0)
 		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(1)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(2)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(3)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 	};
-
-	//std::array<vk::DescriptorSetLayoutBinding, 4> frame_uniform_bindings{
-	//vk::DescriptorSetLayoutBinding{}
-	//.setStageFlags(vk::ShaderStageFlagBits::eVertex)
-	//.setBinding(0)
-	//.setDescriptorCount(1)
-	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-	//vk::DescriptorSetLayoutBinding{}
-	//.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-	//.setBinding(1)
-	//.setDescriptorCount(1)
-	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-	//vk::DescriptorSetLayoutBinding{}
-	//.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-	//.setBinding(2)
-	//.setDescriptorCount(1)
-	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-	//vk::DescriptorSetLayoutBinding{}
-	//.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-	//.setBinding(3)
-	//.setDescriptorCount(1)
-	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-//};
 
 	const auto frame_uniform_setinfo = vk::DescriptorSetLayoutCreateInfo{}
 		.setFlags(vk::DescriptorSetLayoutCreateFlags())
@@ -189,64 +181,6 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 															  nullptr);
 	
 	logger.info(std::source_location::current(), "Created frame uniform layout");
-	
-	// create pointlight uniform
-	std::array<vk::DescriptorSetLayoutBinding, 1> pointlight_uniform_layout_bindings{
-		vk::DescriptorSetLayoutBinding{}
-		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(0)
-		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-	};
-
-	const auto pointlight_uniform_bindings_setinfo = vk::DescriptorSetLayoutCreateInfo{}
-		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(pointlight_uniform_layout_bindings);
-	
-	m_pointlight_uniform.set_layout =
-		context->device.get().createDescriptorSetLayoutUnique(pointlight_uniform_bindings_setinfo,
-															  nullptr);
-	
-	logger.info(std::source_location::current(), "Created point light uniform layout");
-	
-	// create directionallight uniform
-	std::array<vk::DescriptorSetLayoutBinding, 1> directionallight_uniform_layout_bindings{
-		vk::DescriptorSetLayoutBinding{}
-		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(0)
-		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-	};
-
-	const auto directionallight_uniform_bindings_setinfo = vk::DescriptorSetLayoutCreateInfo{}
-		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(directionallight_uniform_layout_bindings);
-	
-	m_directionallight_uniform.set_layout =
-		context->device.get().createDescriptorSetLayoutUnique(directionallight_uniform_bindings_setinfo,
-															  nullptr);
-	
-	logger.info(std::source_location::current(), "Created directional light uniform layout");
-	
-	
-	// create spotlight uniform
-	std::array<vk::DescriptorSetLayoutBinding, 1> spotlight_uniform_layout_bindings{
-		vk::DescriptorSetLayoutBinding{}
-		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(0)
-		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
-	};
-
-	const auto spotlight_uniform_bindings_setinfo = vk::DescriptorSetLayoutCreateInfo{}
-		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(spotlight_uniform_layout_bindings);
-	
-	m_spotlight_uniform.set_layout =
-		context->device.get().createDescriptorSetLayoutUnique(spotlight_uniform_bindings_setinfo,
-															  nullptr);
-	
-	logger.info(std::source_location::current(), "Created spotlight light uniform layout");
 	
 	std::array<vk::DescriptorSetLayoutBinding, 1> ambient_texture_bindings{
 		vk::DescriptorSetLayoutBinding{}
@@ -310,12 +244,8 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
 
-	//NOTE: thsese MUST match the indices of each individual set
-	std::array<vk::DescriptorSetLayout, 8> const descriptorset_layouts{
+	std::array<vk::DescriptorSetLayout, 5> const descriptorset_layouts{
 		m_frame_uniform.set_layout.get(),
-		m_pointlight_uniform.set_layout.get(),
-		m_spotlight_uniform.set_layout.get(),
-		m_directionallight_uniform.set_layout.get(),
 		m_ambient.layout.get(),
 		m_diffuse.layout.get(),
 		m_specular.layout.get(),
@@ -404,63 +334,113 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	m_pipeline = std::move(result.value);
 	logger.info(std::source_location::current(), "Created Pipeline");
+	
 
 	/*Allocate Per-Frame Uniform Descriptor Sets*/
-	m_frame_uniform.data.view = glm::mat4(1.0f);
-	m_frame_uniform.data.proj = glm::mat4(1.0f);
-	m_frame_uniform.data.position = glm::vec3(1.0f);
+	uint32_t constexpr layouts_size = 1;
+	const auto frame_uniform_allocate_info = vk::DescriptorSetAllocateInfo{}
+		.setDescriptorPool(descriptor_pool->descriptor_pool.get())
+		.setDescriptorSetCount(layouts_size)
+		.setSetLayouts(m_frame_uniform.set_layout.get());
 
-	for (uint32_t i = 0; i < m_frame_uniform.buffers.size(); i++) {
-		m_frame_uniform.buffers[i] =
-			decltype(m_frame_uniform)::BufferType(&m_frame_uniform.data,
-												  logger,
-												  context->physical_device,
-												  context->device.get(),
-												  descriptor_pool->descriptor_pool.get(),
-												  m_frame_uniform.set_layout.get());
+
+	for (size_t i = 0; i < m_frame_uniform.sets.size(); i++) {
+		//NOTE: due to only having 1 identical layout for each set, we need to allocate
+		//      them seperately like this. this is assumed to be better than having
+		//      duplicate layouts laying around
+		std::vector<vk::UniqueDescriptorSet> sets =
+			context->device.get().allocateDescriptorSetsUnique(frame_uniform_allocate_info);
+
+		m_frame_uniform.sets[i] = std::move(sets[0]);
+		logger.info(std::source_location::current(),
+					"created frame uniform descriptor set");
 	}
 
-	logger.info(std::source_location::current(),
-				"created frame uniform descriptor sets");
-	
-	for (uint32_t i = 0; i < m_pointlight_uniform.buffers.size(); i++) {
-		m_pointlight_uniform.buffers[i] =
-			decltype(m_pointlight_uniform)::BufferType(&m_pointlight_uniform.data,
-													   logger,
-													   context->physical_device,
-													   context->device.get(),
-													   descriptor_pool->descriptor_pool.get(),
-													   m_pointlight_uniform.set_layout.get());
-	}
-
-	logger.info(std::source_location::current(),
-				"created pointlight uniform descriptor sets");
-
-	for (uint32_t i = 0; i < m_directionallight_uniform.buffers.size(); i++) {
-		m_directionallight_uniform.buffers[i] =
-			decltype(m_directionallight_uniform)::BufferType(&m_directionallight_uniform.data,
-															 logger,
-															 context->physical_device,
+	CameraUniformData camera_init_data;
+	camera_init_data.view = glm::mat4(1.0f);
+	camera_init_data.proj = glm::mat4(1.0f);
+	camera_init_data.position = glm::vec3(0.0f);
+	for (auto& buffer: m_frame_uniform.memories.camera) {
+		buffer = UniformMemoryDirectWrite<CameraUniformData>(context->physical_device,
 															 context->device.get(),
-															 descriptor_pool->descriptor_pool.get(),
-															 m_directionallight_uniform.set_layout.get());
-	}
+															 &camera_init_data);
 
-	logger.info(std::source_location::current(),
-				"created directionallight uniform descriptor sets");
+		logger.info(std::source_location::current(),
+					"created frame uniform camera descriptor memories");
+	}
 	
-	for (uint32_t i = 0; i < m_spotlight_uniform.buffers.size(); i++) {
-		m_spotlight_uniform.buffers[i] =
-			decltype(m_spotlight_uniform)::BufferType(&m_spotlight_uniform.data,
-													  logger,
-													  context->physical_device,
-													  context->device.get(),
-													  descriptor_pool->descriptor_pool.get(),
-													  m_spotlight_uniform.set_layout.get());
+	PointLightUniformData pointlight_init_data;
+	for (auto& buffer: m_frame_uniform.memories.pointlight) {
+		buffer = UniformMemoryDirectWrite<PointLightUniformData>(context->physical_device,
+																 context->device.get(),
+																 &pointlight_init_data);
+		logger.info(std::source_location::current(),
+					"created frame uniform pointlight descriptor memories");
 	}
+	
+	SpotLightUniformData spotlight_init_data;
+	for (auto& buffer: m_frame_uniform.memories.spotlight) {
+		buffer = UniformMemoryDirectWrite<SpotLightUniformData>(context->physical_device,
+																context->device.get(),
+																&spotlight_init_data);
+		logger.info(std::source_location::current(),
+					"created frame uniform spotlight descriptor memories");
+	}
+	
+	DirectionalLightUniformData dirlight_init_data;
+	for (auto& buffer: m_frame_uniform.memories.directionallight) {
+		buffer = UniformMemoryDirectWrite<DirectionalLightUniformData>(context->physical_device,
+																	   context->device.get(),
+																	   &dirlight_init_data);
+		logger.info(std::source_location::current(),
+					"created frame uniform directional light descriptor memories");
+	}
+	
+	
+	for (size_t i = 0; i < m_frame_uniform.sets.size(); i++) {
 
-	logger.info(std::source_location::current(),
-				"created spotlight uniform descriptor sets");
+		std::array<vk::WriteDescriptorSet, 4> writes {
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_frame_uniform.sets[i].get())
+			.setDstBinding(0)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_frame_uniform.memories.camera[i].buffer_info()),
+			
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_frame_uniform.sets[i].get())
+			.setDstBinding(1)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_frame_uniform.memories.pointlight[i].buffer_info()),
+			
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_frame_uniform.sets[i].get())
+			.setDstBinding(2)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_frame_uniform.memories.spotlight[i].buffer_info()),
+			
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_frame_uniform.sets[i].get())
+			.setDstBinding(3)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_frame_uniform.memories.directionallight[i].buffer_info()),
+		};
+
+		context->device.get().updateDescriptorSets(writes.size(),
+												   writes.data(),
+												   0,
+												   nullptr);
+
+		logger.info(std::source_location::current(),
+					"added another set of writes");
+	}
 }
 
 
@@ -468,28 +448,32 @@ MaterialPipeline::MaterialPipeline(MaterialPipeline&& rhs) noexcept
 {
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
-	std::swap(m_frame_uniform, rhs.m_frame_uniform);
+	std::swap(m_frame_uniform.set_layout, rhs.m_frame_uniform.set_layout);
+	std::swap(m_frame_uniform.sets, rhs.m_frame_uniform.sets);
+	std::swap(m_frame_uniform.memories.camera, rhs.m_frame_uniform.memories.camera);
+	std::swap(m_frame_uniform.memories.pointlight, rhs.m_frame_uniform.memories.pointlight);
+	std::swap(m_frame_uniform.memories.spotlight, rhs.m_frame_uniform.memories.spotlight);
+	std::swap(m_frame_uniform.memories.directionallight, rhs.m_frame_uniform.memories.directionallight);
 	std::swap(m_ambient, rhs.m_ambient);
 	std::swap(m_diffuse, rhs.m_diffuse);
 	std::swap(m_specular, rhs.m_specular);
 	std::swap(m_normal, rhs.m_normal);
-	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
-	std::swap(m_directionallight_uniform, rhs.m_directionallight_uniform);
-	std::swap(m_spotlight_uniform, rhs.m_spotlight_uniform);
 }
 
 MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 {
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
-	std::swap(m_frame_uniform, rhs.m_frame_uniform);
+	std::swap(m_frame_uniform.set_layout, rhs.m_frame_uniform.set_layout);
+	std::swap(m_frame_uniform.sets, rhs.m_frame_uniform.sets);
+	std::swap(m_frame_uniform.memories.camera, rhs.m_frame_uniform.memories.camera);
+	std::swap(m_frame_uniform.memories.pointlight, rhs.m_frame_uniform.memories.pointlight);
+	std::swap(m_frame_uniform.memories.spotlight, rhs.m_frame_uniform.memories.spotlight);
+	std::swap(m_frame_uniform.memories.directionallight, rhs.m_frame_uniform.memories.directionallight);
 	std::swap(m_ambient, rhs.m_ambient);
 	std::swap(m_diffuse, rhs.m_diffuse);
 	std::swap(m_specular, rhs.m_specular);
 	std::swap(m_normal, rhs.m_normal);
-	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
-	std::swap(m_directionallight_uniform, rhs.m_directionallight_uniform);
-	std::swap(m_spotlight_uniform, rhs.m_spotlight_uniform);
 	return *this;
 }
 
@@ -543,61 +527,45 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		logger.info(std::source_location::current(), "Created normal default");
 	}
 	
-	m_frame_uniform.data.view = frame_info.view;
-	m_frame_uniform.data.proj = frame_info.proj;
-	m_frame_uniform.data.position = frame_info.camera_position;
-	copy_to_allocated_memory(device,
-							 m_frame_uniform.buffers[*current_flightframe].m_memory,
-							 reinterpret_cast<void*>(&m_frame_uniform.data),
-							 m_frame_uniform.data_memsize);
+	CameraUniformData camera_data;
+	camera_data.view = frame_info.view;
+	camera_data.proj = frame_info.proj;
+	camera_data.position = frame_info.camera_position;
+	m_frame_uniform.memories.camera[*current_flightframe].write(device, &camera_data);
 	
 	SortedLights sorted_lights;
 	std::ranges::for_each(lights, std::bind_front(sort_light, &logger, &sorted_lights));
 	
 	if (!sorted_lights.points.empty()) {
-		PointLight& p = sorted_lights.points.front();
-		m_pointlight_uniform.data = p;
+		PointLightUniformData data = sorted_lights.points.front();
+		m_frame_uniform.memories.pointlight[*current_flightframe].write(device, &data);
 	}
-	
-	copy_to_allocated_memory(device,
-							 m_pointlight_uniform.buffers[*current_flightframe].m_memory,
-							 reinterpret_cast<void*>(&m_pointlight_uniform.data),
-							 m_pointlight_uniform.data_memsize);
-	
-	if (!sorted_lights.directionals.empty()) {
-		DirectionalLight& p = sorted_lights.directionals.front();
-		m_directionallight_uniform.data = p;
+	else {
+		logger.warn(std::source_location::current(), "no point lights are provided");
 	}
-	
-	copy_to_allocated_memory(device,
-							 m_directionallight_uniform.buffers[*current_flightframe].m_memory,
-							 reinterpret_cast<void*>(&m_directionallight_uniform.data),
-							 m_directionallight_uniform.data_memsize);
-	
-	if (sorted_lights.spots.empty())
-		logger.warn(std::source_location::current(),
-					"no spotlights are provided");
 
 	if (!sorted_lights.spots.empty()) {
-		SpotLight& p = sorted_lights.spots.front();
-		m_spotlight_uniform.data = p;
+		SpotLightUniformData data = sorted_lights.spots.front();
+		m_frame_uniform.memories.spotlight[*current_flightframe].write(device, &data);
 	}
-	
-	copy_to_allocated_memory(device,
-							 m_spotlight_uniform.buffers[*current_flightframe].m_memory,
-							 reinterpret_cast<void*>(&m_spotlight_uniform.data),
-							 m_spotlight_uniform.data_memsize);
-	
-	
+	else {
+		logger.warn(std::source_location::current(), "no spotlights are provided");
+	}
+
+	if (!sorted_lights.directionals.empty()) {
+		DirectionalLightUniformData data = sorted_lights.directionals.front();
+		m_frame_uniform.memories.directionallight[*current_flightframe].write(device, &data);
+	}
+	else {
+		logger.warn(std::source_location::current(), "no directional lights are provided");
+	}
+
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
 	
 	//NOTE: thsese MUST match the indices of each individual set
-	std::array<vk::DescriptorSet, 8> init_sets{
-		m_frame_uniform.buffers[*current_flightframe].m_set.get(),
-		m_pointlight_uniform.buffers[*current_flightframe].m_set.get(),
-		m_spotlight_uniform.buffers[*current_flightframe].m_set.get(),
-		m_directionallight_uniform.buffers[*current_flightframe].m_set.get(),
+	std::array<vk::DescriptorSet, 5> init_sets{
+		m_frame_uniform.sets[*current_flightframe].get(),
 		m_ambient.sets[&m_ambient.default_texture][*current_flightframe].get(),
 		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
 		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
