@@ -90,20 +90,27 @@ private:
 		glm::vec3 position;
 		float _padding1{1.0f};
 	};
-
-	DescriptorSetIndex static constexpr frame_set_index = DescriptorSetIndex{0};
-	struct
+	
+	struct LightInfoUniformData
 	{
-		vk::UniqueDescriptorSetLayout set_layout;
-		FlightFramesArray<vk::UniqueDescriptorSet> sets;
-	    struct 
-		{
-			FlightFramesArray<UniformMemoryDirectWrite<CameraUniformData>> camera; 
-			FlightFramesArray<UniformMemoryDirectWrite<PointLightUniformData>> pointlight; 
-			FlightFramesArray<UniformMemoryDirectWrite<SpotLightUniformData>> spotlight; 
-			FlightFramesArray<UniformMemoryDirectWrite<DirectionalLightUniformData>> directionallight; 
-		} memories;
-	} m_frame_uniform;
+		float point_count;
+		float spot_count;
+		float directional_count;
+		float _padding1{1.0f};
+	};
+
+	vk::UniqueDescriptorSetLayout m_global_set_layout;
+	
+	struct GlobalSetUniform
+	{
+		vk::UniqueDescriptorSet set;
+		UniformMemoryDirectWrite<CameraUniformData> camera; 
+		UniformMemoryDirectWrite<PointLightUniformData> pointlight; 
+		UniformMemoryDirectWrite<SpotLightUniformData> spotlight; 
+		UniformMemoryDirectWrite<DirectionalLightUniformData> directionallight; 
+	};
+	
+	FlightFramesArray<GlobalSetUniform> m_global_set_uniforms;
 
 	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;
 	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
