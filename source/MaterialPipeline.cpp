@@ -148,14 +148,37 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 								"This can cause compatability issues on some devices",
 								sizeof(PushConstants)));
 	}
-
+	
 	std::array<vk::DescriptorSetLayoutBinding, 1> frame_uniform_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
 		.setBinding(0)
 		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer)
 	};
+
+	//std::array<vk::DescriptorSetLayoutBinding, 4> frame_uniform_bindings{
+	//vk::DescriptorSetLayoutBinding{}
+	//.setStageFlags(vk::ShaderStageFlagBits::eVertex)
+	//.setBinding(0)
+	//.setDescriptorCount(1)
+	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+	//vk::DescriptorSetLayoutBinding{}
+	//.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+	//.setBinding(1)
+	//.setDescriptorCount(1)
+	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+	//vk::DescriptorSetLayoutBinding{}
+	//.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+	//.setBinding(2)
+	//.setDescriptorCount(1)
+	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+	//vk::DescriptorSetLayoutBinding{}
+	//.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+	//.setBinding(3)
+	//.setDescriptorCount(1)
+	//.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+//};
 
 	const auto frame_uniform_setinfo = vk::DescriptorSetLayoutCreateInfo{}
 		.setFlags(vk::DescriptorSetLayoutCreateFlags())
@@ -287,15 +310,16 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
 
+	//NOTE: thsese MUST match the indices of each individual set
 	std::array<vk::DescriptorSetLayout, 8> const descriptorset_layouts{
 		m_frame_uniform.set_layout.get(),
+		m_pointlight_uniform.set_layout.get(),
+		m_spotlight_uniform.set_layout.get(),
+		m_directionallight_uniform.set_layout.get(),
 		m_ambient.layout.get(),
 		m_diffuse.layout.get(),
 		m_specular.layout.get(),
 		m_normal.layout.get(),
-		m_pointlight_uniform.set_layout.get(),
-		m_spotlight_uniform.set_layout.get(),
-		m_directionallight_uniform.set_layout.get(),
 	};
 
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
@@ -384,7 +408,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	/*Allocate Per-Frame Uniform Descriptor Sets*/
 	m_frame_uniform.data.view = glm::mat4(1.0f);
 	m_frame_uniform.data.proj = glm::mat4(1.0f);
-	m_frame_uniform.data.camera_position = glm::vec3(1.0f);
+	m_frame_uniform.data.position = glm::vec3(1.0f);
 
 	for (uint32_t i = 0; i < m_frame_uniform.buffers.size(); i++) {
 		m_frame_uniform.buffers[i] =
@@ -521,7 +545,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	
 	m_frame_uniform.data.view = frame_info.view;
 	m_frame_uniform.data.proj = frame_info.proj;
-	m_frame_uniform.data.camera_position = frame_info.camera_position;
+	m_frame_uniform.data.position = frame_info.camera_position;
 	copy_to_allocated_memory(device,
 							 m_frame_uniform.buffers[*current_flightframe].m_memory,
 							 reinterpret_cast<void*>(&m_frame_uniform.data),
@@ -532,13 +556,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	
 	if (!sorted_lights.points.empty()) {
 		PointLight& p = sorted_lights.points.front();
-		m_pointlight_uniform.data.position = p.position;
-		m_pointlight_uniform.data.ambient = p.ambient;
-		m_pointlight_uniform.data.diffuse = p.diffuse;
-		m_pointlight_uniform.data.specular = p.specular;
-		m_pointlight_uniform.data.attenuation.constant = p.attenuation.constant;
-		m_pointlight_uniform.data.attenuation.linear = p.attenuation.linear;
-		m_pointlight_uniform.data.attenuation.quadratic = p.attenuation.quadratic;
+		m_pointlight_uniform.data = p;
 	}
 	
 	copy_to_allocated_memory(device,
@@ -548,10 +566,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	
 	if (!sorted_lights.directionals.empty()) {
 		DirectionalLight& p = sorted_lights.directionals.front();
-		m_directionallight_uniform.data.direction = p.direction;
-		m_directionallight_uniform.data.ambient = p.ambient;
-		m_directionallight_uniform.data.diffuse = p.diffuse;
-		m_directionallight_uniform.data.specular = p.specular;
+		m_directionallight_uniform.data = p;
 	}
 	
 	copy_to_allocated_memory(device,
@@ -565,16 +580,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 
 	if (!sorted_lights.spots.empty()) {
 		SpotLight& p = sorted_lights.spots.front();
-		m_spotlight_uniform.data.position = p.position;
-		m_spotlight_uniform.data.direction = p.direction;
-		m_spotlight_uniform.data.ambient = p.ambient;
-		m_spotlight_uniform.data.diffuse = p.diffuse;
-		m_spotlight_uniform.data.specular = p.specular;
-		m_spotlight_uniform.data.attenuation.constant = p.attenuation.constant;
-		m_spotlight_uniform.data.attenuation.linear = p.attenuation.linear;
-		m_spotlight_uniform.data.attenuation.quadratic = p.attenuation.quadratic;
-		m_spotlight_uniform.data.cutoff.inner = p.cutoff.inner;
-		m_spotlight_uniform.data.cutoff.outer = p.cutoff.outer;
+		m_spotlight_uniform.data = p;
 	}
 	
 	copy_to_allocated_memory(device,
@@ -586,15 +592,16 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
 	
+	//NOTE: thsese MUST match the indices of each individual set
 	std::array<vk::DescriptorSet, 8> init_sets{
 		m_frame_uniform.buffers[*current_flightframe].m_set.get(),
+		m_pointlight_uniform.buffers[*current_flightframe].m_set.get(),
+		m_spotlight_uniform.buffers[*current_flightframe].m_set.get(),
+		m_directionallight_uniform.buffers[*current_flightframe].m_set.get(),
 		m_ambient.sets[&m_ambient.default_texture][*current_flightframe].get(),
 		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
 		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
 		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
-		m_pointlight_uniform.buffers[*current_flightframe].m_set.get(),
-		m_spotlight_uniform.buffers[*current_flightframe].m_set.get(),
-		m_directionallight_uniform.buffers[*current_flightframe].m_set.get(),
 	};
 
 	const uint32_t first_set = 0;

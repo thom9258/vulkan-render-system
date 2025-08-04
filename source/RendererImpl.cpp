@@ -244,7 +244,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  Pipelines* pipelines,
-						  MaterialPipeline2& material_pipeline,
+						  MaterialPipeline& material_pipeline,
 						  Logger* logger,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
@@ -335,7 +335,7 @@ auto render_geometry_pass(GeometryPass& pass,
 									  sorted.basetextures);
 
 		
-		MaterialPipeline2::FrameInfo material_frame_info{};
+		MaterialPipeline::FrameInfo material_frame_info{};
 		material_frame_info.view = world_info.view;
 		material_frame_info.proj = world_info.projection;
 		material_frame_info.camera_position = world_info.camera_position;
@@ -379,7 +379,7 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 										 true
 										 );
 	
-	material_pipeline = MaterialPipeline2(logger,
+	material_pipeline = MaterialPipeline(logger,
 										 context,
 										 presenter,
 										 descriptor_pool,

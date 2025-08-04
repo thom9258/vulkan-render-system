@@ -44,20 +44,36 @@ struct SpotLight
 	// cutoff.y = outer
 };	
 
-layout(set = 1, binding = 0) uniform sampler2D ambient;
-layout(set = 2, binding = 0) uniform sampler2D diffuse;
-layout(set = 3, binding = 0) uniform sampler2D specular;
-layout(set = 4, binding = 0) uniform sampler2D normal;
+layout (set = 0, binding = 1)
+uniform PointLightUniform0 { PointLight pointlight0; };
 
-layout (set = 5, binding = 0)
+layout (set = 0, binding = 2)
+uniform SpotLightUniform0 { SpotLight spotlight0; };
+
+layout (set = 0, binding = 3)
+uniform DirectionalLightUniform0 { DirectionalLight directionallight0; };
+
+
+layout (set = 1, binding = 0)
 uniform PointLightUniform { PointLight pointlight; };
 
-layout (set = 6, binding = 0)
+layout (set = 2, binding = 0)
 uniform SpotLightUniform { SpotLight spotlight; };
 
-layout (set = 7, binding = 0)
+layout (set = 3, binding = 0)
 uniform DirectionalLightUniform { DirectionalLight directionallight; };
 
+layout(set = 4, binding = 0) 
+uniform sampler2D ambient;
+
+layout(set = 5, binding = 0) 
+uniform sampler2D diffuse;
+
+layout(set = 6, binding = 0) 
+uniform sampler2D specular;
+
+layout(set = 7, binding = 0) 
+uniform sampler2D normal;
 
 vec3 calculate_point_light(PointLight light)
 {

@@ -1,14 +1,14 @@
 #pragma once
 
 #include <VulkanRenderer/Renderer.hpp>
-#include "NormRenderPipeline.hpp"
-#include "WireframePipeline.hpp"
-#include "BaseTexturePipeline.hpp"
 
 #include "PresenterImpl.hpp"
 #include "ContextImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
 
+#include "NormRenderPipeline.hpp"
+#include "WireframePipeline.hpp"
+#include "BaseTexturePipeline.hpp"
 #include "MaterialPipeline.hpp"
 
 struct GeometryPass
@@ -100,5 +100,5 @@ public:
 
 	GeometryPass geometry_pass;
 	Pipelines pipelines;
-	MaterialPipeline2 material_pipeline;
+	MaterialPipeline material_pipeline;
 };

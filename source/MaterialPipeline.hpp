@@ -3,7 +3,6 @@
 #include <filesystem>
 
 #include <VulkanRenderer/Renderable.hpp>
-#include <VulkanRenderer/Light.hpp>
 
 #include "VertexImpl.hpp"
 #include "VertexBuffer.hpp"
@@ -17,6 +16,7 @@
 #include "TextureImpl.hpp"
 #include "ShaderTextureImpl.hpp"
 
+#include "LightUniforms.hpp"
 #include "PipelineUtils.hpp"
 
 #include <algorithm>
@@ -34,68 +34,9 @@ struct SortedLights
 	std::vector<SpotLight> spots;
 };
 
-
-
 void sort_light(Logger* logger,
 				SortedLights* sorted,
 				Light light);
-
-
-struct DirectionalLightUniformLayout
-{
-	glm::vec3 direction;
-	float _padding1{1.0f};
-	glm::vec3 ambient;
-	float _padding2{1.0f};
-	glm::vec3 diffuse;
-	float _padding3{1.0f};
-	glm::vec3 specular;
-	float _padding4{1.0f};
-};
-
-struct PointLightUniformLayout
-{
-	glm::vec3 position;
-	float _padding1{1.0f};
-	glm::vec3 ambient;
-	float _padding2{1.0f};
-	glm::vec3 diffuse;
-	float _padding3{1.0f};
-	glm::vec3 specular;
-	float _padding4{1.0f};
-	struct {
-		float constant;
-		float linear;
-		float quadratic;
-	}attenuation;
-	float _padding5{1.0f};
-};
-
-struct SpotLightUniformLayout
-{
-	glm::vec3 position;
-	float _padding1{1.0f};
-	glm::vec3 direction;
-	float _padding2{1.0f};
-	glm::vec3 ambient;
-	float _padding3{1.0f};
-	glm::vec3 diffuse;
-	float _padding4{1.0f};
-	glm::vec3 specular;
-	float _padding5{1.0f};
-	struct {
-		float constant;
-		float linear;
-		float quadratic;
-	}attenuation;
-	float _padding6{1.0f};
-	struct {
-		float inner;
-		float outer;
-	}cutoff;
-	float _padding7[2]{1.0f, 1.0f};
-};
-
 
 
 struct MaterialPipeline
@@ -142,20 +83,36 @@ private:
 	vk::UniquePipelineLayout m_layout;
     vk::UniquePipeline m_pipeline;
 	
-	struct FrameUniformLayout
+	struct CameraUniformLayout
 	{
 		glm::mat4 view;
 		glm::mat4 proj;
-		glm::vec3 camera_position;
+		glm::vec3 position;
 		float _padding1{1.0f};
 	};
+	
 
-	Uniform<DescriptorSetIndex{0}, FrameUniformLayout> m_frame_uniform;
-	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;
-	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
-	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
-	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
-	Uniform<DescriptorSetIndex{5}, PointLightUniformLayout> m_pointlight_uniform;
-	Uniform<DescriptorSetIndex{6}, SpotLightUniformLayout> m_spotlight_uniform;
-	Uniform<DescriptorSetIndex{7}, DirectionalLightUniformLayout> m_directionallight_uniform;
+	//struct FrameUniform 
+	//{
+	//DescriptorSetIndex static constexpr set_index = DescriptorSetIndex{0};
+	//vk::UniqueDescriptorSetLayout set_layout;
+	//FlightFramesArray<UniformBuffer<CameraUniformLayout>> camera_binding; 
+	//FlightFramesArray<UniformBuffer<PointLightUniformLayout>> pointlight_binding; 
+	//FlightFramesArray<UniformBuffer<SpotLightUniformLayout>> spotlight_binding; 
+	//FlightFramesArray<UniformBuffer<DirectionalLightUniformLayout>> directionallight_binding; 
+//};
+	//
+	//FrameUniform m_frame_uniform;
+
+
+
+	Uniform<DescriptorSetIndex{0}, CameraUniformLayout> m_frame_uniform;
+	Uniform<DescriptorSetIndex{1}, PointLightUniformLayout> m_pointlight_uniform;
+	Uniform<DescriptorSetIndex{2}, SpotLightUniformLayout> m_spotlight_uniform;
+	Uniform<DescriptorSetIndex{3}, DirectionalLightUniformLayout> m_directionallight_uniform;
+	TextureDescriptor<DescriptorSetIndex{4}> m_ambient;
+	TextureDescriptor<DescriptorSetIndex{5}> m_diffuse;
+	TextureDescriptor<DescriptorSetIndex{6}> m_specular;
+	TextureDescriptor<DescriptorSetIndex{7}> m_normal;
 };
+

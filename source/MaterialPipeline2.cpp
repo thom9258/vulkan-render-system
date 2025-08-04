@@ -19,16 +19,16 @@ void sort_light(Logger* logger,
 	}
 }
 
-MaterialPipeline::MaterialPipeline(Logger& logger,
+MaterialPipeline2::MaterialPipeline2(Logger& logger,
 								   Render::Context::Impl* context,
 								   Presenter::Impl* presenter,
 								   DescriptorPool::Impl* descriptor_pool,
 								   vk::RenderPass& renderpass,
 								   std::filesystem::path const shader_root_path)
 {
-	std::string const pipeline_name = "MaterialPipeline";
-	std::string const vertexshader_name = "Material.vert.spv";
-	std::string const fragmentshader_name = "Material.frag.spv";
+	std::string const pipeline_name = "MaterialPipeline2";
+	std::string const vertexshader_name = "Material2.vert.spv";
+	std::string const fragmentshader_name = "Material2.frag.spv";
 	logger.info(std::source_location::current(),
 				std::format("Creating Pipeline {}",
 							pipeline_name));
@@ -225,74 +225,40 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	logger.info(std::source_location::current(), "Created spotlight light uniform layout");
 	
-	std::array<vk::DescriptorSetLayoutBinding, 1> ambient_texture_bindings{
+	std::array<vk::DescriptorSetLayoutBinding, 4> model_textures_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(0)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(1)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(2)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(3)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
 	};
-	auto ambient_texture_setinfo = vk::DescriptorSetLayoutCreateInfo{}
-		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(ambient_texture_bindings);
-	
-	m_ambient.layout =
-		context->device.get().createDescriptorSetLayoutUnique(ambient_texture_setinfo,
-															  nullptr);
 
-	std::array<vk::DescriptorSetLayoutBinding, 1> diffuse_texture_bindings{
-		vk::DescriptorSetLayoutBinding{}
-		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(0)
-		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
-	};
-	auto diffuse_texture_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+	auto model_textures_setinfo = vk::DescriptorSetLayoutCreateInfo{}
 		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(diffuse_texture_bindings);
+		.setBindings(model_textures_bindings);
 	
-	m_diffuse.layout =
-		context->device.get().createDescriptorSetLayoutUnique(diffuse_texture_setinfo,
+	material_sets.layout =
+		context->device.get().createDescriptorSetLayoutUnique(model_texture_setinfo,
 															  nullptr);
-	
-	std::array<vk::DescriptorSetLayoutBinding, 1> normal_texture_bindings{
-		vk::DescriptorSetLayoutBinding{}
-		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(0)
-		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
-	};
-	auto normal_texture_setinfo = vk::DescriptorSetLayoutCreateInfo{}
-		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(normal_texture_bindings);
-	
-	m_normal.layout =
-		context->device.get().createDescriptorSetLayoutUnique(normal_texture_setinfo,
-															  nullptr);
-	
-	std::array<vk::DescriptorSetLayoutBinding, 1> specular_texture_bindings{
-		vk::DescriptorSetLayoutBinding{}
-		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		.setBinding(0)
-		.setDescriptorCount(1)
-		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
-	};
-	auto specular_texture_setinfo = vk::DescriptorSetLayoutCreateInfo{}
-		.setFlags(vk::DescriptorSetLayoutCreateFlags())
-		.setBindings(specular_texture_bindings);
-	
-	m_specular.layout =
-		context->device.get().createDescriptorSetLayoutUnique(specular_texture_setinfo,
-															  nullptr);
-	
-	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
 
 	std::array<vk::DescriptorSetLayout, 8> const descriptorset_layouts{
 		m_frame_uniform.set_layout.get(),
-		m_ambient.layout.get(),
-		m_diffuse.layout.get(),
-		m_specular.layout.get(),
-		m_normal.layout.get(),
+		material_sets.layout.get(),
 		m_pointlight_uniform.set_layout.get(),
 		m_spotlight_uniform.set_layout.get(),
 		m_directionallight_uniform.set_layout.get(),
@@ -440,40 +406,34 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 }
 
 
-MaterialPipeline::MaterialPipeline(MaterialPipeline&& rhs) noexcept
+MaterialPipeline2::MaterialPipeline2(MaterialPipeline2&& rhs) noexcept
 {
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_frame_uniform, rhs.m_frame_uniform);
-	std::swap(m_ambient, rhs.m_ambient);
-	std::swap(m_diffuse, rhs.m_diffuse);
-	std::swap(m_specular, rhs.m_specular);
-	std::swap(m_normal, rhs.m_normal);
+	std::swap(material_sets, rhs.material_sets);
 	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
 	std::swap(m_directionallight_uniform, rhs.m_directionallight_uniform);
 	std::swap(m_spotlight_uniform, rhs.m_spotlight_uniform);
 }
 
-MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
+MaterialPipeline2& MaterialPipeline2::operator=(MaterialPipeline2&& rhs) noexcept
 {
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_frame_uniform, rhs.m_frame_uniform);
-	std::swap(m_ambient, rhs.m_ambient);
-	std::swap(m_diffuse, rhs.m_diffuse);
-	std::swap(m_specular, rhs.m_specular);
-	std::swap(m_normal, rhs.m_normal);
+	std::swap(material_sets, rhs.material_sets);
 	std::swap(m_pointlight_uniform, rhs.m_pointlight_uniform);
 	std::swap(m_directionallight_uniform, rhs.m_directionallight_uniform);
 	std::swap(m_spotlight_uniform, rhs.m_spotlight_uniform);
 	return *this;
 }
 
-MaterialPipeline::~MaterialPipeline()
+MaterialPipeline2::~MaterialPipeline2()
 {
 }
 
-void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
+void MaterialPipeline2::render(MaterialPipeline2::FrameInfo& frame_info,
 							  Logger& logger,
 							  vk::Device& device,
 							  vk::DescriptorPool descriptor_pool,
@@ -588,10 +548,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	
 	std::array<vk::DescriptorSet, 8> init_sets{
 		m_frame_uniform.buffers[*current_flightframe].m_set.get(),
-		m_ambient.sets[&m_ambient.default_texture][*current_flightframe].get(),
-		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
-		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
-		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
+		material_sets.sets[&material_sets.default_texture][*current_flightframe].get(),
 		m_pointlight_uniform.buffers[*current_flightframe].m_set.get(),
 		m_spotlight_uniform.buffers[*current_flightframe].m_set.get(),
 		m_directionallight_uniform.buffers[*current_flightframe].m_set.get(),

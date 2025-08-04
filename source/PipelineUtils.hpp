@@ -8,6 +8,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include <map>
+#include <utility>
 
 using BindingIndex = StrongType<uint32_t, struct BindingIndexTag>;
 using TotalDescriptorCount = StrongType<uint32_t, struct TotalDescriptorCountTag>;
@@ -15,6 +16,7 @@ using FragmentPath = StrongType<std::filesystem::path, struct FragmentPathTag>;
 using VertexPath = StrongType<std::filesystem::path, struct VertexPathTag>;
 
 using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
+using DescriptorSetBindingIndex = StrongType<uint32_t, struct DescriptorSetBindingIndexTag>;
 
 
 auto create_texture_descriptorset(vk::Device device,
@@ -131,3 +133,44 @@ struct TextureDescriptor
 	vk::UniqueDescriptorSetLayout layout;
 	std::map<TextureSamplerReadOnly*, FlightFramesArray<vk::UniqueDescriptorSet>> sets;
 };
+
+struct TextureMaterial
+{
+	TextureSamplerReadOnly* ambient;
+	TextureSamplerReadOnly* diffuse;
+	TextureSamplerReadOnly* specular;
+	TextureSamplerReadOnly* normal;
+	
+	bool operator==(TextureMaterial const& rhs) const
+	{
+		return ambient == rhs.ambient
+			&& diffuse == rhs.diffuse
+			&& specular == rhs.specular
+			&& normal == rhs.normal;
+	}
+};
+
+template <DescriptorSetIndex t_set_index>
+struct TextureMaterialDescriptorSet
+{
+	using MaterialDescriptorSet = std::pair<
+		TextureMaterial,
+		FlightFramesArray<vk::UniqueDescriptorSet>>;
+
+	DescriptorSetIndex static constexpr set_index = t_set_index;
+	TextureMaterial default_material;
+	vk::UniqueDescriptorSetLayout layout;
+	std::vector<MaterialDescriptorSet> sets;
+	
+	auto get_set(TextureMaterial const& material, CurrentFlightFrame flightframe)
+		-> std::optional<vk::DescriptorSet>
+	{
+		for (MaterialDescriptorSet const& set: sets) {
+			if (set.first == material)
+				return set.second[*flightframe].get();
+		}
+		
+		return std::nullopt;
+	}
+};
+
