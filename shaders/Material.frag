@@ -42,16 +42,29 @@ struct SpotLight
 	vec2 cutoff;
 	// cutoff.x = inner
 	// cutoff.y = outer
-};	
+};
+
+const int max_pointlights = 10;
+const int max_spotlights = 10;
+const int max_directionallights = 10;
 
 layout (set = 0, binding = 1)
-uniform PointLightUniform { PointLight pointlight; };
+uniform PointLightUniform { PointLight pointlight[max_pointlights]; };
 
 layout (set = 0, binding = 2)
-uniform SpotLightUniform { SpotLight spotlight; };
+uniform SpotLightUniform { SpotLight spotlight[max_spotlights]; };
 
 layout (set = 0, binding = 3)
-uniform DirectionalLightUniform { DirectionalLight directionallight; };
+uniform DirectionalLightUniform { DirectionalLight directionallight[max_directionallights]; };
+
+layout (set = 0, binding = 4)
+uniform LightLengthsUniform { 
+	ivec3 light_length;
+
+	// light_length.x = pointlight length
+	// light_length.y = spotlight length
+	// light_length.z = directionallight length
+};
 
 layout(set = 1, binding = 0) 
 uniform sampler2D ambient;
@@ -150,10 +163,20 @@ vec3 calculate_spot_light(SpotLight light)
 
 void main() 
 {
-	 vec3 total_lighting = vec3(0.0);
-	 total_lighting += calculate_point_light(pointlight);
-	 total_lighting += calculate_directional_light(directionallight);
-	 total_lighting += calculate_spot_light(spotlight);
-	 
-	 final_color = vec4(total_lighting, 1.0);
+	const int pointlight_length = light_length.x;
+	const int spotlight_length = light_length.y;
+	const int directionallight_length = light_length.z;
+
+	vec3 total_lighting = vec3(0.0);
+
+	for (int i = 0; i < pointlight_length; i++)
+		total_lighting += calculate_point_light(pointlight[i]);
+
+	for (int i = 0; i < spotlight_length; i++)
+		total_lighting += calculate_spot_light(spotlight[i]);
+
+	for (int i = 0; i < directionallight_length; i++)
+		total_lighting += calculate_directional_light(directionallight[i]);
+	
+	final_color = vec4(total_lighting, 1.0);
 }

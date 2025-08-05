@@ -45,6 +45,7 @@ template<typename TData>
 struct UniformMemoryDirectWrite
 {
 	using Data = std::remove_cvref_t<TData>;
+	size_t m_count;
 	AllocatedMemory m_memory;
 	
 	UniformMemoryDirectWrite() = default;
@@ -53,22 +54,26 @@ struct UniformMemoryDirectWrite
 	UniformMemoryDirectWrite(UniformMemoryDirectWrite&& rhs)
 	{
 		std::swap(m_memory, rhs.m_memory);
+		std::swap(m_count, rhs.m_count);
 	}
 
 	UniformMemoryDirectWrite& operator=(const UniformMemoryDirectWrite&) = delete;
 	UniformMemoryDirectWrite& operator=(UniformMemoryDirectWrite&& rhs)
 	{
 		std::swap(m_memory, rhs.m_memory);
+		std::swap(m_count, rhs.m_count);
 		return *this;
 	}
 
 	explicit UniformMemoryDirectWrite(vk::PhysicalDevice physical_device,
 									  vk::Device device,
-									  Data* init)
+									  size_t count)
 	{
+		m_count = (count < 1) ? 1 : count;
+
 		m_memory = allocate_memory(physical_device,
 								   device,
-								   sizeof(Data),
+								   sizeof(Data) * m_count,
 								   vk::BufferUsageFlagBits::eTransferSrc
 								   | vk::BufferUsageFlagBits::eUniformBuffer,
 								   // Host Visible and Coherent allows direct
@@ -76,16 +81,17 @@ struct UniformMemoryDirectWrite
 								   // but it can be slower overall
 								   vk::MemoryPropertyFlagBits::eHostVisible
 								   | vk::MemoryPropertyFlagBits::eHostCoherent);
-		
-		write(device, init);
 	}
 	
-	void write(vk::Device device, Data* data)
+	void write(vk::Device device, Data* data, size_t length)
 	{
+		if (length == 0) return;
+		if (length > m_count) length = m_count;
+
 		copy_to_allocated_memory(device,
 								 m_memory,
 								 reinterpret_cast<void*>(data),
-								 sizeof(Data));
+								 sizeof(Data) * length);
 	}
 	
 	vk::DescriptorBufferInfo& buffer_info() const

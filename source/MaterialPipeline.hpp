@@ -91,16 +91,21 @@ private:
 		float _padding1{1.0f};
 	};
 	
-	struct LightInfoUniformData
+	struct LightArrayLengthsUniformData
 	{
-		float point_count;
-		float spot_count;
-		float directional_count;
-		float _padding1{1.0f};
+		int point_length = 0;
+		int spot_length = 0;
+		int directional_length = 0;
+		int _padding1{0};
 	};
 
-	vk::UniqueDescriptorSetLayout m_global_set_layout;
-	
+	static constexpr size_t camera_uniform_count = 1;
+	static constexpr size_t lightarray_lengths_count = 1;
+
+	static constexpr size_t max_pointlights = 10;
+	static constexpr size_t max_spotlights = 10;
+	static constexpr size_t max_directionallights = 10;
+
 	struct GlobalSetUniform
 	{
 		vk::UniqueDescriptorSet set;
@@ -108,8 +113,10 @@ private:
 		UniformMemoryDirectWrite<PointLightUniformData> pointlight; 
 		UniformMemoryDirectWrite<SpotLightUniformData> spotlight; 
 		UniformMemoryDirectWrite<DirectionalLightUniformData> directionallight; 
+		UniformMemoryDirectWrite<LightArrayLengthsUniformData> lightarray_lengths; 
 	};
 	
+	vk::UniqueDescriptorSetLayout m_global_set_layout;
 	FlightFramesArray<GlobalSetUniform> m_global_set_uniforms;
 
 	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;

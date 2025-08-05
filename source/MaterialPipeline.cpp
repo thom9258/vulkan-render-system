@@ -149,7 +149,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 								sizeof(PushConstants)));
 	}
 	
-	std::array<vk::DescriptorSetLayoutBinding, 4> frame_uniform_bindings{
+	std::array<vk::DescriptorSetLayoutBinding, 5> frame_uniform_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
 		.setBinding(0)
@@ -168,6 +168,11 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(3)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(4)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 	};
@@ -343,11 +348,11 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		.setDescriptorSetCount(layouts_size)
 		.setSetLayouts(m_global_set_layout.get());
 
-
+	
+	//NOTE: due to only having 1 identical layout for each set, we need to allocate
+	//      them seperately like this. this is assumed to be better than having
+	//      duplicate layouts laying around
 	for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
-		//NOTE: due to only having 1 identical layout for each set, we need to allocate
-		//      them seperately like this. this is assumed to be better than having
-		//      duplicate layouts laying around
 		std::vector<vk::UniqueDescriptorSet> sets =
 			context->device.get().allocateDescriptorSetsUnique(frame_uniform_allocate_info);
 
@@ -364,11 +369,18 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	PointLightUniformData pointlight_init_data;
 	SpotLightUniformData spotlight_init_data;
 	DirectionalLightUniformData dirlight_init_data;
+	
+	LightArrayLengthsUniformData lightarray_lengths_init_data;
+	lightarray_lengths_init_data.point_length = 0;
+	lightarray_lengths_init_data.spot_length = 0;
+	lightarray_lengths_init_data.directional_length = 0;
 
 	for (auto& uniform: m_global_set_uniforms) {
-		uniform.camera = UniformMemoryDirectWrite<CameraUniformData>(context->physical_device,
-																	 context->device.get(),
-																	 &camera_init_data);
+		uniform.camera =
+			UniformMemoryDirectWrite<CameraUniformData>(context->physical_device,
+														context->device.get(),
+														camera_uniform_count);
+		uniform.camera.write(context->device.get(), &camera_init_data, 1);
 
 		logger.info(std::source_location::current(),
 					"created frame uniform camera descriptor memories");
@@ -376,28 +388,47 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		uniform.pointlight =
 			UniformMemoryDirectWrite<PointLightUniformData>(context->physical_device,
 															context->device.get(),
-															&pointlight_init_data);
+															max_pointlights);
+		uniform.pointlight.write(context->device.get(), &pointlight_init_data, 1);
+
 		logger.info(std::source_location::current(),
 					"created frame uniform pointlight descriptor memories");
 	
 		uniform.spotlight =
 			UniformMemoryDirectWrite<SpotLightUniformData>(context->physical_device,
-																context->device.get(),
-																&spotlight_init_data);
+														   context->device.get(),
+														   max_spotlights);
+		uniform.spotlight.write(context->device.get(), &spotlight_init_data, 1);
 		logger.info(std::source_location::current(),
 					"created frame uniform spotlight descriptor memories");
 	
 		uniform.directionallight =
 			UniformMemoryDirectWrite<DirectionalLightUniformData>(context->physical_device,
 																  context->device.get(),
-																  &dirlight_init_data);
+																  max_directionallights);
+
+		uniform.directionallight.write(context->device.get(), &dirlight_init_data, 1);
 		logger.info(std::source_location::current(),
 					"created frame uniform directional light descriptor memories");
-	}
-	
-	for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
+		
+		uniform.lightarray_lengths =
+			UniformMemoryDirectWrite<LightArrayLengthsUniformData>(context->physical_device,
+																   context->device.get(),
+																   lightarray_lengths_count);
+		uniform.lightarray_lengths.write(context->device.get(),
+										 &lightarray_lengths_init_data,
+										 1);
 
-		std::array<vk::WriteDescriptorSet, 4> writes {
+		logger.info(std::source_location::current(),
+					"created frame uniform light array lengths descriptor memories");
+	}
+
+	// NOTE: Here we technically update the descriptor sets, but this is done to
+	//       initialize them before use. Aftwerwards, it is not nessecary to update with a write 
+    //       as the uniforms are direct write uniforms, thus simply writing to the memory
+	//       is considered updating them
+	for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
+		std::array<vk::WriteDescriptorSet, 5> writes {
 			vk::WriteDescriptorSet{}
 			.setDstSet(m_global_set_uniforms[i].set.get())
 			.setDstBinding(0)
@@ -429,13 +460,20 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 			.setDescriptorCount(1)
 			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
 			.setBufferInfo(m_global_set_uniforms[i].directionallight.buffer_info()),
+
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_global_set_uniforms[i].set.get())
+			.setDstBinding(4)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_global_set_uniforms[i].lightarray_lengths.buffer_info()),
 		};
 
 		context->device.get().updateDescriptorSets(writes.size(),
 												   writes.data(),
 												   0,
 												   nullptr);
-
 		logger.info(std::source_location::current(),
 					"added another set of writes");
 	}
@@ -522,34 +560,51 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	camera_data.view = frame_info.view;
 	camera_data.proj = frame_info.proj;
 	camera_data.position = frame_info.camera_position;
-	m_global_set_uniforms[*current_flightframe].camera.write(device, &camera_data);
+	m_global_set_uniforms[*current_flightframe].camera.write(device, &camera_data, 1);
 	
 	SortedLights sorted_lights;
 	std::ranges::for_each(lights, std::bind_front(sort_light, &logger, &sorted_lights));
 	
+	LightArrayLengthsUniformData lightarray_lengths_data{};
+	
 	if (!sorted_lights.points.empty()) {
-		PointLightUniformData data = sorted_lights.points.front();
-		m_global_set_uniforms[*current_flightframe].pointlight.write(device, &data);
-	}
-	else {
-		logger.warn(std::source_location::current(), "no point lights are provided");
+		std::vector<PointLightUniformData> data;
+		for (auto light: sorted_lights.points)
+			data.push_back(PointLightUniformData{light});
+		
+		size_t const length = 
+			(data.size() > max_pointlights) ? max_pointlights : data.size();
+
+		m_global_set_uniforms[*current_flightframe].pointlight.write(device,
+																	 data.data(),
+																	 length);
+		lightarray_lengths_data.point_length = length;
 	}
 
 	if (!sorted_lights.spots.empty()) {
 		SpotLightUniformData data = sorted_lights.spots.front();
-		m_global_set_uniforms[*current_flightframe].spotlight.write(device, &data);
-	}
-	else {
-		logger.warn(std::source_location::current(), "no spotlights are provided");
+		m_global_set_uniforms[*current_flightframe].spotlight.write(device, &data, 1);
+		lightarray_lengths_data.spot_length = 1;
 	}
 
 	if (!sorted_lights.directionals.empty()) {
 		DirectionalLightUniformData data = sorted_lights.directionals.front();
-		m_global_set_uniforms[*current_flightframe].directionallight.write(device, &data);
+		m_global_set_uniforms[*current_flightframe].directionallight.write(device, &data, 1);
+		lightarray_lengths_data.directional_length = 1;
 	}
-	else {
-		logger.warn(std::source_location::current(), "no directional lights are provided");
-	}
+
+	m_global_set_uniforms[*current_flightframe].lightarray_lengths.write(device,
+																		 &lightarray_lengths_data,
+																		 1);
+
+#if 1
+	const auto msg = std::format("Pointlights: {}\nSpotlights: {}\n DirLights: {}",
+								 lightarray_lengths_data.point_length,
+								 lightarray_lengths_data.spot_length,
+								 lightarray_lengths_data.directional_length);
+	logger.info(std::source_location::current(),
+				msg.c_str());
+#endif	
 
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
