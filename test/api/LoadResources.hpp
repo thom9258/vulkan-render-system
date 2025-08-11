@@ -14,7 +14,6 @@ struct Resources
 	Resources(const Resources&) = delete;
 	Resources& operator=(Resources&&) = delete;
 	Resources& operator=(const Resources&) = delete;
-	
 
 	Resources(Render::Context& context,
 			  std::filesystem::path assets_root);
@@ -27,6 +26,14 @@ struct Resources
 		Mesh mesh;
 		TexturedMesh textured_mesh;
 	} cube;
+	
+	struct {
+		Mesh mesh;
+	} gizmo_cone;
+	
+	struct {
+		Mesh mesh;
+	} gizmo_sphere;
 	
 	struct {
 		TexturedMesh mesh;
@@ -133,22 +140,97 @@ auto get_cube_vertices()
 	return vertices;
 }
 
+auto get_gizmo_cone_vertices()
+	-> std::vector<VertexPosNormColor> 
+{
+	sg_status status;
+	size_t vertices_length{0};
+	
+	sg_gizmo_cone_info info{};
+	info.height = 5.0f;
+	info.radius = 3.2f;
+	
+	status = sg_gizmo_cone_vertices(&info, &vertices_length, nullptr);
+	if (status != SG_OK_RETURNED_LENGTH)
+		throw std::runtime_error("Could not get positions size");
+
+	std::vector<sg_position> positions(vertices_length);
+	status = sg_gizmo_cone_vertices(&info,
+									&vertices_length,
+									positions.data());
+
+	if (status != SG_OK_RETURNED_BUFFER)
+		throw std::runtime_error("Could not get vertices");
+
+	std::vector<VertexPosNormColor> vertices(positions.size());
+	for (size_t i = 0; i < vertices.size(); i++) {
+		vertices[i].pos = {positions[i].x, positions[i].y, positions[i].z};
+		vertices[i].color = {1.0f, 1.0f, 1.0f};
+	}
+
+	return vertices;
+}
+
+auto get_gizmo_sphere_vertices()
+	-> std::vector<VertexPosNormColor> 
+{
+	sg_status status;
+	size_t vertices_length{0};
+	
+	Attenuation attenuation;
+	attenuation.constant = 1.0f;
+	attenuation.linear = 0.09f;
+	attenuation.quadratic = 0.032f;
+
+	sg_gizmo_sphere_info info{};
+	//info.radius = 1.0f;
+	info.radius = attenuation.approximate_distance(0.1f);
+	
+	status = sg_gizmo_sphere_vertices(&info, &vertices_length, nullptr);
+	if (status != SG_OK_RETURNED_LENGTH)
+		throw std::runtime_error("Could not get positions size");
+
+	std::vector<sg_position> positions(vertices_length);
+	status = sg_gizmo_sphere_vertices(&info,
+									&vertices_length,
+									positions.data());
+
+	if (status != SG_OK_RETURNED_BUFFER)
+		throw std::runtime_error("Could not get vertices");
+
+	std::vector<VertexPosNormColor> vertices(positions.size());
+	for (size_t i = 0; i < vertices.size(); i++) {
+		vertices[i].pos = {positions[i].x, positions[i].y, positions[i].z};
+		vertices[i].color = {1.0f, 1.0f, 1.0f};
+	}
+
+	return vertices;
+}
+
 Resources::Resources(Render::Context& context,
 					 std::filesystem::path assets_root)
 {
 	std::filesystem::path models_root = assets_root / "models/";
 	std::filesystem::path textures_root = assets_root / "textures/";
 	
-	const std::vector<VertexPosNormColorUV> textured_cube_vertices = get_textured_cube_vertices();
 	cube.textured_mesh = TexturedMesh{
-		VertexBuffer::create<VertexPosNormColorUV>(context, textured_cube_vertices)
+		VertexBuffer::create<VertexPosNormColorUV>(context,
+												   get_textured_cube_vertices())
 	};
 	
-	const std::vector<VertexPosNormColor> cube_vertices = get_cube_vertices();
-
 	cube.mesh = Mesh{
-		VertexBuffer::create<VertexPosNormColor>(context, cube_vertices)
+		VertexBuffer::create<VertexPosNormColor>(context, get_cube_vertices())
 	};
+	
+	gizmo_sphere.mesh = Mesh{
+		VertexBuffer::create<VertexPosNormColor>(context, 
+												 get_gizmo_sphere_vertices())
+	};
+	gizmo_cone.mesh = Mesh{
+		VertexBuffer::create<VertexPosNormColor>(context, 
+												 get_gizmo_cone_vertices())
+	};
+	
 
 	auto loaded_monkey_mesh = load_obj(context,
 									   assets_root,

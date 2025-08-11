@@ -3,6 +3,7 @@
 #include "glm.hpp"
 
 #include <variant>
+#include <algorithm>
 
 struct DirectionalLight
 {
@@ -17,6 +18,13 @@ struct Attenuation
 	float constant;
 	float linear;
 	float quadratic;
+
+	constexpr auto approximate_distance(float intensity)
+		const noexcept -> float
+	{
+		float F = std::clamp(intensity, 0.0f, 1.0f);
+		return ((-constant * F) - (4 * F * quadratic) + 1) / F * linear;
+	}
 };
 
 struct PointLight

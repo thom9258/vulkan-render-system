@@ -163,11 +163,13 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(2)
+		//.setDescriptorCount(max_spotlights)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(3)
+		//.setDescriptorCount(max_directionallights)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 		vk::DescriptorSetLayoutBinding{}
@@ -389,6 +391,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 			UniformMemoryDirectWrite<PointLightUniformData>(context->physical_device,
 															context->device.get(),
 															max_pointlights);
+
 		uniform.pointlight.write(context->device.get(), &pointlight_init_data, 1);
 
 		logger.info(std::source_location::current(),
@@ -570,27 +573,38 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	if (!sorted_lights.points.empty()) {
 		std::vector<PointLightUniformData> data;
 		for (auto light: sorted_lights.points)
-			data.push_back(PointLightUniformData{light});
+			data.emplace_back(light);
 		
-		size_t const length = 
-			(data.size() > max_pointlights) ? max_pointlights : data.size();
-
+		size_t const length = std::min(data.size(), max_pointlights);
 		m_global_set_uniforms[*current_flightframe].pointlight.write(device,
 																	 data.data(),
-																	 length);
+																	 data.size());
 		lightarray_lengths_data.point_length = length;
 	}
 
 	if (!sorted_lights.spots.empty()) {
-		SpotLightUniformData data = sorted_lights.spots.front();
-		m_global_set_uniforms[*current_flightframe].spotlight.write(device, &data, 1);
-		lightarray_lengths_data.spot_length = 1;
+		std::vector<SpotLightUniformData> data;
+		for (auto light: sorted_lights.spots)
+			data.emplace_back(light);
+
+		size_t const length = std::min(data.size(), max_spotlights);
+		m_global_set_uniforms[*current_flightframe].spotlight.write(device,
+																	data.data(),
+																	data.size());
+		lightarray_lengths_data.spot_length = length;
 	}
 
 	if (!sorted_lights.directionals.empty()) {
-		DirectionalLightUniformData data = sorted_lights.directionals.front();
-		m_global_set_uniforms[*current_flightframe].directionallight.write(device, &data, 1);
-		lightarray_lengths_data.directional_length = 1;
+		std::vector<DirectionalLightUniformData> data;
+		for (auto light: sorted_lights.directionals)
+			data.emplace_back(light);
+
+		size_t const length = std::min(data.size(), max_directionallights);
+		m_global_set_uniforms[*current_flightframe].directionallight.write(device,
+																		   data.data(),
+																		   data.size());
+		lightarray_lengths_data.directional_length = length;
+
 	}
 
 	m_global_set_uniforms[*current_flightframe].lightarray_lengths.write(device,

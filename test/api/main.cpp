@@ -38,6 +38,20 @@ with_time_measurement(F&& f, Args&&... args)
 	return end - start;
 }
 
+		
+auto rotation_from_direction(glm::vec3 direction)
+	-> glm::mat3
+{
+	glm::vec3 const rotationZ = direction;
+	glm::vec3 const rotationX = glm::normalize(glm::cross(glm::vec3(0, 1, 0), rotationZ));
+	glm::vec3 const rotationY = glm::normalize(glm::cross(rotationZ, rotationX));
+	return glm::mat3(rotationX.x, rotationY.x, rotationZ.x,
+					 rotationX.y, rotationY.y, rotationZ.y,
+					 rotationX.z, rotationY.z, rotationZ.z);
+}
+
+
+
 constexpr bool slowframes = false;
 constexpr bool printframerate = true;
 constexpr size_t printframerateinterval = 100;
@@ -94,86 +108,118 @@ auto mixed_light_scene(Resources& resources,
 					   CurrentFrameInfo frameInfo,
 					   glm::vec3 campos,
 					   glm::vec3 camfront,
-					   bool spotlight_enabled)
+					   bool spotlight_enabled,
+					   bool extra_pointlights_enabled,
+					   bool directionallight_enabled)
 	-> Scene
 {
 	Scene scene;
-	
-	//{
-	//PointLight pl;
-	//pl.position = glm::vec3(-2.0f, 1.0f, 0.7f);
-	//pl.diffuse = glm::vec3(3.0f, 1.0f, 1.0f);
-	//pl.ambient = pl.diffuse * 0.05f;
-	//pl.specular = glm::vec3(1.0f) * 0.1f;
-	//pl.attenuation.constant = 1.0f;
-	//pl.attenuation.linear = 0.09f;
-	//pl.attenuation.quadratic = 0.032f;
-	//scene.lights.push_back(pl);
-	//WireframeRenderable plbox{};
-	//plbox.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
-	//plbox.mesh = &resources.cube.mesh;
-	//plbox.model = glm::translate(glm::mat4(1.0f), pl.position);
-	//plbox.model = glm::scale(plbox.model, glm::vec3(0.05f));
-	//scene.renderables.push_back(plbox);
-//}
-	{
+
+	if (true) {
 		PointLight pl;
-		pl.position = glm::vec3(-2.0f, 1.0f, -0.7f);
-		pl.diffuse = glm::vec3(3.0f, 3.0f, 1.0f);
-		pl.ambient = pl.diffuse * 0.05f;
-		pl.specular = glm::vec3(1.0f) * 0.1f;
+		pl.position = glm::vec3(-1.0f, 1.0f, 1.0f);
+		pl.ambient = glm::vec3(0.0f);
+		pl.specular = glm::vec3(1.0f);
+		pl.diffuse = glm::vec3(0.8f, 0.2f, 0.2f);
 		pl.attenuation.constant = 1.0f;
 		pl.attenuation.linear = 0.09f;
 		pl.attenuation.quadratic = 0.032f;
 		scene.lights.push_back(pl);
-		WireframeRenderable plbox{};
-		plbox.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
-		plbox.mesh = &resources.cube.mesh;
-		plbox.model = glm::translate(glm::mat4(1.0f), pl.position);
-		plbox.model = glm::scale(plbox.model, glm::vec3(0.05f));
-		scene.renderables.push_back(plbox);
+		WireframeRenderable gizmo{};
+		gizmo.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
+		gizmo.mesh = &resources.gizmo_sphere.mesh;
+		gizmo.model = glm::translate(glm::mat4(1.0f), pl.position);
+		gizmo.model = glm::scale(gizmo.model, glm::vec3(1.0f));
+		scene.renderables.push_back(gizmo);
+		gizmo.model = glm::scale(gizmo.model, glm::vec3(0.1f));
+		scene.renderables.push_back(gizmo);
+	}
+	if (extra_pointlights_enabled) {
+		PointLight pl;
+		pl.position = glm::vec3(1.0f, 1.0f, -2.0f);
+		pl.ambient = glm::vec3(0.0f);
+		pl.specular = glm::vec3(1.0f);
+		pl.diffuse = glm::vec3(0.4f);
+		pl.attenuation.constant = 1.0f;
+		pl.attenuation.linear = 0.09f;
+		pl.attenuation.quadratic = 0.032f;
+		scene.lights.push_back(pl);
+		
+		WireframeRenderable gizmo{};
+		gizmo.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
+		gizmo.mesh = &resources.gizmo_sphere.mesh;
+		gizmo.model = glm::translate(glm::mat4(1.0f), pl.position);
+		gizmo.model = glm::scale(gizmo.model, glm::vec3(1.0f));
+		scene.renderables.push_back(gizmo);
+		gizmo.model = glm::scale(gizmo.model, glm::vec3(0.1f));
+		scene.renderables.push_back(gizmo);
+	}
+	if (directionallight_enabled) {
+		DirectionalLight dl;
+		dl.direction = glm::vec3(-0.1f, -0.2f, -0.0f);
+		dl.diffuse = glm::vec3(1.0f, 1.0f, 0.4f);
+		dl.ambient = glm::vec3(0.1f);
+		//dl.ambient = dl.diffuse * 0.01f;
+		dl.specular = glm::vec3(0.3f);
+		scene.lights.push_back(dl);
 	}
 	
-	DirectionalLight dl;
-	dl.direction = glm::vec3(-0.1f, -0.2f, -0.0f);
-	dl.diffuse = glm::vec3(1.0f, 1.0f, 0.4f);
-	dl.ambient = dl.diffuse * 0.01f;
-	dl.specular = glm::vec3(0.1f);
-	scene.lights.push_back(dl);
-	
 	if (spotlight_enabled) {
-		SpotLight s1;
-		s1.position = glm::vec3(-1.0f, 0.0f, -1.0f);
-		s1.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-		s1.ambient = glm::vec3(0.0f);
-		s1.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
-		s1.specular = glm::vec3(1.0f);
-		s1.attenuation.constant = 1.0f;
-		s1.attenuation.linear = 0.09f;
-		s1.attenuation.quadratic = 0.032f;
-		s1.cutoff.inner = glm::cos(glm::radians(30.0f));
-		s1.cutoff.outer = glm::cos(glm::radians(35.0f));
-		scene.lights.push_back(s1);
+		SpotLight spot;
+		spot.position = glm::vec3(-1.0f, 0.0f, -1.0f);
+		spot.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
+		spot.ambient = glm::vec3(0.0f);
+		spot.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
+		spot.specular = glm::vec3(1.0f);
+		spot.attenuation.constant = 1.0f;
+		spot.attenuation.linear = 0.09f;
+		spot.attenuation.quadratic = 0.032f;
+		spot.cutoff.inner = glm::cos(glm::radians(30.0f));
+		spot.cutoff.outer = glm::cos(glm::radians(35.0f));
+		scene.lights.push_back(spot);
+
+		WireframeRenderable gizmo{};
+		gizmo.basecolor = glm::vec4(glm::normalize(spot.diffuse), 1.0f);
+		gizmo.mesh = &resources.gizmo_cone.mesh;
+		gizmo.model = glm::mat4(1.0f);
+		gizmo.model = glm::translate(gizmo.model, spot.position);
+		gizmo.model = glm::rotate(gizmo.model,
+								  glm::radians(90.0f),
+								  glm::vec3(1, 0, 0));
+		gizmo.model = glm::rotate(gizmo.model,
+								  glm::radians(90 + 45.0f),
+								  glm::vec3(0, 0, 1));
+		gizmo.model = glm::translate(gizmo.model, glm::vec3(0, -2.5f, 0.0f));
+
+		scene.renderables.push_back(gizmo);
 		
-		WireframeRenderable spotpos{};
-		spotpos.basecolor = glm::vec4(glm::normalize(s1.diffuse), 1.0f);
-		spotpos.mesh = &resources.cube.mesh;
-		spotpos.model = glm::translate(glm::mat4(1.0f), s1.position);
-		spotpos.model = glm::scale(spotpos.model, glm::vec3(0.1f));
-		scene.renderables.push_back(spotpos);
-		WireframeRenderable spotdir{};
-		spotdir.basecolor = glm::vec4(glm::normalize(s1.diffuse), 1.0f);
-		spotdir.mesh = &resources.cube.mesh;
-		spotdir.model = glm::translate(glm::mat4(1.0f), s1.position + s1.direction);
-		spotdir.model = glm::scale(spotdir.model, glm::vec3(0.4f));
-		scene.renderables.push_back(spotdir);
+		spot.position = glm::vec3(2.0f, 1.0f, -2.0f);
+		spot.direction = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
+		spot.ambient = glm::vec3(0.0f);
+		spot.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
+		spot.specular = glm::vec3(1.0f);
+		spot.attenuation.constant = 1.0f;
+		spot.attenuation.linear = 0.09f;
+		spot.attenuation.quadratic = 0.032f;
+		spot.cutoff.inner = glm::cos(glm::radians(15.0f));
+		spot.cutoff.outer = glm::cos(glm::radians(35.0f));
+		scene.lights.push_back(spot);
+		
+		gizmo.basecolor = glm::vec4(glm::normalize(spot.diffuse), 1.0f);
+		gizmo.mesh = &resources.gizmo_cone.mesh;
+		glm::vec3 const cone_offset(0.0f, 0.5f, 0.0f);
+		glm::vec3 const cone_direction(0.0f, 1.0f, 0.0f);
+		gizmo.model = glm::mat4(1.0f);
+		gizmo.model = glm::translate(gizmo.model, spot.position);
+		scene.renderables.push_back(gizmo);
 	}
 	
 	MaterialRenderable chest{};
 	chest.mesh = &resources.chest.mesh;
 	chest.casts_shadow = true;
-	chest.texture.ambient = nullptr;
+	chest.texture.ambient = &resources.chest.diffuse;
 	chest.texture.diffuse = &resources.chest.diffuse;
+	chest.texture.specular = &resources.chest.diffuse;
 	chest.model = glm::mat4(1.0f);
 	chest.model = glm::translate(chest.model, glm::vec3(1.5f, -1.0f, 1.5f));
 	chest.model = glm::scale(chest.model, glm::vec3(0.02f));
@@ -335,6 +381,8 @@ int main()
 	uint64_t framecount = 0;
 	
 	bool spotlight_enabled = true;
+	bool extra_pointlights_enabled = true;
+	bool directionallight_enabled = false;
 
 	while (!exit) {
 		/** ************************************************************************
@@ -363,6 +411,12 @@ int main()
 					
 				case SDLK_t:
 					spotlight_enabled = !spotlight_enabled;
+					break;
+				case SDLK_p:
+					extra_pointlights_enabled = !extra_pointlights_enabled;
+					break;
+				case SDLK_o:
+					directionallight_enabled = !directionallight_enabled;
 					break;
 				case SDLK_w:
 					camera.position += camera_forward * move_speed;
@@ -455,7 +509,9 @@ int main()
 										  frameInfo,
 										  camera.position,
 										  camera.position + camera_forward,
-										  spotlight_enabled);
+										  spotlight_enabled,
+										  extra_pointlights_enabled,
+										  directionallight_enabled);
 #else
 				scene = normcolor_scene(resources, frameInfo);
 #endif

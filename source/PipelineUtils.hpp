@@ -70,7 +70,6 @@ struct UniformMemoryDirectWrite
 									  size_t count)
 	{
 		m_count = (count < 1) ? 1 : count;
-
 		m_memory = allocate_memory(physical_device,
 								   device,
 								   sizeof(Data) * m_count,
@@ -87,7 +86,6 @@ struct UniformMemoryDirectWrite
 	{
 		if (length == 0) return;
 		if (length > m_count) length = m_count;
-
 		copy_to_allocated_memory(device,
 								 m_memory,
 								 reinterpret_cast<void*>(data),
@@ -99,7 +97,7 @@ struct UniformMemoryDirectWrite
 		static auto info = vk::DescriptorBufferInfo{}
 			.setBuffer(m_memory.buffer.get())
 			.setOffset(0)
-			.setRange(sizeof(Data));
+			.setRange(sizeof(Data) * m_count);
 		return info;
 	}
 	
