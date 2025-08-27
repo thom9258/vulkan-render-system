@@ -11,6 +11,15 @@
 #include "BaseTexturePipeline.hpp"
 #include "MaterialPipeline.hpp"
 
+struct ShadowPass
+{
+	vk::Extent2D extent;
+	vk::UniqueRenderPass renderpass;
+	std::vector<Texture2D::Impl> depthbuffers;
+	std::vector<vk::UniqueImageView> depthbuffer_views;
+	std::vector<vk::UniqueFramebuffer> framebuffers;
+};
+
 struct GeometryPass
 {
 	vk::Extent2D extent;
@@ -22,11 +31,12 @@ struct GeometryPass
 	std::vector<vk::UniqueFramebuffer> framebuffers;
 };
 
-struct Pipelines
+struct GeometryPipelines
 {
 	BaseTexturePipeline basetexture;
 	NormRenderPipeline normcolor;
 	WireframePipeline wireframe;
+	MaterialPipeline material;
 };
 
 struct SortedRenderables
@@ -41,13 +51,6 @@ void sort_renderable(Logger* logger,
 					 SortedRenderables* sorted,
 					 Renderable renderable);
 
-auto create_pipelines(Render::Context::Impl* context,
-					  Presenter::Impl* presenter,
-					  const vk::Extent2D render_extent,
-					  const std::filesystem::path shader_root_path,
-					  bool debug_print) 
-	-> Pipelines;
-
 auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 						  vk::Device& device,
 						  vk::CommandPool& command_pool,
@@ -60,7 +63,7 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 auto render_geometry_pass(GeometryPass& pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
-						  Pipelines* pipelines,
+						  GeometryPipelines* pipelines,
 						  Logger* logger,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
@@ -99,6 +102,5 @@ public:
 	DescriptorPool::Impl* descriptor_pool;
 
 	GeometryPass geometry_pass;
-	Pipelines pipelines;
-	MaterialPipeline material_pipeline;
+	GeometryPipelines geometry_pipelines;
 };

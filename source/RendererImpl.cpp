@@ -46,51 +46,6 @@ void sort_renderable(Logger* logger,
 	}
 }
 
-auto create_pipelines(Render::Context::Impl* context,
-					  Presenter::Impl* presenter,
-					  DescriptorPool::Impl* descriptor_pool,
-					  vk::RenderPass& renderpass,
-					  const vk::Extent2D render_extent,
-					  const std::filesystem::path shader_root_path,
-					  bool debug_print) 
-	-> Pipelines
-{
-	Pipelines pipelines;
-	pipelines.basetexture = create_base_texture_pipeline(context->logger,
-														 context,
-														 presenter,
-														 descriptor_pool,
-														 renderpass,
-														 presenter->max_frames_in_flight,
-														 render_extent,
-														 shader_root_path,
-														 debug_print);
-	context->logger.info(std::source_location::current(),
-						 "Created BaseTexture Pipeline");
-
-	pipelines.normcolor = create_norm_render_pipeline(context->logger,
-													  context->physical_device,
-													  context->device.get(),
-													  renderpass,
-													  presenter->max_frames_in_flight,
-													  render_extent,
-													  shader_root_path,
-													  debug_print);
-	context->logger.info(std::source_location::current(),
-						 "Created NormColor Pipeline");
-
-	pipelines.wireframe = create_wireframe_render_pipeline(context->logger,
-														   context->device.get(),
-														   renderpass,
-														   render_extent,
-														   shader_root_path,
-														   debug_print);
-	context->logger.info(std::source_location::current(),
-						 "Created Wireframe Pipeline");
-	
-	return pipelines;
-}
-
 auto create_geometry_pass(Render::Context::Impl* context,
 						  vk::Extent2D render_extent,
 						  const uint32_t frames_in_flight,
@@ -243,8 +198,7 @@ auto create_geometry_pass(Render::Context::Impl* context,
 auto render_geometry_pass(GeometryPass& pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
-						  Pipelines* pipelines,
-						  MaterialPipeline& material_pipeline,
+						  GeometryPipelines* pipelines,
 						  Logger* logger,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
@@ -339,15 +293,15 @@ auto render_geometry_pass(GeometryPass& pass,
 		material_frame_info.view = world_info.view;
 		material_frame_info.proj = world_info.projection;
 		material_frame_info.camera_position = world_info.camera_position;
-		material_pipeline.render(material_frame_info,
-								 *logger,
-								 device,
-								 descriptor_pool,
-								 commandbuffer,
-								 CurrentFlightFrame{current_frame_in_flight},
-								 MaxFlightFrames{max_frames_in_flight},
-								 sorted.materialrenderables,
-								 lights);
+		pipelines->material.render(material_frame_info,
+								   *logger,
+								   device,
+								   descriptor_pool,
+								   commandbuffer,
+								   CurrentFlightFrame{current_frame_in_flight},
+								   MaxFlightFrames{max_frames_in_flight},
+								   sorted.materialrenderables,
+								   lights);
 
 		commandbuffer.endRenderPass();
 	};
@@ -371,28 +325,55 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	, logger(logger)
 	, descriptor_pool(descriptor_pool)
 {
+	//TODO: Allow extent to be set externally
+	//TODO: Allow debug print to be set externally
+	vk::Extent2D const render_extent = context->get_window_extent();
+	bool const debug_print = true;
 	geometry_pass = create_geometry_pass(context,
-										 //TODO: Allow extent to be set externally
-										 context->get_window_extent(),
+										 render_extent,
 										 presenter->max_frames_in_flight,
-										 //TODO: Allow debug print to be set externally
-										 true
-										 );
+										 debug_print);
 	
-	material_pipeline = MaterialPipeline(logger,
-										 context,
-										 presenter,
-										 descriptor_pool,
-										 geometry_pass.renderpass.get(),
-										 shaders_root);
+	geometry_pipelines.material = MaterialPipeline(logger,
+												   context,
+												   presenter,
+												   descriptor_pool,
+												   geometry_pass.renderpass.get(),
+												   shaders_root);
+	context->logger.info(std::source_location::current(),
+						 "Created Material Pipeline");
 	
-	pipelines = create_pipelines(context,
-								 presenter,
-								 descriptor_pool,
-								 geometry_pass.renderpass.get(),
-								 context->get_window_extent(),
-								 shaders_root,
-								 true);
+	geometry_pipelines.basetexture = create_base_texture_pipeline(context->logger,
+																  context,
+																  presenter,
+																  descriptor_pool,
+																  geometry_pass.renderpass.get(),
+																  presenter->max_frames_in_flight,
+																  render_extent,
+																  shaders_root,
+																  debug_print);
+	context->logger.info(std::source_location::current(),
+						 "Created BaseTexture Pipeline");
+
+	geometry_pipelines.normcolor = create_norm_render_pipeline(context->logger,
+															   context->physical_device,
+															   context->device.get(),
+															   geometry_pass.renderpass.get(),
+															   presenter->max_frames_in_flight,
+															   render_extent,
+															   shaders_root,
+															   debug_print);
+	context->logger.info(std::source_location::current(),
+						 "Created NormColor Pipeline");
+
+	geometry_pipelines.wireframe = create_wireframe_render_pipeline(context->logger,
+																	context->device.get(),
+																	geometry_pass.renderpass.get(),
+																	render_extent,
+																	shaders_root,
+																	debug_print);
+	context->logger.info(std::source_location::current(),
+						 "Created Wireframe Pipeline");
 }
 
 Renderer::Impl::~Impl()
@@ -407,8 +388,7 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 		-> Texture2D::Impl*
 {
 	return render_geometry_pass(geometry_pass,
-								&pipelines,
-								material_pipeline,
+								&geometry_pipelines,
 								&logger,
 								current_frame_in_flight,
 								presenter->max_frames_in_flight,
