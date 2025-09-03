@@ -46,6 +46,70 @@ void sort_renderable(Logger* logger,
 	}
 }
 
+ShadowPass::ShadowPass(Render::Context::Impl* context,
+					   vk::Extent2D extent,
+					   const uint32_t frames_in_flight,
+					   const bool debug_print)
+	: extent{extent}
+{
+	auto constexpr color_format = vk::Format::eR8Srgb;
+    const auto color_attachment = vk::AttachmentDescription{}
+		.setFlags(vk::AttachmentDescriptionFlags())
+		.setFormat(color_format)
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eStore)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		// NOTE these are important, as they determine the layout of the image before and after
+		// the renderpass
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
+
+	auto constexpr depth_format = vk::Format::eD32Sfloat;
+    const auto depth_attachment = vk::AttachmentDescription{}
+		.setFlags(vk::AttachmentDescriptionFlags())
+		.setFormat(depth_format)
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		// NOTE these are important, as they determine the layout of the image before and after
+		// the renderpass
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+	const auto color_reference = vk::AttachmentReference{}
+		.setAttachment(0)
+		.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+	const auto depth_reference = vk::AttachmentReference{}
+		.setAttachment(1)
+		.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+	
+    auto subpass = vk::SubpassDescription{}
+		.setFlags(vk::SubpassDescriptionFlags())
+		.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+		.setInputAttachments({})
+		.setResolveAttachments({})
+		.setColorAttachments(color_reference)
+		.setPDepthStencilAttachment(&depth_reference);
+	
+	auto color_depth_dependency = vk::SubpassDependency{}
+		.setSrcSubpass(vk::SubpassExternal)
+		.setDstSubpass(0)
+		.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput
+						 | vk::PipelineStageFlagBits::eEarlyFragmentTests)
+		.setSrcAccessMask(vk::AccessFlags())
+		.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput
+						 | vk::PipelineStageFlagBits::eEarlyFragmentTests)
+		.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite
+						  | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
+
+	
+}
+
 auto create_geometry_pass(Render::Context::Impl* context,
 						  vk::Extent2D render_extent,
 						  const uint32_t frames_in_flight,
@@ -69,6 +133,7 @@ auto create_geometry_pass(Render::Context::Impl* context,
 		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
 		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
 		// NOTE these are important, as they determine the layout of the image before and after
+		// the renderpass
 		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
 
@@ -81,6 +146,7 @@ auto create_geometry_pass(Render::Context::Impl* context,
 		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
 		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
 		// NOTE these are important, as they determine the layout of the image before and after
+		// the renderpass
 		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 

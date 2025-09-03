@@ -611,7 +611,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 																		 &lightarray_lengths_data,
 																		 1);
 
-#if 1
+#if 0
 	const auto msg = std::format("Pointlights: {}\nSpotlights: {}\n DirLights: {}",
 								 lightarray_lengths_data.point_length,
 								 lightarray_lengths_data.spot_length,

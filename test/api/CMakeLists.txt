@@ -12,6 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(vulkan-renderer CONFIG REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 #-------------------------------------------------------------------------
 # Fetch SimpleGeometry
@@ -39,4 +40,5 @@ target_link_libraries(${PROJECT_NAME}
   ${Vulkan_LIBRARIES}
   ${SDL2_LIBRARIES}
   vulkan-renderer::vulkan-renderer
+  nlohmann_json::nlohmann_json
 )

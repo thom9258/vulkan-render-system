@@ -1,5 +1,6 @@
 [requires]
-vulkan-renderer/1.2
+vulkan-renderer/1.3
+nlohmann_json/3.12.0
 
 [generators]
 CMakeToolchain

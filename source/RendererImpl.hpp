@@ -11,8 +11,13 @@
 #include "BaseTexturePipeline.hpp"
 #include "MaterialPipeline.hpp"
 
-struct ShadowPass
+class ShadowPass
 {
+	ShadowPass(Render::Context::Impl* context,
+			   vk::Extent2D extent,
+			   const uint32_t frames_in_flight,
+			   const bool debug_print);
+
 	vk::Extent2D extent;
 	vk::UniqueRenderPass renderpass;
 	std::vector<Texture2D::Impl> depthbuffers;

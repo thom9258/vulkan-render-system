@@ -7,6 +7,8 @@
 #include <thread>
 #include <ranges>
 #include <thread>
+#include <fstream>
+#include <streambuf>
 
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/Presenter.hpp>
@@ -18,8 +20,13 @@
 #include <VulkanRenderer/Bitmap.hpp>
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/ShaderTexture.hpp>
+#include <VulkanRenderer/Utils.hpp>
+#include <VulkanRenderer/Transform.hpp>
 
 #include "LoadResources.hpp"
+
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 std::filesystem::path root = "../../../";
 std::filesystem::path shaders_root = root / "compiled_shaders/";
@@ -65,10 +72,143 @@ std::vector<VertexPosNormColor> triangle_vertices = {
 
 struct Scene
 {
-
 	std::vector<Renderable> renderables;
 	std::vector<Light> lights;
 };
+
+struct StaticObject
+{
+	std::string name;
+	Render::Transform transform;
+};
+
+auto parse_vec3(json j)
+	-> glm::vec3
+{
+	return {j[0], j[1], j[2]};
+}
+
+auto parse_quat(json j)
+	-> glm::quat
+{
+	return {j[0], j[1], j[2], j[3]};
+}
+
+auto parse_transform(json j)
+	-> Render::Transform
+{
+	glm::vec3 const pos = parse_vec3(j["position"]);
+	glm::quat const rot = parse_quat(j["rotation-wxyz"]);
+	glm::vec3 const scale = parse_vec3(j["scale"]);
+	return {pos, rot, scale};
+}
+
+auto load_scene_from_path(std::filesystem::path const path,
+						  Resources& resources)
+	-> Scene
+{
+	std::ifstream fs(path.string());
+	std::string content;
+	fs.seekg(0, std::ios::end);   
+	content.reserve(fs.tellg());
+	fs.seekg(0, std::ios::beg);
+
+	content.assign((std::istreambuf_iterator<char>(fs)),
+				   std::istreambuf_iterator<char>());
+
+	json j = json::parse(content);
+	Scene scene;
+
+	json statics = j["statics"];
+	for (auto& obj: statics) {
+		std::string name = obj["name"];
+		Render::Transform transform = parse_transform(obj);
+	
+		if (name == "smg") {
+			MaterialRenderable smg{};
+			smg.mesh = &resources.smg.textured_mesh;
+			smg.casts_shadow = true;
+			smg.texture.ambient = &resources.smg.diffuse;
+			smg.texture.diffuse = &resources.smg.diffuse;
+			smg.texture.specular = &resources.smg.specular;
+			smg.texture.normal = &resources.smg.normal;
+			smg.model = transform.as_matrix();
+			scene.renderables.push_back(smg);
+		}
+		else if (name == "chest") {
+			MaterialRenderable chest{};
+			chest.mesh = &resources.chest.mesh;
+			chest.casts_shadow = true;
+			chest.texture.ambient = &resources.chest.diffuse;
+			chest.texture.diffuse = &resources.chest.diffuse;
+			chest.texture.specular = &resources.chest.diffuse;
+			chest.model = transform.as_matrix();
+			scene.renderables.push_back(chest);
+		}
+		else if (name == "box") {
+			MaterialRenderable box{};
+			box.mesh = &resources.cube.textured_mesh;
+			box.casts_shadow = true;
+			box.texture.ambient = &resources.box.diffuse;
+			box.texture.diffuse = &resources.box.diffuse;
+			box.texture.specular = &resources.box.specular;
+			box.model = transform.as_matrix();
+			scene.renderables.push_back(box);
+		}
+		else if (name == "floor") {
+			MaterialRenderable floor{};
+			floor.mesh = &resources.cube.textured_mesh;
+			floor.casts_shadow = true;
+			floor.texture.diffuse = &resources.brickwall.diffuse;
+			floor.texture.specular = &resources.brickwall.specular;
+			floor.texture.normal = &resources.brickwall.normal;
+			floor.model = transform.as_matrix();
+			scene.renderables.push_back(floor);
+		}
+		else {
+			std::cout << "Unknown renderable " << name << std::endl;
+		}
+	}
+	
+	json lights = j["lights"];
+	for (auto& obj: lights) {
+		std::string type = obj["type"];
+
+		if (type == "point") {
+			PointLight p;
+			p.position = parse_vec3(obj["position"]);
+			p.ambient = parse_vec3(obj["ambient"]);
+			p.specular = parse_vec3(obj["specular"]);
+			p.diffuse = parse_vec3(obj["diffuse"]);
+			p.attenuation.constant = obj["attenuation-constant"];
+			p.attenuation.linear = obj["attenuation-linear"];
+			p.attenuation.quadratic = obj["attenuation-quadratic"];
+			scene.lights.push_back(p);
+		}
+		else if (type == "spot") {
+			SpotLight p;
+			p.position = parse_vec3(obj["position"]);
+			p.direction = glm::normalize(parse_vec3(obj["direction"]));
+			p.ambient = parse_vec3(obj["ambient"]);
+			p.specular = parse_vec3(obj["specular"]);
+			p.diffuse = parse_vec3(obj["diffuse"]);
+			p.attenuation.constant = obj["attenuation-constant"];
+			p.attenuation.linear = obj["attenuation-linear"];
+			p.attenuation.quadratic = obj["attenuation-quadratic"];
+			p.cutoff.inner =
+				glm::cos(glm::radians(static_cast<float>(obj["cutoff-inner-degrees"])));
+			p.cutoff.outer =
+				glm::cos(glm::radians(static_cast<float>(obj["cutoff-outer-degrees"])));
+
+			scene.lights.push_back(p);
+		}
+		else {
+			std::cout << "Unknown light " << type << std::endl;
+		}
+	}
+
+	return scene;
+}
 
 auto normcolor_scene(Resources& resources,
 					 CurrentFrameInfo frameInfo)
@@ -504,7 +644,7 @@ int main()
 			-> std::optional<Texture2D::Impl*>
 			{
 				Scene scene;
-#if 1 
+#if 0
 				scene = mixed_light_scene(resources,
 										  frameInfo,
 										  camera.position,
@@ -513,7 +653,8 @@ int main()
 										  extra_pointlights_enabled,
 										  directionallight_enabled);
 #else
-				scene = normcolor_scene(resources, frameInfo);
+				scene = load_scene_from_path("../scenes/simplescene.json",
+											 resources);
 #endif
 
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,

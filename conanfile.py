@@ -4,7 +4,7 @@ from conan.tools.cmake import CMakeToolchain, CMake, cmake_layout, CMakeDeps
 
 class VulkanRendererRecipe(ConanFile):
     name = "vulkan-renderer"
-    version = "1.2"
+    version = "1.3"
 
     # Optional metadata
     license = "<Put the package license here>"
