@@ -1,0 +1,6 @@
+**/build
+**CMakeCache.txt
+**CMakeFiles
+**CMakeUserPresets.json
+**compiled_shaders
+**compile_commands.json
