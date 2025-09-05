@@ -1,0 +1,26 @@
+{
+    "prefabs" : 
+	[
+		{
+			"name": "smg", 
+			"draw-mode": "normcolor",
+			"position": [2, 1, 0],
+			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.2, 0.2, 0.2]
+		},
+		{
+			"name": "chest", 
+			"draw-mode": "normcolor",
+			"position": [-2, 1, 0],
+			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.03, 0.03, 0.03]
+		},
+		{
+			"name": "box",
+			"draw-mode": "normcolor",
+			"position": [0, -0.2, 0],
+			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [1, 1, 1]
+		}
+	]
+}

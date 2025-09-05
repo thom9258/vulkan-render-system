@@ -30,9 +30,15 @@ using json = nlohmann::json;
 
 std::filesystem::path root = "../../../";
 std::filesystem::path shaders_root = root / "compiled_shaders/";
+std::filesystem::path scenes_root = "../scenes/";
 std::filesystem::path assets_root = root / "assets/";
 std::filesystem::path models_root = assets_root / "models/";
 std::filesystem::path textures_root = assets_root / "textures/";
+
+
+glm::vec3 constexpr world_right = glm::vec3(1.0f, 0.0f, 0.0f);
+glm::vec3 constexpr world_up = glm::vec3(0.0f, 1.0f, 0.0f);
+glm::vec3 constexpr world_forward = glm::vec3(0.0f, 0.0f, 1.0f);
 
 template <typename F, typename... Args>
 std::chrono::duration<double>
@@ -60,7 +66,7 @@ auto rotation_from_direction(glm::vec3 direction)
 
 
 constexpr bool slowframes = false;
-constexpr bool printframerate = true;
+constexpr bool printframerate = false;
 constexpr size_t printframerateinterval = 100;
 
 std::vector<VertexPosNormColor> triangle_vertices = {
@@ -74,12 +80,6 @@ struct Scene
 {
 	std::vector<Renderable> renderables;
 	std::vector<Light> lights;
-};
-
-struct StaticObject
-{
-	std::string name;
-	Render::Transform transform;
 };
 
 auto parse_vec3(json j)
@@ -119,51 +119,90 @@ auto load_scene_from_path(std::filesystem::path const path,
 	json j = json::parse(content);
 	Scene scene;
 
-	json statics = j["statics"];
-	for (auto& obj: statics) {
-		std::string name = obj["name"];
-		Render::Transform transform = parse_transform(obj);
+	json prefabs = j["prefabs"];
+	for (auto& prefab: prefabs) {
+		std::string name = prefab["name"];
+		Render::Transform transform = parse_transform(prefab);
 	
 		if (name == "smg") {
-			MaterialRenderable smg{};
-			smg.mesh = &resources.smg.textured_mesh;
-			smg.casts_shadow = true;
-			smg.texture.ambient = &resources.smg.diffuse;
-			smg.texture.diffuse = &resources.smg.diffuse;
-			smg.texture.specular = &resources.smg.specular;
-			smg.texture.normal = &resources.smg.normal;
-			smg.model = transform.as_matrix();
-			scene.renderables.push_back(smg);
+			if (prefab["draw-mode"] == "material") {
+				MaterialRenderable smg{};
+				smg.mesh = &resources.smg.textured_mesh;
+				smg.casts_shadow = true;
+				//smg.texture.ambient = &resources.smg.diffuse;
+				smg.texture.ambient = nullptr;
+				smg.texture.diffuse = &resources.smg.diffuse;
+				smg.texture.specular = &resources.smg.specular;
+				smg.texture.normal = &resources.smg.normal;
+				smg.model = transform.as_matrix();
+				scene.renderables.push_back(smg);
+			}
+			else if (prefab["draw-mode"] == "normcolor") {
+				NormColorRenderable smg{};
+				smg.mesh = &resources.smg.mesh;
+				smg.model = transform.as_matrix();
+				scene.renderables.push_back(smg);
+			}
+			else {
+				std::cout << "Unknown draw mode for " << name << std::endl;
+			}
 		}
 		else if (name == "chest") {
-			MaterialRenderable chest{};
-			chest.mesh = &resources.chest.mesh;
-			chest.casts_shadow = true;
-			chest.texture.ambient = &resources.chest.diffuse;
-			chest.texture.diffuse = &resources.chest.diffuse;
-			chest.texture.specular = &resources.chest.diffuse;
-			chest.model = transform.as_matrix();
-			scene.renderables.push_back(chest);
+			if (prefab["draw-mode"] == "material") {
+				MaterialRenderable chest{};
+				chest.mesh = &resources.chest.textured_mesh;
+				chest.casts_shadow = true;
+				chest.texture.ambient = &resources.chest.diffuse;
+				chest.texture.diffuse = &resources.chest.diffuse;
+				chest.texture.specular = &resources.chest.diffuse;
+				chest.model = transform.as_matrix();
+				scene.renderables.push_back(chest);
+			}
+			else if (prefab["draw-mode"] == "normcolor") {
+				NormColorRenderable chest{};
+				chest.mesh = &resources.chest.mesh;
+				chest.model = transform.as_matrix();
+				scene.renderables.push_back(chest);
+			}
+			else {
+				std::cout << "Unknown draw mode for " << name << std::endl;
+			}
 		}
 		else if (name == "box") {
-			MaterialRenderable box{};
-			box.mesh = &resources.cube.textured_mesh;
-			box.casts_shadow = true;
-			box.texture.ambient = &resources.box.diffuse;
-			box.texture.diffuse = &resources.box.diffuse;
-			box.texture.specular = &resources.box.specular;
-			box.model = transform.as_matrix();
-			scene.renderables.push_back(box);
+			if (prefab["draw-mode"] == "material") {
+				MaterialRenderable box{};
+				box.mesh = &resources.cube.textured_mesh;
+				box.casts_shadow = true;
+				box.texture.ambient = &resources.box.diffuse;
+				box.texture.diffuse = &resources.box.diffuse;
+				box.texture.specular = &resources.box.specular;
+				box.model = transform.as_matrix();
+				scene.renderables.push_back(box);
+			}
+			else if (prefab["draw-mode"] == "normcolor") {
+				NormColorRenderable box{};
+				box.mesh = &resources.cube.mesh;
+				box.model = transform.as_matrix();
+				scene.renderables.push_back(box);
+			}
+			else {
+				std::cout << "Unknown draw mode for " << name << std::endl;
+			}
 		}
 		else if (name == "floor") {
-			MaterialRenderable floor{};
-			floor.mesh = &resources.cube.textured_mesh;
-			floor.casts_shadow = true;
-			floor.texture.diffuse = &resources.brickwall.diffuse;
-			floor.texture.specular = &resources.brickwall.specular;
-			floor.texture.normal = &resources.brickwall.normal;
-			floor.model = transform.as_matrix();
-			scene.renderables.push_back(floor);
+			if (prefab["draw-mode"] == "material") {
+				MaterialRenderable floor{};
+				floor.mesh = &resources.cube.textured_mesh;
+				floor.casts_shadow = true;
+				floor.texture.diffuse = &resources.brickwall.diffuse;
+				floor.texture.specular = &resources.brickwall.specular;
+				floor.texture.normal = &resources.brickwall.normal;
+				floor.model = transform.as_matrix();
+				scene.renderables.push_back(floor);
+			}
+			else {
+				std::cout << "Unknown draw mode for " << name << std::endl;
+			}
 		}
 		else {
 			std::cout << "Unknown renderable " << name << std::endl;
@@ -174,7 +213,15 @@ auto load_scene_from_path(std::filesystem::path const path,
 	for (auto& obj: lights) {
 		std::string type = obj["type"];
 
-		if (type == "point") {
+		if (type == "directional") {
+			DirectionalLight p;
+			p.direction = parse_vec3(obj["direction"]);
+			p.ambient = parse_vec3(obj["ambient"]);
+			p.specular = parse_vec3(obj["specular"]);
+			p.diffuse = parse_vec3(obj["diffuse"]);
+			scene.lights.push_back(p);
+		}
+		else if (type == "point") {
 			PointLight p;
 			p.position = parse_vec3(obj["position"]);
 			p.ambient = parse_vec3(obj["ambient"]);
@@ -184,6 +231,19 @@ auto load_scene_from_path(std::filesystem::path const path,
 			p.attenuation.linear = obj["attenuation-linear"];
 			p.attenuation.quadratic = obj["attenuation-quadratic"];
 			scene.lights.push_back(p);
+			
+			if (obj["draw-gizmo"] == "yes") {
+				WireframeRenderable gizmo{};
+				gizmo.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
+				gizmo.mesh = &resources.gizmo_sphere.mesh;
+				float const scale = p.attenuation.approximate_distance(0.03f);
+				gizmo.model = glm::translate(glm::mat4(1.0f), p.position)
+					* glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+				scene.renderables.push_back(gizmo);
+				gizmo.model = glm::translate(glm::mat4(1.0f), p.position)
+					* glm::scale(glm::mat4(1.0f), glm::vec3(scale * 0.04f));
+				scene.renderables.push_back(gizmo);
+			}
 		}
 		else if (type == "spot") {
 			SpotLight p;
@@ -201,6 +261,45 @@ auto load_scene_from_path(std::filesystem::path const path,
 				glm::cos(glm::radians(static_cast<float>(obj["cutoff-outer-degrees"])));
 
 			scene.lights.push_back(p);
+			
+			if (obj["draw-gizmo"] == "yes") {
+				WireframeRenderable center{};
+				center.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
+				center.mesh = &resources.gizmo_sphere.mesh;
+				center.model = glm::translate(glm::mat4(1.0f), p.position)
+					* glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));
+				scene.renderables.push_back(center);
+				
+				WireframeRenderable forward{};
+				forward.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
+				forward.mesh = &resources.gizmo_sphere.mesh;
+				forward.model = glm::translate(glm::mat4(1.0f), p.position + p.direction)
+					* glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+				scene.renderables.push_back(forward);
+
+				WireframeRenderable cone{};
+				cone.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
+				cone.mesh = &resources.gizmo_cone.mesh;
+				float const length = p.attenuation.approximate_distance(0.02f);
+				
+#if 0
+				glm::mat4 const cone_model = 
+					glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -length/2, 0.0f))
+					* glm::scale(cone.model, glm::vec3(2, length, 2));
+
+				glm::mat4 const light_model = 
+					glm::translate(glm::mat4(1.0f), p.position);
+
+				cone.model = light_model * cone_model;
+#else
+				cone.model = glm::mat4(1.0f);
+				cone.model = glm::translate(cone.model, p.position);
+
+				cone.model = glm::translate(cone.model, glm::vec3(0.0f, -length/2, 0.0f));
+				cone.model = glm::scale(cone.model, glm::vec3(length, length, length));
+#endif
+				scene.renderables.push_back(cone);
+			}
 		}
 		else {
 			std::cout << "Unknown light " << type << std::endl;
@@ -209,210 +308,6 @@ auto load_scene_from_path(std::filesystem::path const path,
 
 	return scene;
 }
-
-auto normcolor_scene(Resources& resources,
-					 CurrentFrameInfo frameInfo)
-	-> Scene
-{
-	Scene scene;
-	
-	NormColorRenderable box{};
-	box.mesh = &resources.cube.mesh;
-	box.model = glm::mat4(1.0f);
-	box.model = glm::translate(box.model, glm::vec3(1.5f, 0.8f, 0.0f));
-	box.model = glm::rotate(box.model,
-							glm::radians(frameInfo.total_frame_count * 1.0f),
-							glm::normalize(glm::vec3(0, 1, 0)));
-	scene.renderables.push_back(box);
-	
-	NormColorRenderable floor{};
-	floor.mesh = &resources.cube.mesh;
-	floor.model = glm::mat4(1.0f);
-	floor.model = glm::translate(floor.model, glm::vec3(0.0f, -1.0f, 0.0f));
-	floor.model = glm::scale(floor.model, glm::vec3(10.0f, 0.1f, 10.0f));
-	scene.renderables.push_back(floor);
-		
-	NormColorRenderable smg{};
-	smg.mesh = &resources.smg.mesh;
-	smg.model = glm::mat4(1.0f);
-	smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
-	smg.model = glm::scale(smg.model, glm::vec3(0.2f));
-	smg.model = glm::rotate(smg.model,
-						   glm::radians(frameInfo.total_frame_count * 1.0f),
-						   glm::normalize(glm::vec3(0, 1, 0)));
-	scene.renderables.push_back(smg);
-	return scene;
-}
-
-auto mixed_light_scene(Resources& resources,
-					   CurrentFrameInfo frameInfo,
-					   glm::vec3 campos,
-					   glm::vec3 camfront,
-					   bool spotlight_enabled,
-					   bool extra_pointlights_enabled,
-					   bool directionallight_enabled)
-	-> Scene
-{
-	Scene scene;
-
-	if (true) {
-		PointLight pl;
-		pl.position = glm::vec3(-1.0f, 1.0f, 1.0f);
-		pl.ambient = glm::vec3(0.0f);
-		pl.specular = glm::vec3(1.0f);
-		pl.diffuse = glm::vec3(0.8f, 0.2f, 0.2f);
-		pl.attenuation.constant = 1.0f;
-		pl.attenuation.linear = 0.09f;
-		pl.attenuation.quadratic = 0.032f;
-		scene.lights.push_back(pl);
-		WireframeRenderable gizmo{};
-		gizmo.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
-		gizmo.mesh = &resources.gizmo_sphere.mesh;
-		gizmo.model = glm::translate(glm::mat4(1.0f), pl.position);
-		gizmo.model = glm::scale(gizmo.model, glm::vec3(1.0f));
-		scene.renderables.push_back(gizmo);
-		gizmo.model = glm::scale(gizmo.model, glm::vec3(0.1f));
-		scene.renderables.push_back(gizmo);
-	}
-	if (extra_pointlights_enabled) {
-		PointLight pl;
-		pl.position = glm::vec3(1.0f, 1.0f, -2.0f);
-		pl.ambient = glm::vec3(0.0f);
-		pl.specular = glm::vec3(1.0f);
-		pl.diffuse = glm::vec3(0.4f);
-		pl.attenuation.constant = 1.0f;
-		pl.attenuation.linear = 0.09f;
-		pl.attenuation.quadratic = 0.032f;
-		scene.lights.push_back(pl);
-		
-		WireframeRenderable gizmo{};
-		gizmo.basecolor = glm::vec4(glm::normalize(pl.diffuse), 1.0f);
-		gizmo.mesh = &resources.gizmo_sphere.mesh;
-		gizmo.model = glm::translate(glm::mat4(1.0f), pl.position);
-		gizmo.model = glm::scale(gizmo.model, glm::vec3(1.0f));
-		scene.renderables.push_back(gizmo);
-		gizmo.model = glm::scale(gizmo.model, glm::vec3(0.1f));
-		scene.renderables.push_back(gizmo);
-	}
-	if (directionallight_enabled) {
-		DirectionalLight dl;
-		dl.direction = glm::vec3(-0.1f, -0.2f, -0.0f);
-		dl.diffuse = glm::vec3(1.0f, 1.0f, 0.4f);
-		dl.ambient = glm::vec3(0.1f);
-		//dl.ambient = dl.diffuse * 0.01f;
-		dl.specular = glm::vec3(0.3f);
-		scene.lights.push_back(dl);
-	}
-	
-	if (spotlight_enabled) {
-		SpotLight spot;
-		spot.position = glm::vec3(-1.0f, 0.0f, -1.0f);
-		spot.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-		spot.ambient = glm::vec3(0.0f);
-		spot.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
-		spot.specular = glm::vec3(1.0f);
-		spot.attenuation.constant = 1.0f;
-		spot.attenuation.linear = 0.09f;
-		spot.attenuation.quadratic = 0.032f;
-		spot.cutoff.inner = glm::cos(glm::radians(30.0f));
-		spot.cutoff.outer = glm::cos(glm::radians(35.0f));
-		scene.lights.push_back(spot);
-
-		WireframeRenderable gizmo{};
-		gizmo.basecolor = glm::vec4(glm::normalize(spot.diffuse), 1.0f);
-		gizmo.mesh = &resources.gizmo_cone.mesh;
-		gizmo.model = glm::mat4(1.0f);
-		gizmo.model = glm::translate(gizmo.model, spot.position);
-		gizmo.model = glm::rotate(gizmo.model,
-								  glm::radians(90.0f),
-								  glm::vec3(1, 0, 0));
-		gizmo.model = glm::rotate(gizmo.model,
-								  glm::radians(90 + 45.0f),
-								  glm::vec3(0, 0, 1));
-		gizmo.model = glm::translate(gizmo.model, glm::vec3(0, -2.5f, 0.0f));
-
-		scene.renderables.push_back(gizmo);
-		
-		spot.position = glm::vec3(2.0f, 1.0f, -2.0f);
-		spot.direction = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
-		spot.ambient = glm::vec3(0.0f);
-		spot.diffuse = glm::vec3(2.5f, 2.5f, 0.8f);
-		spot.specular = glm::vec3(1.0f);
-		spot.attenuation.constant = 1.0f;
-		spot.attenuation.linear = 0.09f;
-		spot.attenuation.quadratic = 0.032f;
-		spot.cutoff.inner = glm::cos(glm::radians(15.0f));
-		spot.cutoff.outer = glm::cos(glm::radians(35.0f));
-		scene.lights.push_back(spot);
-		
-		gizmo.basecolor = glm::vec4(glm::normalize(spot.diffuse), 1.0f);
-		gizmo.mesh = &resources.gizmo_cone.mesh;
-		glm::vec3 const cone_offset(0.0f, 0.5f, 0.0f);
-		glm::vec3 const cone_direction(0.0f, 1.0f, 0.0f);
-		gizmo.model = glm::mat4(1.0f);
-		gizmo.model = glm::translate(gizmo.model, spot.position);
-		scene.renderables.push_back(gizmo);
-	}
-	
-	MaterialRenderable chest{};
-	chest.mesh = &resources.chest.mesh;
-	chest.casts_shadow = true;
-	chest.texture.ambient = &resources.chest.diffuse;
-	chest.texture.diffuse = &resources.chest.diffuse;
-	chest.texture.specular = &resources.chest.diffuse;
-	chest.model = glm::mat4(1.0f);
-	chest.model = glm::translate(chest.model, glm::vec3(1.5f, -1.0f, 1.5f));
-	chest.model = glm::scale(chest.model, glm::vec3(0.02f));
-	chest.model = glm::rotate(chest.model,
-							  //glm::radians(3.14f/2),
-							  glm::radians(frameInfo.total_frame_count * 0.5f),
-							  glm::normalize(glm::vec3(0, 1, 0)));
-	scene.renderables.push_back(chest);
-	
-
-	MaterialRenderable smg{};
-	smg.mesh = &resources.smg.textured_mesh;
-	smg.casts_shadow = true;
-	smg.texture.ambient = nullptr;
-	smg.texture.diffuse = &resources.smg.diffuse;
-	smg.texture.specular = &resources.smg.specular;
-	smg.texture.normal = &resources.smg.normal;
-	smg.model = glm::mat4(1.0f);
-	smg.model = glm::translate(smg.model, glm::vec3(-1.5f, 0.0f, 0.0f));
-	smg.model = glm::scale(smg.model, glm::vec3(0.2f));
-	smg.model = glm::rotate(smg.model,
-							glm::radians(frameInfo.total_frame_count * 1.0f),
-							glm::normalize(glm::vec3(0, 1, 0)));
-	scene.renderables.push_back(smg);
-	
-	MaterialRenderable box{};
-	box.mesh = &resources.cube.textured_mesh;
-	box.casts_shadow = true;
-	box.texture.ambient = nullptr;
-	box.texture.diffuse = &resources.box.diffuse;
-	box.texture.specular = &resources.box.specular;
-	box.model = glm::mat4(1.0f);
-	box.model = glm::translate(box.model, glm::vec3(1.5f, 0.8f, 0.0f));
-	box.model = glm::rotate(box.model,
-							glm::radians(frameInfo.total_frame_count * 1.0f),
-							glm::normalize(glm::vec3(0, 1, 0)));
-	scene.renderables.push_back(box);
-	
-	MaterialRenderable floor{};
-	floor.mesh = &resources.cube.textured_mesh;
-	floor.casts_shadow = true;
-	floor.texture.diffuse = &resources.brickwall.diffuse;
-	floor.texture.specular = &resources.brickwall.specular;
-	floor.texture.normal = &resources.brickwall.normal;
-	floor.model = glm::mat4(1.0f);
-	floor.model = glm::translate(floor.model, glm::vec3(0.0f, -1.0f, 0.0f));
-	floor.model = glm::scale(floor.model, glm::vec3(10.0f, 0.1f, 10.0f));
-	scene.renderables.push_back(floor);
-
-	return scene;
-}
-
-
 
 int main()
 {
@@ -528,9 +423,6 @@ int main()
 		/** ************************************************************************
 		 * Handle Inputs
 		 */
-		glm::vec3 constexpr world_right = glm::vec3(1.0f, 0.0f, 0.0f);
-		glm::vec3 constexpr world_up = glm::vec3(0.0f, 1.0f, 0.0f);
-		glm::vec3 constexpr world_forward = glm::vec3(0.0f, 0.0f, 1.0f);
 		glm::vec3 const camera_right = camera.rotation[0];
 		glm::vec3 const camera_up = camera.rotation[1];
 		glm::vec3 const camera_forward = camera.rotation[2];
@@ -643,19 +535,8 @@ int main()
 		FrameProducer frameGenerator = [&] (CurrentFrameInfo frameInfo)
 			-> std::optional<Texture2D::Impl*>
 			{
-				Scene scene;
-#if 0
-				scene = mixed_light_scene(resources,
-										  frameInfo,
-										  camera.position,
-										  camera.position + camera_forward,
-										  spotlight_enabled,
-										  extra_pointlights_enabled,
-										  directionallight_enabled);
-#else
-				scene = load_scene_from_path("../scenes/simplescene.json",
-											 resources);
-#endif
+				Scene scene	= load_scene_from_path(scenes_root / "shadowtest.json",
+												   resources);
 
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
 												   frameInfo.total_frame_count,

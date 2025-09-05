@@ -36,7 +36,8 @@ struct Resources
 	} gizmo_sphere;
 	
 	struct {
-		TexturedMesh mesh;
+		TexturedMesh textured_mesh;
+		Mesh mesh;
 		TextureSamplerReadOnly diffuse;
 	} chest;
 	
@@ -147,8 +148,8 @@ auto get_gizmo_cone_vertices()
 	size_t vertices_length{0};
 	
 	sg_gizmo_cone_info info{};
-	info.height = 5.0f;
-	info.radius = 3.2f;
+	info.height = 1.0f;
+	info.radius = 0.5f;
 	
 	status = sg_gizmo_cone_vertices(&info, &vertices_length, nullptr);
 	if (status != SG_OK_RETURNED_LENGTH)
@@ -176,15 +177,8 @@ auto get_gizmo_sphere_vertices()
 {
 	sg_status status;
 	size_t vertices_length{0};
-	
-	Attenuation attenuation;
-	attenuation.constant = 1.0f;
-	attenuation.linear = 0.09f;
-	attenuation.quadratic = 0.032f;
-
 	sg_gizmo_sphere_info info{};
-	//info.radius = 1.0f;
-	info.radius = attenuation.approximate_distance(0.1f);
+	info.radius = 1.0f;
 	
 	status = sg_gizmo_sphere_vertices(&info, &vertices_length, nullptr);
 	if (status != SG_OK_RETURNED_LENGTH)
@@ -254,19 +248,34 @@ Resources::Resources(Render::Context& context,
 		throw std::runtime_error(std::string("TinyOBJ error: ") +
 								 std::get<MeshLoadError>(loaded_monkey_mesh).msg);
 	}
-	
+
 	std::cout << "loading chest model!" << std::endl;
-	auto loaded_chest = load_obj_with_texcoords(context,
-												assets_root,
-												"models/ChestWowStyle/Chest.obj");
-	if (auto p = std::get_if<TexturedMesh>(&loaded_chest)) {
+	auto loaded_chest = load_obj(context,
+								 assets_root,
+								 "models/ChestWowStyle/Chest.obj");
+	if (auto p = std::get_if<Mesh>(&loaded_chest)) {
 		chest.mesh = std::move(*p);
 	}
-	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_chest)) {
+	else if (auto p = std::get_if<MeshWithWarning>(&loaded_chest)) {
 		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
 		chest.mesh = std::move(p->mesh);
 	}
 	else if (auto p = std::get_if<MeshLoadError>(&loaded_chest)) {
+		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
+	}
+	
+	std::cout << "loading textured chest model!" << std::endl;
+	auto loaded_textured_chest = load_obj_with_texcoords(context,
+												assets_root,
+												"models/ChestWowStyle/Chest.obj");
+	if (auto p = std::get_if<TexturedMesh>(&loaded_textured_chest)) {
+		chest.textured_mesh = std::move(*p);
+	}
+	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_textured_chest)) {
+		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
+		chest.textured_mesh = std::move(p->mesh);
+	}
+	else if (auto p = std::get_if<MeshLoadError>(&loaded_textured_chest)) {
 		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
 	}
 
