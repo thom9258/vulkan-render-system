@@ -16,21 +16,21 @@
 			"scale": [0.03, 0.03, 0.03]
 		},
 		{
-			"name": "floor", 
+			"name": "box", 
 			"draw-mode": "material",
 			"position": [0, -0.2, 0],
 			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 0.2, 10]
 		},
 		{
-			"name": "box", 
+			"name": "floor", 
 			"draw-mode": "material",
 			"position": [0, 2, 5],
 			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 5, 0.2]
 		},
 		{
-			"name": "box", 
+			"name": "floor", 
 			"draw-mode": "material",
 			"position": [5, 2, 0],
 			"rotation-wxyz": [ 0.7071068, 0, -0.7071068, 0 ],
@@ -41,8 +41,8 @@
 	[
 		{
 			"type": "directional", 
-			"direction": [-0.1, -0.2, 0],
-			"diffuse": [0.0, 0.0, 0.0],
+			"direction": [0.0, -1, 0.0],
+			"diffuse": [0.1, 0.1, 0.1],
 			"specular": [0.0, 0.0, 0.0],
 			"ambient": [0.03, 0.03, 0.03]
 		},
