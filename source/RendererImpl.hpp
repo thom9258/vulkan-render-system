@@ -5,6 +5,7 @@
 #include "PresenterImpl.hpp"
 #include "ContextImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
+#include "FlightFrames.hpp"
 
 #include "NormRenderPipeline.hpp"
 #include "WireframePipeline.hpp"
@@ -14,15 +15,28 @@
 class ShadowPass
 {
 	ShadowPass(Render::Context::Impl* context,
-			   vk::Extent2D extent,
+			   U32Extent extent,
 			   const uint32_t frames_in_flight,
 			   const bool debug_print);
+private:
+	U32Extent m_extent;
+	vk::UniqueRenderPass m_renderpass;
 
-	vk::Extent2D extent;
-	vk::UniqueRenderPass renderpass;
-	std::vector<Texture2D::Impl> depthbuffers;
-	std::vector<vk::UniqueImageView> depthbuffer_views;
-	std::vector<vk::UniqueFramebuffer> framebuffers;
+	struct FrameTextures {
+		Texture2D colorbuffer;
+		vk::UniqueImageView colorbuffer_view;
+		Texture2D depthbuffer;
+		vk::UniqueImageView depthbuffer_view;
+		vk::UniqueFramebuffer framebuffer;
+	};
+
+	FlightFramesArray<FrameTextures> m_framestextures;
+
+	//FlightFramesArray<Texture2D::Impl> colorbuffers;
+	//FlightFramesArray<vk::UniqueImageView> colorbuffer_views;
+	//FlightFramesArray<Texture2D::Impl> depthbuffers;
+	//FlightFramesArray<vk::UniqueImageView> depthbuffer_views;
+	//FlightFramesArray<vk::UniqueFramebuffer> framebuffers;
 };
 
 struct GeometryPass
