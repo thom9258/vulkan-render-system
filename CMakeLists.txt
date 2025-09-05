@@ -8,10 +8,10 @@ project(vulkan-renderer
 
 
 add_library(${PROJECT_NAME} SHARED)
-
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME}) 
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(polymorph)
 find_package(glm)
@@ -73,7 +73,6 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShaderTextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PipelineUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline.cpp
-#  ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline2.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp

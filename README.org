@@ -1,0 +1,31 @@
+* Vulkan Renderer Implementation
+  
+A (not so) simple vulkan renderer, targeting ps1-ps2 capabilities.
+
+
+* Roadmap
+  
+Required Features:
+- [X] Setup Geometry pass with support for debug rendering (wireframe normaldirection).
+- [X] Pimpl Abstraction Interface.
+- [X] Model & Texture support - includes loaders and renderer handling.
+- [X] LightCasters - support basic untextured lights (directional, point, spot)
+- [ ] Shadowmaps - simple support for a static amount of shadow maps (2-4) is fine.
+- [ ] Animated meshes - limit support to gltf models.
+- [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
+- [ ] Add a gpu physical device selection method.
+- [ ] Fix screen extent and render extents, so they are disconnected.
+   
+Optional Features:
+- [ ] Model tinting for post-lighting manipulation (useful for dark/light models).
+- [ ] Async render thread.
+- [ ] fix commandbuffer connection between rendering and presentation - potentially just disallow headless rendering.
+- [ ] disable validation layer for release builds.
+- [ ] move stb_image and objloader headers behind interface.
+- [ ] Simple SSAO pass.
+- [ ] Add capability query of different features and disable renderer steps accordingly.
+- [ ] Implement format fallback alternatives for textures.
+- [ ] Simpler abstraction.
+- [ ] Resource Managers (that are also loaders) - support for textures and meshes.
+- [ ] FOV render culling.
+- [ ] Gizmos using ImGuizmo.
