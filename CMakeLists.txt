@@ -8,10 +8,10 @@ project(vulkan-renderer
 
 
 add_library(${PROJECT_NAME} SHARED)
-
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME}) 
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(polymorph)
 find_package(glm)
@@ -19,7 +19,7 @@ find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
-target_compile_options(${PROJECT_NAME} PRIVATE "-Wno-terminate")
+target_compile_options(${PROJECT_NAME} PRIVATE "")
 
 target_include_directories(${PROJECT_NAME} 
   PUBLIC
@@ -73,7 +73,6 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShaderTextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PipelineUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline.cpp
-#  ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline2.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp

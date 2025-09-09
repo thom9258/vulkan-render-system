@@ -11,8 +11,8 @@ struct Camera
 {
 	Camera(glm::vec3 position, glm::vec3 look_direction, glm::vec3 up) noexcept;
 	
-	const auto view()
-		noexcept -> glm::mat4;
+	auto view()
+		const noexcept -> glm::mat4;
 	
 	enum class Direction
 	{
@@ -23,8 +23,8 @@ struct Camera
 	
 	void translate(Direction direction, float distance) noexcept;
 
-	const auto position() 
-		noexcept -> glm::vec3;
+	auto position() 
+		const noexcept -> glm::vec3;
 	
 	glm::vec3 m_position{0.0f};
 	glm::vec3 m_forward{0.0f, 0.0f, -1.0f};

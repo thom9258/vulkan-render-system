@@ -47,10 +47,9 @@ void sort_renderable(Logger* logger,
 }
 
 ShadowPass::ShadowPass(Render::Context::Impl* context,
-					   vk::Extent2D extent,
-					   const uint32_t frames_in_flight,
+					   U32Extent extent,
 					   const bool debug_print)
-	: extent{extent}
+	: m_extent{extent}
 {
 	auto constexpr color_format = vk::Format::eR8Srgb;
     const auto color_attachment = vk::AttachmentDescription{}
@@ -108,6 +107,131 @@ ShadowPass::ShadowPass(Render::Context::Impl* context,
 						  | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
 
 	
+	std::array<vk::AttachmentDescription, 2> attachments {
+		color_attachment,
+		depth_attachment
+	};
+	std::array<vk::SubpassDependency, 1> dependencies {
+		color_depth_dependency
+	};
+    auto renderPassCreateInfo = vk::RenderPassCreateInfo{}
+		.setFlags(vk::RenderPassCreateFlags())
+		.setAttachments(attachments)
+		.setDependencies(dependencies)
+		.setSubpasses(subpass);
+
+	m_renderpass = context->device.get().createRenderPassUnique(renderPassCreateInfo);
+	context->logger.info(std::source_location::current(),
+						 "Created Shadowmap Render Pass!");
+
+	for (FrameTextures& textures: m_framestextures) {
+		/* Setup the rendertarget and its view for the render pass
+		 */
+		textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
+														 context,
+														 m_extent,
+														 vkformat_to_textureformat(color_format)));
+		
+		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
+		{
+			textures.colorbuffer.impl->layout =
+				transition_image_for_color_override(textures.colorbuffer.impl->allocated.image.get(),
+													commandbuffer);
+		};
+		
+		with_buffer_submit(context->device.get(),
+						   context->commandpool.get(),
+						   context->graphics_queue(),
+						   transition_to_transfer_src);
+		
+		textures.colorbuffer_view
+			= textures.colorbuffer.impl->create_view(context,
+													 vk::ImageAspectFlagBits::eColor);
+
+
+		
+		/* Setup the depthbuffer and its view for the render pass
+		 */
+		textures.depthbuffer = Texture2D(std::make_unique<Texture2D::Impl>(DepthBufferTexture,
+																		   context,
+																		   m_extent));
+														 
+		/* Setup the depthbuffer view
+		 */
+		textures.depthbuffer_view = 
+			textures.depthbuffer.impl->create_view(context,
+												   vk::ImageAspectFlagBits::eDepth);
+		
+		/* Setup the FrameBuffer
+		 */
+		std::array<vk::ImageView, 2> attachments{
+			textures.colorbuffer_view.get(),
+			textures.depthbuffer_view.get(),
+		};
+		auto framebufferCreateInfo = vk::FramebufferCreateInfo{}
+			.setFlags(vk::FramebufferCreateFlags())
+			.setAttachments(attachments)
+			.setWidth(m_extent.width())
+			.setHeight(m_extent.height())
+			.setRenderPass(m_renderpass.get())
+			.setLayers(1);
+
+		textures.framebuffer = 
+			context->device.get().createFramebufferUnique(framebufferCreateInfo);
+	}
+
+	context->logger.info(std::source_location::current(),
+						 "Created Shadowpass FramePasses!");
+	
+}
+
+void ShadowPass::record(Logger* logger,
+						std::uint32_t current_flightframe,
+						vk::CommandBuffer& commandbuffer)
+{
+	
+ 	const auto render_area = vk::Rect2D{}
+		.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
+		.setExtent(vk::Extent2D{m_extent.width(), m_extent.height()});
+
+	std::array<vk::ClearValue, 2> clearvalues{
+		vk::ClearValue{}.setColor({1.0f, 1.0f, 1.0f, 1.0f}),
+		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
+	};
+	
+	const auto renderPassInfo = vk::RenderPassBeginInfo{}
+		.setRenderPass(m_renderpass.get())
+		.setFramebuffer(m_framestextures[current_flightframe].framebuffer.get())
+		.setRenderArea(render_area)
+		.setClearValues(clearvalues);
+	
+	commandbuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+	
+	std::array<vk::Viewport, 1> const viewports{
+		vk::Viewport{}
+		.setX(0.0f)
+		.setY(0.0f)
+		.setWidth(m_extent.width())
+		.setHeight(m_extent.height())
+		.setMinDepth(0.0f)
+		.setMaxDepth(1.0f)
+	};
+	uint32_t const viewport_start = 0;
+	commandbuffer.setViewport(viewport_start, viewports);
+	
+	std::array<vk::Rect2D, 1> const scissors{
+		vk::Rect2D{}
+		.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
+		.setExtent(vk::Extent2D{m_extent.width(), m_extent.height()}),
+	};
+	const uint32_t scissor_start = 0;
+	commandbuffer.setScissor(scissor_start, scissors);
+	
+
+	//TODO: DRAW OBJECTS HERE USING PIPELINE
+	
+
+	commandbuffer.endRenderPass();
 }
 
 auto create_geometry_pass(Render::Context::Impl* context,
@@ -191,16 +315,18 @@ auto create_geometry_pass(Render::Context::Impl* context,
 	context->logger.info(std::source_location::current(),
 						 "Created Render Pass!");
 	
+	U32Extent texture_extent {
+		render_extent.width,
+		render_extent.height
+	};
+	
 	for (size_t i = 0; i < frames_in_flight; i++) {
 		/* Setup the rendertarget for the render pass
 		 */
-		const auto rendertarget_extent = U32Extent{
-			render_extent.width,
-			render_extent.height};
 
 		pass.colorbuffers.push_back(Texture2D::Impl(RenderTargetTexture,
 													context,
-													rendertarget_extent,
+													texture_extent,
 													vkformat_to_textureformat(render_format)));
 		
 		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
@@ -228,7 +354,7 @@ auto create_geometry_pass(Render::Context::Impl* context,
 		 */
 		pass.depthbuffers.push_back(Texture2D::Impl(DepthBufferTexture,
 													context,
-													rendertarget_extent));
+													texture_extent));
 														 
 		/* Setup the depthbuffer view
 		 */

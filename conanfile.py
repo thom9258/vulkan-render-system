@@ -17,7 +17,7 @@ class VulkanRendererRecipe(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
-    exports_sources = "CMakeLists.txt", "include/VulkanRenderer/*", "source/*", "cmake/*"
+    exports_sources = "compile_commands.json", "CMakeLists.txt", "include/VulkanRenderer/*", "source/*", "cmake/*"
 
     def config_options(self):
         if self.settings.os == "Windows":

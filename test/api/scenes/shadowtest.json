@@ -16,21 +16,21 @@
 			"scale": [0.03, 0.03, 0.03]
 		},
 		{
-			"name": "floor", 
+			"name": "box", 
 			"draw-mode": "material",
 			"position": [0, -0.2, 0],
 			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 0.2, 10]
 		},
 		{
-			"name": "box", 
+			"name": "floor", 
 			"draw-mode": "material",
 			"position": [0, 2, 5],
 			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 5, 0.2]
 		},
 		{
-			"name": "box", 
+			"name": "floor", 
 			"draw-mode": "material",
 			"position": [5, 2, 0],
 			"rotation-wxyz": [ 0.7071068, 0, -0.7071068, 0 ],
@@ -41,8 +41,8 @@
 	[
 		{
 			"type": "directional", 
-			"direction": [-0.1, -0.2, 0],
-			"diffuse": [0.0, 0.0, 0.0],
+			"direction": [0.0, -1, 0.0],
+			"diffuse": [0.5, 0.5, 0.5],
 			"specular": [0.0, 0.0, 0.0],
 			"ambient": [0.03, 0.03, 0.03]
 		},
@@ -51,7 +51,7 @@
 			"draw-gizmo": "yes",
 			"position": [-1, 0.5, -1],
 			"direction": [1, 0, 1],
-			"diffuse": [1.0, 1.0, 1.0],
+			"diffuse": [2, 2, 2],
 			"specular": [1, 1, 1],
 			"ambient": [0, 0, 0],
 			"attenuation-constant" : 1,
@@ -65,7 +65,7 @@
 			"draw-gizmo": "yes",
 			"position": [-3, 4, 4],
 			"direction": [0, -1, 0],
-			"diffuse": [0.8, 0.2, 0.8],
+			"diffuse": [1, 0.2, 1],
 			"specular": [1, 1, 1],
 			"ambient": [0, 0, 0],
 			"attenuation-constant" : 1,

@@ -9,14 +9,14 @@ Camera::Camera(glm::vec3 position, glm::vec3 look_direction, glm::vec3 up) noexc
 	m_right = glm::normalize(glm::cross(up, m_forward));
 }
 
-const auto Camera::view()
-	noexcept -> glm::mat4
+auto Camera::view()
+	const noexcept -> glm::mat4
 {
 	return glm::lookAt(m_position, m_position + m_forward, m_up);
 }
 
-const auto Camera::position() 
-	noexcept -> glm::vec3
+auto Camera::position() 
+	const noexcept -> glm::vec3
 {
 	return m_position;
 }

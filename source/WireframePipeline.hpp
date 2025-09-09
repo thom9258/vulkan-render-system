@@ -27,7 +27,7 @@ create_wireframe_render_pipeline(Logger& logger,
 								 vk::RenderPass& renderpass,
 								 const vk::Extent2D render_extent,
 								 const std::filesystem::path shader_root_path,
-								 bool debug_print) noexcept
+								 bool debug_print)
 {
 	const std::string pipeline_name = "Wireframe";
 	const std::filesystem::path vertexshader_name = "Wireframe.vert.spv";

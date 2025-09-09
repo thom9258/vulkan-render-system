@@ -366,8 +366,8 @@ int main()
 	const auto window = context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
 	
-	glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 0.0f, -3.0f);
-	glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 1.0f, -3.0f);
+	glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 1.0f, 0.0f);
 	glm::vec3 constexpr camera_init_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	
 	struct {
@@ -414,10 +414,7 @@ int main()
 	SDL_Event event{};
 	bool exit = false;
 	uint64_t framecount = 0;
-	
-	bool spotlight_enabled = true;
-	bool extra_pointlights_enabled = true;
-	bool directionallight_enabled = false;
+	std::size_t scene_index = 0;
 
 	while (!exit) {
 		/** ************************************************************************
@@ -441,14 +438,8 @@ int main()
 					exit = true;
 					break;
 					
-				case SDLK_t:
-					spotlight_enabled = !spotlight_enabled;
-					break;
-				case SDLK_p:
-					extra_pointlights_enabled = !extra_pointlights_enabled;
-					break;
-				case SDLK_o:
-					directionallight_enabled = !directionallight_enabled;
+				case SDLK_n:
+					scene_index++;
 					break;
 				case SDLK_w:
 					camera.position += camera_forward * move_speed;
@@ -535,7 +526,16 @@ int main()
 		FrameProducer frameGenerator = [&] (CurrentFrameInfo frameInfo)
 			-> std::optional<Texture2D::Impl*>
 			{
-				Scene scene	= load_scene_from_path(scenes_root / "shadowtest.json",
+				
+				std::array<std::filesystem::path, 2> const scenes {
+					scenes_root / "shadowtest.json",
+					scenes_root / "normaltest.json"
+				};
+
+				if (scene_index > scenes.size() - 1)
+					scene_index = 0;
+				
+				Scene scene	= load_scene_from_path(scenes.at(scene_index),
 												   resources);
 
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
