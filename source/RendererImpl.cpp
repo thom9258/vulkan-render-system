@@ -1,5 +1,7 @@
 #include "RendererImpl.hpp"
 
+#include "MaterialPipeline.hpp"
+
 auto create_texture_view(vk::Device& device,
 						 Texture2D& texture,
 						 const vk::ImageAspectFlags aspect)
@@ -46,12 +48,16 @@ void sort_renderable(Logger* logger,
 	}
 }
 
-ShadowPass::ShadowPass(Render::Context::Impl* context,
+ShadowPass::ShadowPass(Logger& logger,
+					   Render::Context::Impl* context,
+					   Presenter::Impl* presenter,
 					   U32Extent extent,
+					   const std::filesystem::path shader_root_path,
 					   const bool debug_print)
 	: m_extent{extent}
 {
-	auto constexpr color_format = vk::Format::eR8Srgb;
+	//auto constexpr color_format = vk::Format::eR8Srgb;
+	auto constexpr color_format = vk::Format::eR8G8B8A8Srgb;
     const auto color_attachment = vk::AttachmentDescription{}
 		.setFlags(vk::AttachmentDescriptionFlags())
 		.setFormat(color_format)
@@ -148,17 +154,14 @@ ShadowPass::ShadowPass(Render::Context::Impl* context,
 			= textures.colorbuffer.impl->create_view(context,
 													 vk::ImageAspectFlagBits::eColor);
 
-
-		
 		/* Setup the depthbuffer and its view for the render pass
 		 */
 		textures.depthbuffer = Texture2D(std::make_unique<Texture2D::Impl>(DepthBufferTexture,
 																		   context,
 																		   m_extent));
-														 
 		/* Setup the depthbuffer view
 		 */
-		textures.depthbuffer_view = 
+		textures.depthbuffer_view =
 			textures.depthbuffer.impl->create_view(context,
 												   vk::ImageAspectFlagBits::eDepth);
 		
@@ -183,13 +186,266 @@ ShadowPass::ShadowPass(Render::Context::Impl* context,
 	context->logger.info(std::source_location::current(),
 						 "Created Shadowpass FramePasses!");
 	
+	const std::string pipeline_name = "ShadowPass";
+	const std::string vertexshader_name = "OrthographicDepth.vert.spv";
+	const std::string fragmentshader_name = "OrthographicDepth.frag.spv";
+
+	auto const frames_in_flight = MaxFlightFrames{presenter->max_frames_in_flight};
+	
+	const auto vertex_path = VertexPath{shader_root_path / vertexshader_name};
+	const auto fragment_path = FragmentPath{shader_root_path / fragmentshader_name};
+	auto shaderstage_infos = create_shaderstage_infos(context->device.get(),
+													  vertex_path,
+													  fragment_path);
+
+	if (!shaderstage_infos) {
+		std::string const msg = std::format("{} could not load vertex/fragment sources {} / {}",
+											pipeline_name,
+											vertexshader_name,
+											fragmentshader_name);
+		logger.fatal(std::source_location::current(), msg);
+		throw std::runtime_error(msg);
+	}
+
+    std::array<vk::DynamicState, 2> dynamic_states{
+		vk::DynamicState::eViewport,
+		vk::DynamicState::eScissor
+	};
+
+	auto pipelineDynamicStateCreateInfo = vk::PipelineDynamicStateCreateInfo{}
+		.setFlags(vk::PipelineDynamicStateCreateFlags())
+		.setDynamicStates(dynamic_states);
+	
+	const auto bindingDescriptions = binding_descriptions(VertexPosNormColorUV{});
+	const auto attributeDescriptions = attribute_descriptions(VertexPosNormColorUV{});
+	
+	auto pipelineVertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{}
+		.setFlags(vk::PipelineVertexInputStateCreateFlags())
+		.setVertexBindingDescriptions(bindingDescriptions)
+		.setVertexAttributeDescriptions(attributeDescriptions);
+
+    auto pipelineInputAssemblyStateCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{}
+		.setFlags(vk::PipelineInputAssemblyStateCreateFlags())
+		.setPrimitiveRestartEnable(vk::False)
+		.setTopology(vk::PrimitiveTopology::eTriangleList);
+	
+	 const auto initial_viewport = vk::Viewport{}
+		.setX(0.0f)
+		.setY(0.0f)
+		.setWidth(static_cast<float>(m_extent.width()))
+		.setHeight(static_cast<float>(m_extent.height()))
+		.setMinDepth(0.0f)
+		.setMaxDepth(1.0f);
+	
+	auto initial_scissor = vk::Rect2D{}
+		.setOffset(vk::Offset2D{}.setX(0.0f)
+				                 .setY(0.0f));
+
+	
+    auto pipelineViewportStateCreateInfo = vk::PipelineViewportStateCreateInfo{}
+		.setFlags(vk::PipelineViewportStateCreateFlags())
+		.setViewports(initial_viewport)
+		.setScissors(initial_scissor);
+	
+    auto pipelineRasterizationStateCreateInfo = vk::PipelineRasterizationStateCreateInfo{}
+		.setFlags(vk::PipelineRasterizationStateCreateFlags())
+		.setDepthClampEnable(false)
+		.setRasterizerDiscardEnable(false)
+		.setPolygonMode(vk::PolygonMode::eFill)
+		.setCullMode(vk::CullModeFlagBits::eBack)
+		.setFrontFace(vk::FrontFace::eCounterClockwise)
+		.setDepthBiasEnable(false)
+		.setDepthBiasConstantFactor(0.0f)
+		.setDepthBiasClamp(0.0f)
+		.setDepthBiasSlopeFactor(0.0f)
+		.setLineWidth(1.0f);
+
+    auto pipelineMultisampleStateCreateInfo = vk::PipelineMultisampleStateCreateInfo{}
+		.setFlags(vk::PipelineMultisampleStateCreateFlags())
+		.setSampleShadingEnable(false)
+		.setRasterizationSamples(vk::SampleCountFlagBits::e1);
+
+	//TODO: Do we need alpha for shadowpasses?
+    vk::ColorComponentFlags constexpr colorComponentFlags(vk::ColorComponentFlagBits::eR 
+														  | vk::ColorComponentFlagBits::eG 
+														  | vk::ColorComponentFlagBits::eB 
+														  | vk::ColorComponentFlagBits::eA);
+
+	auto pipelineColorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{}
+		.setBlendEnable(false)
+		.setSrcColorBlendFactor(vk::BlendFactor::eOne)
+		.setDstColorBlendFactor(vk::BlendFactor::eZero)
+		.setColorBlendOp(vk::BlendOp::eAdd)
+		.setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
+		.setDstAlphaBlendFactor(vk::BlendFactor::eZero)
+		.setAlphaBlendOp(vk::BlendOp::eAdd)
+		.setColorWriteMask(colorComponentFlags);
+	
+	auto pipelineColorBlendStateCreateInfo = vk::PipelineColorBlendStateCreateInfo{}
+		.setFlags(vk::PipelineColorBlendStateCreateFlags())
+		.setLogicOpEnable(false)
+		.setLogicOp(vk::LogicOp::eNoOp)
+		.setAttachments(pipelineColorBlendAttachmentState)
+		.setBlendConstants({ 1.0f, 1.0f, 1.0f, 1.0f });
+
+	const auto push_constant_range = vk::PushConstantRange{}
+		.setOffset(0)
+		.setSize(sizeof(RenderPipeline::PushConstants))
+		.setStageFlags(vk::ShaderStageFlagBits::eVertex);
+	
+	if (sizeof(RenderPipeline::PushConstants) > 128) {
+		logger.warn(std::source_location::current(), 
+					std::format("PushConstant size={} is larger than minimum supported (128)"
+								"This can cause compatability issues on some devices",
+								sizeof(RenderPipeline::PushConstants)));
+	}
+
+	const auto layout_binding = vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+	
+	const auto set_info = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindingCount(1)
+		.setBindings(layout_binding);
+	
+	m_pipeline.descriptor_layout =
+		context->device.get().createDescriptorSetLayoutUnique(set_info, nullptr);
+	
+    auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
+		.setFlags(vk::PipelineLayoutCreateFlags())
+		.setSetLayouts(m_pipeline.descriptor_layout.get())
+		.setPushConstantRanges(push_constant_range);
+
+	m_pipeline.layout = 
+		context->device.get().createPipelineLayoutUnique(pipelineLayoutCreateInfo);
+	
+	logger.info(std::source_location::current(), "Created Pipeline Layout");
+	
+	auto depth_stencil_state_info = vk::PipelineDepthStencilStateCreateInfo{}
+		.setDepthTestEnable(true)
+		.setDepthWriteEnable(true)
+		.setDepthCompareOp(vk::CompareOp::eLess)
+		.setDepthBoundsTestEnable(false)
+		.setMinDepthBounds(0.0f)
+		.setMaxDepthBounds(1.0f)
+		.setStencilTestEnable(false);
+	
+	auto graphicsPipelineCreateInfo = vk::GraphicsPipelineCreateInfo{}
+		.setFlags(vk::PipelineCreateFlags())
+		.setStages(shaderstage_infos.value().create_info)
+		.setPVertexInputState(&pipelineVertexInputStateCreateInfo)
+		.setPInputAssemblyState(&pipelineInputAssemblyStateCreateInfo)
+		.setPTessellationState(nullptr)
+		.setPViewportState(&pipelineViewportStateCreateInfo)
+		.setPRasterizationState(&pipelineRasterizationStateCreateInfo)
+		.setPMultisampleState(&pipelineMultisampleStateCreateInfo)
+		.setPDepthStencilState(&depth_stencil_state_info)
+		.setPColorBlendState(&pipelineColorBlendStateCreateInfo)
+		.setPDynamicState(&pipelineDynamicStateCreateInfo)
+		.setLayout(m_pipeline.layout.get())
+		.setRenderPass(m_renderpass.get());
+
+	vk::ResultValue<vk::UniquePipeline> result =
+		context->device.get().createGraphicsPipelineUnique(nullptr,
+											graphicsPipelineCreateInfo);
+	
+    switch (result.result) {
+	case vk::Result::eSuccess:
+		break;
+	case vk::Result::ePipelineCompileRequiredEXT:
+		logger.error(std::source_location::current(),
+					 "Creating pipeline error: PipelineCompileRequiredEXT");
+	default: 
+		logger.error(std::source_location::current(),
+					 "Creating pipeline error: Unknown invalid Result state");
+    }
+	
+	m_pipeline.pipeline = std::move(result.value);
+	logger.info(std::source_location::current(),
+				"Created Pipeline");
+	
+	std::array<vk::DescriptorPoolSize, 1> sizes {
+		vk::DescriptorPoolSize{}
+		.setType(vk::DescriptorType::eUniformBuffer)
+		.setDescriptorCount(10),
+	};
+	
+	const auto pool_info = vk::DescriptorPoolCreateInfo{}
+		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+		.setMaxSets(10)
+		.setPoolSizes(sizes);
+	
+	m_pipeline.descriptor_pool = context->device.get().createDescriptorPoolUnique(pool_info, nullptr);
+	logger.info(std::source_location::current(),
+				"Created Descriptor Pool");
+
+	for (uint32_t i = 0; i < frames_in_flight.get(); i++) {
+		m_pipeline.descriptor_memories
+			.push_back(allocate_memory(context->physical_device,
+									   context->device.get(),
+									   sizeof(CameraUniformData),
+									   vk::BufferUsageFlagBits::eTransferSrc
+									   | vk::BufferUsageFlagBits::eUniformBuffer,
+									   // Host Visible and Coherent allows direct
+									   // writes into the buffers without sync issues.
+									   vk::MemoryPropertyFlagBits::eHostVisible
+									   | vk::MemoryPropertyFlagBits::eHostCoherent));
+
+		const auto allocate_info = vk::DescriptorSetAllocateInfo{}
+			.setDescriptorPool(m_pipeline.descriptor_pool.get())
+			.setDescriptorSetCount(1)
+			.setSetLayouts(m_pipeline.descriptor_layout.get());
+		
+		auto sets = context->device.get().allocateDescriptorSetsUnique(allocate_info);
+		if (sets.size() != 1) {
+			logger.error(std::source_location::current(),
+						 "This system only allows handling 1 set per frame in flight"
+						 "\n if you want more sets find another way to store them..");
+		}
+		
+		m_pipeline.descriptor_sets.push_back(std::move(sets[0]));
+
+		const auto buffer_info = vk::DescriptorBufferInfo{}
+			.setBuffer(m_pipeline.descriptor_memories[i].buffer.get())
+			.setOffset(0)
+			.setRange(sizeof(CameraUniformData));
+		
+		const auto write_descriptor = vk::WriteDescriptorSet{}
+			.setDstBinding(0)
+			.setDstSet(m_pipeline.descriptor_sets[i].get())
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			// here images can be set aswell
+			.setBufferInfo(buffer_info);
+		
+		const uint32_t write_count = 1;
+		const uint32_t copy_count = 0;
+		context->device.get().updateDescriptorSets(write_count,
+												   &write_descriptor,
+												   copy_count,
+												   nullptr);
+	}
+
+	logger.info(std::source_location::current(),
+				std::format("Allocated {} descriptor sets for {} frames in flight",
+							 m_pipeline.descriptor_sets.size(),
+							 frames_in_flight.get()));
+
+	logger.info(std::source_location::current(),
+				"Created Shadowpass RenderPipeline!");
 }
 
 void ShadowPass::record(Logger* logger,
-						std::uint32_t current_flightframe,
-						vk::CommandBuffer& commandbuffer)
+						vk::Device& device,
+						CurrentFlightFrame current_flightframe,
+						vk::CommandBuffer& commandbuffer,
+						CameraUniformData camera_data,
+						std::vector<MaterialRenderable>& renderables)
 {
-	
  	const auto render_area = vk::Rect2D{}
 		.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
 		.setExtent(vk::Extent2D{m_extent.width(), m_extent.height()});
@@ -201,7 +457,7 @@ void ShadowPass::record(Logger* logger,
 	
 	const auto renderPassInfo = vk::RenderPassBeginInfo{}
 		.setRenderPass(m_renderpass.get())
-		.setFramebuffer(m_framestextures[current_flightframe].framebuffer.get())
+		.setFramebuffer(m_framestextures[current_flightframe.get()].framebuffer.get())
 		.setRenderArea(render_area)
 		.setClearValues(clearvalues);
 	
@@ -228,8 +484,58 @@ void ShadowPass::record(Logger* logger,
 	commandbuffer.setScissor(scissor_start, scissors);
 	
 
-	//TODO: DRAW OBJECTS HERE USING PIPELINE
-	
+	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+							   m_pipeline.pipeline.get());
+
+	copy_to_allocated_memory(device,
+							 m_pipeline.descriptor_memories[current_flightframe.get()],
+							 reinterpret_cast<void*>(&camera_data),
+							 sizeof(camera_data));
+
+	const uint32_t first_set = 0;
+	const uint32_t descriptor_set_count = 1;
+	auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
+	const uint32_t dynamic_offset_count = 0;
+	const uint32_t* dynamic_offsets = nullptr;
+	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+									 m_pipeline.layout.get(),
+									 first_set,
+									 descriptor_set_count,
+									 descriptor_sets,
+									 dynamic_offset_count,
+									 dynamic_offsets);
+
+
+	for (auto renderable: renderables) {
+		RenderPipeline::PushConstants push{};
+		push.model = renderable.model;
+		const uint32_t push_offset = 0;
+		commandbuffer.pushConstants(m_pipeline.layout.get(),
+									vk::ShaderStageFlagBits::eVertex,
+									push_offset,
+									sizeof(push),
+									&push);
+		
+		const uint32_t firstBinding = 0;
+		const uint32_t bindingCount = 1;
+		std::array<vk::DeviceSize, bindingCount> offsets = {0};
+		std::array<vk::Buffer, bindingCount> buffers {
+			renderable.mesh->vertexbuffer.impl->buffer.get(),
+		};
+		commandbuffer.bindVertexBuffers(firstBinding,
+										bindingCount,
+										buffers.data(),
+										offsets.data());
+		
+		
+		const uint32_t instanceCount = 1;
+		const uint32_t firstVertex = 0;
+		const uint32_t firstInstance = 0;
+		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+						   instanceCount,
+						   firstVertex,
+						   firstInstance);
+	}
 
 	commandbuffer.endRenderPass();
 }
@@ -388,6 +694,7 @@ auto create_geometry_pass(Render::Context::Impl* context,
 }
 
 auto render_geometry_pass(GeometryPass& pass,
+						  ShadowPass& shadow_pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  GeometryPipelines* pipelines,
@@ -410,6 +717,35 @@ auto render_geometry_pass(GeometryPass& pass,
 		vk::ClearValue{}.setColor({0.0f, 0.0f, flash, 1.0f}),
 		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
 	};
+	
+	SortedRenderables sorted{};
+	auto sort = std::bind_front(sort_renderable, logger, &sorted);
+	std::ranges::for_each(renderables, sort);
+	
+
+
+	auto generate_shadow_pass = [&] (vk::CommandBuffer& commandbuffer) 
+	{
+		ShadowPass::CameraUniformData camera_data;
+		
+        glm::mat4 lightProjection;
+        float near_plane = 1.0f, far_plane = 7.5f;
+        lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+
+		camera_data.view = world_info.view;
+		camera_data.proj = lightProjection;
+
+		shadow_pass.record(logger,
+						   device,
+						   CurrentFlightFrame{current_frame_in_flight},
+						   commandbuffer,
+						   camera_data,
+						   sorted.materialrenderables);
+	};
+	with_buffer_submit(device,
+					   command_pool,
+					   queue,
+					   generate_shadow_pass);
 	
 	auto generate_frame = [&] (vk::CommandBuffer& commandbuffer) 
 	{
@@ -444,10 +780,6 @@ auto render_geometry_pass(GeometryPass& pass,
 		const uint32_t scissor_start = 0;
 		commandbuffer.setScissor(scissor_start, scissors);
 		
-		SortedRenderables sorted{};
-		auto sort = std::bind_front(sort_renderable, logger, &sorted);
-		std::ranges::for_each(renderables, sort);
-	
 		NormColorRenderInfo normcolor_info{};
 		normcolor_info.view = world_info.view;
 		normcolor_info.proj = world_info.projection;
@@ -521,6 +853,13 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	//TODO: Allow debug print to be set externally
 	vk::Extent2D const render_extent = context->get_window_extent();
 	bool const debug_print = true;
+	shadow_pass = ShadowPass(logger,
+							 context,
+							 presenter,
+							 U32Extent{render_extent.width, render_extent.height},
+							 shaders_root,
+							 debug_print);
+
 	geometry_pass = create_geometry_pass(context,
 										 render_extent,
 										 presenter->max_frames_in_flight,
@@ -580,6 +919,7 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 		-> Texture2D::Impl*
 {
 	return render_geometry_pass(geometry_pass,
+								shadow_pass,
 								&geometry_pipelines,
 								&logger,
 								current_frame_in_flight,

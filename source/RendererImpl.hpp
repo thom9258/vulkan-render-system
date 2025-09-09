@@ -14,13 +14,27 @@
 
 class ShadowPass
 {
-	ShadowPass(Render::Context::Impl* context,
+public:
+	ShadowPass() = default;
+	ShadowPass(Logger& logger,
+			   Render::Context::Impl* context,
+			   Presenter::Impl* presenter,
 			   U32Extent extent,
+			   const std::filesystem::path shader_root_path,
 			   const bool debug_print);
+
+	struct CameraUniformData
+	{
+		glm::mat4 view;
+		glm::mat4 proj;
+	};
 	
 	void record(Logger* logger,
-				std::uint32_t current_flightframe,
-				vk::CommandBuffer& commandbuffer);
+				vk::Device& device,
+				CurrentFlightFrame current_flightframe,
+				vk::CommandBuffer& commandbuffer,
+				CameraUniformData camera_data,
+				std::vector<MaterialRenderable>& renderables);
 
 private:
 	U32Extent m_extent;
@@ -35,12 +49,25 @@ private:
 	};
 
 	FlightFramesArray<FrameTextures> m_framestextures;
-
-	//FlightFramesArray<Texture2D::Impl> colorbuffers;
-	//FlightFramesArray<vk::UniqueImageView> colorbuffer_views;
-	//FlightFramesArray<Texture2D::Impl> depthbuffers;
-	//FlightFramesArray<vk::UniqueImageView> depthbuffer_views;
-	//FlightFramesArray<vk::UniqueFramebuffer> framebuffers;
+	
+	struct RenderPipeline 
+	{
+		vk::UniquePipelineLayout layout;
+		vk::UniquePipeline pipeline;
+		
+		vk::UniqueDescriptorSetLayout descriptor_layout;
+		vk::UniqueDescriptorPool descriptor_pool;
+		
+		struct PushConstants
+		{
+			glm::mat4 model;
+		};
+		
+		std::vector<AllocatedMemory> descriptor_memories;
+		std::vector<vk::UniqueDescriptorSet> descriptor_sets;
+	};
+	
+	RenderPipeline m_pipeline;
 };
 
 struct GeometryPass
@@ -84,6 +111,7 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 	-> GeometryPass;
 
 auto render_geometry_pass(GeometryPass& pass,
+						  ShadowPass& shadow_pass,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  GeometryPipelines* pipelines,
@@ -124,6 +152,7 @@ public:
 	Presenter::Impl* presenter{nullptr};
 	DescriptorPool::Impl* descriptor_pool;
 
+	ShadowPass shadow_pass;
 	GeometryPass geometry_pass;
 	GeometryPipelines geometry_pipelines;
 };
