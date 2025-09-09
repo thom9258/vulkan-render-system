@@ -2,7 +2,6 @@
   
 A (not so) simple vulkan renderer, targeting ps1-ps2 capabilities.
 
-
 * Roadmap
   
 Required Features:
@@ -14,11 +13,19 @@ Required Features:
 - [ ] Animated meshes - limit support to gltf models.
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Add a gpu physical device selection method.
-- [ ] Fix screen extent and render extents, so they are disconnected.
+- [ ] Changeable Background color.
+- [ ] Windows support.
    
 Optional Features:
+- [ ] Fix screen extent and render extents, so they are disconnected.
 - [ ] Model tinting for post-lighting manipulation (useful for dark/light models).
 - [ ] Async render thread.
+- [ ] Animation Blending.
+- [ ] Soft Shadows.
+- [ ] Decals.
+- [ ] Skybox.
+- [ ] Billboards.
+- [ ] Transparency (the sorted kind).
 - [ ] fix commandbuffer connection between rendering and presentation - potentially just disallow headless rendering.
 - [ ] disable validation layer for release builds.
 - [ ] move stb_image and objloader headers behind interface.
