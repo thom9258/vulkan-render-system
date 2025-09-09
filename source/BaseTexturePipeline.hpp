@@ -106,7 +106,7 @@ create_base_texture_pipeline(Logger& logger,
 							 uint32_t frames_in_flight,
 							 const vk::Extent2D render_extent,
 							 const std::filesystem::path shader_root_path,
-							 bool debug_print) noexcept
+							 bool debug_print)
 {
 	const std::string pipeline_name = "BaseTexture";
 	const std::filesystem::path vertexshader_name = "Diffuse.vert.spv";

@@ -14,7 +14,7 @@
 struct Logger
 {
 	enum class Type { Info, Warn, Error, Fatal};
-	using LoggerLog = std::function<void(std::source_location, Type, std::string)>;
+	using LoggerLog = std::function<void(std::source_location, Logger::Type, std::string)>;
 	LoggerLog log = [] (std::source_location, Type, std::string) {};
 	
 	void info(std::source_location loc, std::string msg)

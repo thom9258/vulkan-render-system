@@ -73,7 +73,7 @@ create_norm_render_pipeline(Logger& logger,
 							const uint32_t frames_in_flight,
 							const vk::Extent2D render_extent,
 							const std::filesystem::path shader_root_path,
-							bool debug_print) noexcept
+							bool debug_print)
 {
 	const std::string pipeline_name = "NormColor";
 	const std::filesystem::path vertexshader_name = "NormColor.vert.spv";
