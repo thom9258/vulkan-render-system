@@ -728,6 +728,9 @@ auto render_geometry_pass(GeometryPass& pass,
 	{
 		ShadowPass::CameraUniformData camera_data;
 		
+		//TODO: Depth textures is flipped and much further away than expected!
+		//      maybe ortho only works for directional lights, and if we want 
+		//      depth for spots we do perspective with normalized projection?
         glm::mat4 lightProjection;
         float near_plane = 1.0f, far_plane = 7.5f;
         lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
@@ -742,6 +745,8 @@ auto render_geometry_pass(GeometryPass& pass,
 						   camera_data,
 						   sorted.materialrenderables);
 	};
+
+	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier
 	with_buffer_submit(device,
 					   command_pool,
 					   queue,
