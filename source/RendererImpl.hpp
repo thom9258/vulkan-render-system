@@ -16,8 +16,12 @@ class ShadowPass
 {
 	ShadowPass(Render::Context::Impl* context,
 			   U32Extent extent,
-			   const uint32_t frames_in_flight,
 			   const bool debug_print);
+	
+	void record(Logger* logger,
+				std::uint32_t current_flightframe,
+				vk::CommandBuffer& commandbuffer);
+
 private:
 	U32Extent m_extent;
 	vk::UniqueRenderPass m_renderpass;
