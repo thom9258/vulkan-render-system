@@ -2,6 +2,7 @@
 
 #include "Renderable.hpp"
 #include "Light.hpp"
+#include "ShadowCaster.hpp"
 #include "Context.hpp"
 #include "Presenter.hpp"
 #include "DescriptorPool.hpp"
@@ -33,7 +34,8 @@ public:
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables,
-				std::vector<Light>& lights)
+				std::vector<Light>& lights,
+				std::vector<ShadowCaster>& shadowcasters)
 		-> Texture2D::Impl*;
 
 	class Impl;
