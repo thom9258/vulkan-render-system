@@ -12,6 +12,7 @@ enum class TextureFormat
 	R8G8B8A8Srgb,
 	R32G32B32Sfloat,
 	R32G32Sfloat,
+	R32Sfloat,
 };
 
 struct GeneralTextureType { const int _ignore; };

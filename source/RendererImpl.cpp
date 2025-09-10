@@ -56,8 +56,14 @@ ShadowPass::ShadowPass(Logger& logger,
 					   const bool debug_print)
 	: m_extent{extent}
 {
-	//auto constexpr color_format = vk::Format::eR8Srgb;
-	auto constexpr color_format = vk::Format::eR8G8B8A8Srgb;
+	auto constexpr color_format = vk::Format::eR32Sfloat;
+	auto constexpr depth_format = vk::Format::eD32Sfloat;
+    auto constexpr colorComponentFlags(vk::ColorComponentFlagBits::eR);
+	const std::string pipeline_name = "ShadowPass";
+	const std::string vertexshader_name = "OrthographicDepth.vert.spv";
+	const std::string fragmentshader_name = "OrthographicDepth.frag.spv";
+	auto const frames_in_flight = MaxFlightFrames{presenter->max_frames_in_flight};
+
     const auto color_attachment = vk::AttachmentDescription{}
 		.setFlags(vk::AttachmentDescriptionFlags())
 		.setFormat(color_format)
@@ -71,7 +77,6 @@ ShadowPass::ShadowPass(Logger& logger,
 		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
 
-	auto constexpr depth_format = vk::Format::eD32Sfloat;
     const auto depth_attachment = vk::AttachmentDescription{}
 		.setFlags(vk::AttachmentDescriptionFlags())
 		.setFormat(depth_format)
@@ -186,12 +191,6 @@ ShadowPass::ShadowPass(Logger& logger,
 	context->logger.info(std::source_location::current(),
 						 "Created Shadowpass FramePasses!");
 	
-	const std::string pipeline_name = "ShadowPass";
-	const std::string vertexshader_name = "OrthographicDepth.vert.spv";
-	const std::string fragmentshader_name = "OrthographicDepth.frag.spv";
-
-	auto const frames_in_flight = MaxFlightFrames{presenter->max_frames_in_flight};
-	
 	const auto vertex_path = VertexPath{shader_root_path / vertexshader_name};
 	const auto fragment_path = FragmentPath{shader_root_path / fragmentshader_name};
 	auto shaderstage_infos = create_shaderstage_infos(context->device.get(),
@@ -264,12 +263,6 @@ ShadowPass::ShadowPass(Logger& logger,
 		.setFlags(vk::PipelineMultisampleStateCreateFlags())
 		.setSampleShadingEnable(false)
 		.setRasterizationSamples(vk::SampleCountFlagBits::e1);
-
-	//TODO: Do we need alpha for shadowpasses?
-    vk::ColorComponentFlags constexpr colorComponentFlags(vk::ColorComponentFlagBits::eR 
-														  | vk::ColorComponentFlagBits::eG 
-														  | vk::ColorComponentFlagBits::eB 
-														  | vk::ColorComponentFlagBits::eA);
 
 	auto pipelineColorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{}
 		.setBlendEnable(false)
@@ -728,12 +721,14 @@ auto render_geometry_pass(GeometryPass& pass,
 	{
 		ShadowPass::CameraUniformData camera_data;
 		
-		//TODO: Depth textures is flipped and much further away than expected!
+		//TODO: Depth textures is much further away than expected!
 		//      maybe ortho only works for directional lights, and if we want 
 		//      depth for spots we do perspective with normalized projection?
         glm::mat4 lightProjection;
         float near_plane = 1.0f, far_plane = 7.5f;
         lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+		//TODO: maybe we flip like for perspective lights?
+		lightProjection[1][1] *= -1;
 
 		camera_data.view = world_info.view;
 		camera_data.proj = lightProjection;
@@ -861,7 +856,7 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	shadow_pass = ShadowPass(logger,
 							 context,
 							 presenter,
-							 U32Extent{render_extent.width, render_extent.height},
+							 U32Extent{1024, 1024},
 							 shaders_root,
 							 debug_print);
 

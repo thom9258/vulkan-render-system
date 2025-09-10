@@ -69,6 +69,7 @@ auto vkformat_to_textureformat(vk::Format format)
 	case vk::Format::eR8G8B8A8Srgb:    return TextureFormat::R8G8B8A8Srgb;
 	case vk::Format::eR32G32B32Sfloat: return TextureFormat::R32G32B32Sfloat;
 	case vk::Format::eR32G32Sfloat:    return TextureFormat::R32G32Sfloat;
+	case vk::Format::eR32Sfloat:       return TextureFormat::R32Sfloat;
 	};
 	throw std::runtime_error(std::format("unhandled format {}", vk::to_string(format)));
 };
@@ -80,6 +81,7 @@ auto textureformat_to_vkformat(TextureFormat format)
 	case TextureFormat::R8G8B8A8Srgb:    return vk::Format::eR8G8B8A8Srgb;
 	case TextureFormat::R32G32B32Sfloat: return vk::Format::eR32G32B32Sfloat;
 	case TextureFormat::R32G32Sfloat:    return vk::Format::eR32G32Sfloat;
+	case TextureFormat::R32Sfloat:       return vk::Format::eR32Sfloat;
 	};
 	throw std::runtime_error(std::format("unhandled TextureFormat!"));
 };
