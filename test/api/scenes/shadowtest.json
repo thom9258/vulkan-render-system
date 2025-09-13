@@ -47,7 +47,7 @@
 		{
 			"type": "directional", 
 			"casts-shadow": "yes",
-			"direction": [-0.3, -1, 0.2],
+			"direction": [-0.3, -1.0, -0.2],
 			"diffuse": [0.2, 0.2, 0.2],
 			"specular": [0.0, 0.0, 0.0],
 			"ambient": [0.03, 0.03, 0.03]

@@ -9,35 +9,39 @@
 
 using OrthographicProjection = StrongType<glm::mat4, struct OrthographicProjectionTag>;
 using PerspectiveProjection = StrongType<glm::mat4, struct PerspectiveProjectionTag>;
+using PositionVector = StrongType<glm::vec3, struct PositionVectorTag>;
+using UpVector = StrongType<glm::vec3, struct UpVectorTag>;
 
 struct DirectionalShadowCaster
 {
 	DirectionalShadowCaster(OrthographicProjection projection,
 							DirectionalLight Light,
-							glm::vec3 position,
-							glm::vec3 up) noexcept;
+							PositionVector position,
+							UpVector up) noexcept;
 
 	std::optional<glm::mat4> view() const noexcept;
 	std::optional<glm::mat4> model() const noexcept;
+	OrthographicProjection projection() const noexcept;
+	DirectionalLight light() const noexcept;
 
-	OrthographicProjection projection;
-	DirectionalLight light;
-	glm::vec3 position;
-	glm::vec3 up;
+	OrthographicProjection m_projection;
+	DirectionalLight m_light{};
+	PositionVector m_position{glm::vec3(0.0f, 5.0f, 0.0f)};
+	UpVector m_up{glm::vec3(0.0f, 1.0f, 0.0f)};
 };
 
 struct SpotShadowCaster
 {
 	SpotShadowCaster(PerspectiveProjection projection,
 					 SpotLight Light,
-					 glm::vec3 up) noexcept;
+					 UpVector up) noexcept;
 
 	std::optional<glm::mat4> view() const noexcept;
 	std::optional<glm::mat4> model() const noexcept;
 
 	PerspectiveProjection projection;
 	SpotLight light;
-	glm::vec3 up;
+	UpVector up;
 };
 
 struct ShadowCasters

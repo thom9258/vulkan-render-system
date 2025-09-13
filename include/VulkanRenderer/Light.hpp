@@ -7,10 +7,10 @@
 
 struct DirectionalLight
 {
-	glm::vec3 direction;
-	glm::vec3 ambient;
-	glm::vec3 diffuse;
-	glm::vec3 specular;
+	glm::vec3 direction{0.0f, -1.0f, 0.2f};
+	glm::vec3 ambient{0.1f};
+	glm::vec3 diffuse{1.0f};
+	glm::vec3 specular{1.0f};
 };
 
 struct Attenuation

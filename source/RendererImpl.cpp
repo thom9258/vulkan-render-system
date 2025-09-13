@@ -239,8 +239,13 @@ auto render_geometry_pass(GeometryPass& pass,
 		if (shadowcasters.directional_caster.has_value()) {
 			DirectionalShadowCaster& caster = shadowcasters.directional_caster.value();
 			OrthographicShadowPass::CameraUniformData caster_data;
+
+			if (!caster.view().has_value())
+				logger->warn(std::source_location::current(),
+							 "directional shadow caster has no view!");
+
 			caster_data.view = caster.view().value_or(glm::mat4(1.0f));
-			caster_data.proj = caster.projection.get();
+			caster_data.proj = caster.projection().get();
 			shadow_passes.orthographic.record(logger,
 											  device,
 											  CurrentFlightFrame{current_frame_in_flight},
@@ -252,6 +257,10 @@ auto render_geometry_pass(GeometryPass& pass,
 		if (!shadowcasters.spot_casters.empty()) {
 			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
 			PerspectiveShadowPass::CameraUniformData caster_data;
+			if (!caster.view().has_value())
+				logger->warn(std::source_location::current(),
+							 "spot shadow caster has no view!");
+
 			caster_data.view = caster.view().value_or(glm::mat4(1.0f));
 			caster_data.proj = caster.projection.get();
 			shadow_passes.perspective.record(logger,
