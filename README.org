@@ -17,6 +17,7 @@ Required Features:
 - [ ] Windows support.
    
 Optional Features:
+- [ ] Fix point interpolation for textures.
 - [ ] Fix screen extent and render extents, so they are disconnected.
 - [ ] Model tinting for post-lighting manipulation (useful for dark/light models).
 - [ ] Async render thread.

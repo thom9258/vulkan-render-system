@@ -40,13 +40,6 @@ struct SortedRenderables
 	std::vector<MaterialRenderable> materialrenderables;
 };
 
-
-struct SortedShadowCasters
-{
-	std::vector<DirectionalShadowCaster> directionalcasters;
-	std::vector<SpotShadowCaster> spotcasters;
-};
-
 class Renderer::Impl 
 {
 public:
@@ -62,7 +55,7 @@ public:
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables,
 				std::vector<Light>& lights,
-				std::vector<ShadowCaster>& shadowcasters)
+				ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*;
 	
 	Logger logger;
@@ -85,11 +78,6 @@ public:
 void sort_renderable(Logger* logger,
 					 SortedRenderables* sorted,
 					 Renderable renderable);
-
-void sort_shadowcaster(Logger* logger,
-					   SortedShadowCasters* sorted,
-					   ShadowCaster renderable);
-
 
 auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 						  vk::Device& device,
@@ -115,5 +103,6 @@ auto render_geometry_pass(GeometryPass& pass,
 						  vk::Queue& queue,
 						  const WorldRenderInfo& world_info,
 						  std::vector<Renderable>& renderables,
-						  std::vector<ShadowCaster>& shadowcasters)
+						  ShadowCasters& shadowcasters)
+
 	-> Texture2D::Impl*;

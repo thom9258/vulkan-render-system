@@ -49,20 +49,6 @@ void sort_renderable(Logger* logger,
 }
 
 
-void sort_shadowcaster(Logger* logger,
-					   SortedShadowCasters* sorted,
-					   ShadowCaster renderable)
-{
-	if (auto p = std::get_if<DirectionalShadowCaster>(&renderable))
-		sorted->directionalcasters.push_back(*p);
-	else if (auto p = std::get_if<SpotShadowCaster>(&renderable))
-		sorted->spotcasters.push_back(*p);
-	else {
-		logger->warn(std::source_location::current(),
-					 "Found unknown shadowcaster that can not be sorted");
-	}
-}
-
 auto create_geometry_pass(Render::Context::Impl* context,
 						  vk::Extent2D render_extent,
 						  const uint32_t frames_in_flight,
@@ -232,7 +218,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  const WorldRenderInfo& world_info,
 						  std::vector<Renderable>& renderables,
 						  std::vector<Light>& lights,
-						  std::vector<ShadowCaster>& shadowcasters)
+						  ShadowCasters& shadowcasters)
 	-> Texture2D::Impl*
 {
 	//TODO: Pull clearvalues out!
@@ -246,18 +232,14 @@ auto render_geometry_pass(GeometryPass& pass,
 	std::ranges::for_each(renderables,
 						  std::bind_front(sort_renderable, logger, &sorted));
 	
-	SortedShadowCasters sorted_casters{};
-	std::ranges::for_each(shadowcasters,
-						  std::bind_front(sort_shadowcaster, logger, &sorted_casters));
 
-	
 	auto generate_shadow_passes = [&] (vk::CommandBuffer& commandbuffer) 
 	{
 		//TODO: have multiple directional casters
-		if (!sorted_casters.directionalcasters.empty()) {
-			DirectionalShadowCaster& caster = sorted_casters.directionalcasters.front();
+		if (shadowcasters.directional_caster.has_value()) {
+			DirectionalShadowCaster& caster = shadowcasters.directional_caster.value();
 			OrthographicShadowPass::CameraUniformData caster_data;
-			caster_data.view = caster.view;
+			caster_data.view = caster.view().value_or(glm::mat4(1.0f));
 			caster_data.proj = caster.projection.get();
 			shadow_passes.orthographic.record(logger,
 											  device,
@@ -267,10 +249,10 @@ auto render_geometry_pass(GeometryPass& pass,
 											  sorted.materialrenderables);
 		}
 		//TODO: have multiple directional casters
-		if (!sorted_casters.spotcasters.empty()) {
-			SpotShadowCaster& caster = sorted_casters.spotcasters.front();
+		if (!shadowcasters.spot_casters.empty()) {
+			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
 			PerspectiveShadowPass::CameraUniformData caster_data;
-			caster_data.view = caster.view;
+			caster_data.view = caster.view().value_or(glm::mat4(1.0f));
 			caster_data.proj = caster.projection.get();
 			shadow_passes.perspective.record(logger,
 											 device,
@@ -464,7 +446,7 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 							const WorldRenderInfo& world_info,
 							std::vector<Renderable>& renderables,
 							std::vector<Light>& lights,
-							std::vector<ShadowCaster>& shadowcasters)
+							ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*
 {
 	return render_geometry_pass(geometry_pass,
@@ -489,7 +471,7 @@ auto Renderer::render(const uint32_t current_frame_in_flight,
 					  const WorldRenderInfo& world_info,
 					  std::vector<Renderable>& renderables,
 					  std::vector<Light>& lights,
-					  std::vector<ShadowCaster>& shadowcasters)
+					  ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*
 {
 	return impl->render(current_frame_in_flight,

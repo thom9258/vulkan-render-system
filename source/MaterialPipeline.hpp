@@ -114,11 +114,13 @@ private:
 		UniformMemoryDirectWrite<SpotLightUniformData> spotlight; 
 		UniformMemoryDirectWrite<DirectionalLightUniformData> directionallight; 
 		UniformMemoryDirectWrite<LightArrayLengthsUniformData> lightarray_lengths; 
+		//TODO add 2+ samplers to set with shadow maps + a view matrix for them
 	};
 	
 	vk::UniqueDescriptorSetLayout m_global_set_layout;
 	FlightFramesArray<GlobalSetUniform> m_global_set_uniforms;
 
+	//TODO make all the samplers part of a single sampler uniform set
 	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;
 	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
 	TextureDescriptor<DescriptorSetIndex{3}> m_specular;

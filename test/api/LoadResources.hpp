@@ -40,6 +40,12 @@ struct Resources
 		Mesh mesh;
 		TextureSamplerReadOnly diffuse;
 	} chest;
+
+	struct {
+		TexturedMesh mesh;
+		TextureSamplerReadOnly diffuse;
+	} transformship;
+
 	
 	struct {
 		TexturedMesh textured_mesh;
@@ -289,6 +295,32 @@ Resources::Resources(Render::Context& context,
 		| get_bitmap()
 		| move_bitmap_to_gpu(&context)
 		| make_shader_readonly(&context, InterpolationType::Linear);
+	
+	std::cout << "loading TransformShip model!" << std::endl;
+	auto loaded_transformship =
+		load_obj_with_texcoords(context,
+								assets_root,
+								"models/TransformShip/TransformSpaceship.obj");
+	if (auto p = std::get_if<TexturedMesh>(&loaded_transformship)) {
+		transformship.mesh = std::move(*p);
+	}
+	else if (auto p = std::get_if<TexturedMeshWithWarning>(&loaded_transformship)) {
+		std::cout << "TinyOBJ Warning: " << p->warning << std::endl;
+		transformship.mesh = std::move(p->mesh);
+	}
+	else if (auto p = std::get_if<MeshLoadError>(&loaded_transformship)) {
+		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
+	}
+
+	std::cout << "loading chest texture!" << std::endl;
+	transformship.diffuse =
+		load_bitmap(models_root / "TransformShip/TransformShipTexture.png", 
+					BitmapPixelFormat::RGBA,
+					VerticalFlipOnLoad::Yes)
+		| throw_on_bitmap_error()
+		| get_bitmap()
+		| move_bitmap_to_gpu(&context)
+		| make_shader_readonly(&context, InterpolationType::Point);
 
 	std::cout << "loading smg model!" << std::endl;
 	auto loaded_smg = load_obj(context,

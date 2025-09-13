@@ -40,6 +40,10 @@ std::filesystem::path textures_root = assets_root / "textures/";
 glm::vec3 constexpr world_right = glm::vec3(1.0f, 0.0f, 0.0f);
 glm::vec3 constexpr world_up = glm::vec3(0.0f, 1.0f, 0.0f);
 glm::vec3 constexpr world_forward = glm::vec3(0.0f, 0.0f, 1.0f);
+glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 1.0f, -3.0f);
+glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 1.0f, 0.0f);
+glm::vec3 constexpr camera_init_up = glm::vec3(0.0f, 1.0f, 0.0f);
+	
 
 template <typename F, typename... Args>
 std::chrono::duration<double>
@@ -81,7 +85,7 @@ struct Scene
 {
 	std::vector<Renderable> renderables;
 	std::vector<Light> lights;
-	std::vector<ShadowCaster> shadowcasters;
+	ShadowCasters shadowcasters;
 };
 
 auto parse_vec3(json j)
@@ -176,6 +180,19 @@ auto load_scene_from_path(std::filesystem::path const path,
 				std::cout << "Unknown draw mode for " << name << std::endl;
 			}
 		}
+		else if (name == "transformship") {
+			MaterialRenderable ship{};
+			ship.mesh = &resources.transformship.mesh;
+			if (prefab["has-shadow"] == "yes") {
+				ship.has_shadow = true;
+			}
+			ship.texture.ambient = nullptr;
+			ship.texture.diffuse = &resources.transformship.diffuse;
+			ship.texture.specular = nullptr;
+			ship.texture.normal = nullptr;
+			ship.model = transform.as_matrix();
+			scene.renderables.push_back(ship);
+		}
 		else if (name == "box") {
 			if (prefab["draw-mode"] == "material") {
 				MaterialRenderable box{};
@@ -229,34 +246,38 @@ auto load_scene_from_path(std::filesystem::path const path,
 
 		if (type == "directional") {
 			DirectionalLight p;
-			if (obj["casts-shadow"] == "yes") {
-				float near_plane = 1.0f, far_plane = 7.5f;
-				DirectionalShadowCaster caster{
-					glm::mat4(1.0f),
-					OrthographicProjection{glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane)}
-				};
-				caster.projection.get()[1][1] *= -1;
-				scene.shadowcasters.push_back(caster);
-			}
-
 			p.direction = parse_vec3(obj["direction"]);
 			p.ambient = parse_vec3(obj["ambient"]);
 			p.specular = parse_vec3(obj["specular"]);
 			p.diffuse = parse_vec3(obj["diffuse"]);
-			scene.lights.push_back(p);
+
+			if (obj["casts-shadow"] == "yes") {
+				const float near_plane = 1.0f, far_plane = 20.0f;
+				const glm::vec3 position(0.0f, 10.0f, 0.0f);
+
+				DirectionalShadowCaster caster{
+					OrthographicProjection{glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane)},
+					p,
+					position,
+					world_right};
+				scene.shadowcasters.directional_caster = caster;
+				
+				MaterialRenderable ship{};
+				ship.mesh = &resources.transformship.mesh;
+				ship.has_shadow = false;
+				ship.texture.ambient = nullptr;
+				ship.texture.diffuse = &resources.transformship.diffuse;
+				ship.texture.specular = nullptr;
+				ship.texture.normal = nullptr;
+				ship.model = caster.model().value_or(glm::mat4(1.0f));
+				scene.renderables.push_back(ship);
+			}
+			else {
+				scene.lights.push_back(p);
+			}
 		}
 		else if (type == "spot") {
 			SpotLight p;
-			if (obj["casts-shadow"] == "yes") {
-				const float aspect = 1;
-				SpotShadowCaster caster{
-					glm::mat4(1.0f),
-					PerspectiveProjection{glm::perspective(glm::radians(70.f), aspect, 0.1f, 200.0f)}
-				};
-				caster.projection.get()[1][1] *= -1;
-				scene.shadowcasters.push_back(caster);
-			}
-
 			p.position = parse_vec3(obj["position"]);
 			p.direction = glm::normalize(parse_vec3(obj["direction"]));
 			p.ambient = parse_vec3(obj["ambient"]);
@@ -269,9 +290,42 @@ auto load_scene_from_path(std::filesystem::path const path,
 				glm::cos(glm::radians(static_cast<float>(obj["cutoff-inner-degrees"])));
 			p.cutoff.outer =
 				glm::cos(glm::radians(static_cast<float>(obj["cutoff-outer-degrees"])));
-
-			scene.lights.push_back(p);
 			
+	
+			if (obj["casts-shadow"] == "yes") {
+				const float aspect = 1;
+				const float near_plane = 1.0f, far_plane = 20.0f;
+				
+				glm::mat4 view_matrix = 
+					glm::lookAt(p.position, p.position + p.direction, world_up);
+				glm::mat4 model_matrix = glm::inverse(view_matrix);
+				view_matrix[1][1] *= -1;
+
+				SpotShadowCaster caster{
+					PerspectiveProjection{glm::perspective(glm::radians(70.f),
+														   aspect,
+														   near_plane,
+														   far_plane)},
+					p,
+					world_up
+				};
+				
+				scene.shadowcasters.spot_casters.push_back(caster);
+				
+				MaterialRenderable ship{};
+				ship.mesh = &resources.transformship.mesh;
+				ship.has_shadow = false;
+				ship.texture.ambient = nullptr;
+				ship.texture.diffuse = &resources.transformship.diffuse;
+				ship.texture.specular = nullptr;
+				ship.texture.normal = nullptr;
+				ship.model = caster.model().value_or(glm::mat4(1.0f));
+				scene.renderables.push_back(ship);
+			}
+			else {
+				scene.lights.push_back(p);
+			}
+
 			if (obj["draw-gizmo"] == "yes") {
 				WireframeRenderable center{};
 				center.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
@@ -410,10 +464,7 @@ int main()
 	const auto window = context.get_window_extent();
 	const auto aspect = static_cast<float>(window.width()) / static_cast<float>(window.height());
 	
-	glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 1.0f, -3.0f);
-	glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 1.0f, 0.0f);
-	glm::vec3 constexpr camera_init_up = glm::vec3(0.0f, 1.0f, 0.0f);
-	
+
 	struct {
 		glm::vec3 position;
 		glm::mat3 rotation;

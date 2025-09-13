@@ -35,7 +35,7 @@ public:
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables,
 				std::vector<Light>& lights,
-				std::vector<ShadowCaster>& shadowcasters)
+				ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*;
 
 	class Impl;

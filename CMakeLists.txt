@@ -69,6 +69,7 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ContextImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PresenterImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShadowPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/ShadowCaster.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/RendererImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/DescriptorPoolImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexBufferImpl.cpp
