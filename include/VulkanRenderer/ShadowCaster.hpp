@@ -19,8 +19,8 @@ struct DirectionalShadowCaster
 							PositionVector position,
 							UpVector up) noexcept;
 
-	std::optional<glm::mat4> view() const noexcept;
-	std::optional<glm::mat4> model() const noexcept;
+	glm::mat4 view() const noexcept;
+	glm::mat4 model() const noexcept;
 	OrthographicProjection projection() const noexcept;
 	DirectionalLight light() const noexcept;
 

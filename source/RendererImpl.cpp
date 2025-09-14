@@ -239,12 +239,7 @@ auto render_geometry_pass(GeometryPass& pass,
 		if (shadowcasters.directional_caster.has_value()) {
 			DirectionalShadowCaster& caster = shadowcasters.directional_caster.value();
 			OrthographicShadowPass::CameraUniformData caster_data;
-
-			if (!caster.view().has_value())
-				logger->warn(std::source_location::current(),
-							 "directional shadow caster has no view!");
-
-			caster_data.view = caster.view().value_or(glm::mat4(1.0f));
+			caster_data.view = caster.view();
 			caster_data.proj = caster.projection().get();
 			shadow_passes.orthographic.record(logger,
 											  device,
@@ -253,6 +248,7 @@ auto render_geometry_pass(GeometryPass& pass,
 											  caster_data,
 											  sorted.materialrenderables);
 		}
+#if 0
 		//TODO: have multiple directional casters
 		if (!shadowcasters.spot_casters.empty()) {
 			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
@@ -261,7 +257,7 @@ auto render_geometry_pass(GeometryPass& pass,
 				logger->warn(std::source_location::current(),
 							 "spot shadow caster has no view!");
 
-			caster_data.view = caster.view().value_or(glm::mat4(1.0f));
+			caster_data.view = caster.view().value();
 			caster_data.proj = caster.projection.get();
 			shadow_passes.perspective.record(logger,
 											 device,
@@ -270,7 +266,7 @@ auto render_geometry_pass(GeometryPass& pass,
 											 caster_data,
 											 sorted.materialrenderables);
 		}
-
+#endif
 	};
 
 	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier

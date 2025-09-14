@@ -251,33 +251,9 @@ auto load_scene_from_path(std::filesystem::path const path,
 			p.specular = parse_vec3(obj["specular"]);
 			p.diffuse = parse_vec3(obj["diffuse"]);
 
-			const glm::vec3 position(0.0f, 5.0f, 0.0f);
-			
-			std::cout
-				<< std::format("PARSED pos {} {} {} dir {} {} {}",
-							   position[0],
-							   position[1],
-							   position[2],
-							   p.direction[0],
-							   p.direction[1],
-							   p.direction[2])
-				<< std::endl;
-
-			glm::mat4 ship_view = 
-				glm::lookAt(glm::vec3(0.0f), p.direction, world_up);
-			glm::mat4 ship_model = glm::inverse(ship_view);
-			MaterialRenderable ship{};
-			ship.mesh = &resources.transformship.mesh;
-			ship.has_shadow = false;
-			ship.texture.ambient = nullptr;
-			ship.texture.diffuse = &resources.transformship.diffuse;
-			ship.texture.specular = nullptr;
-			ship.texture.normal = nullptr;
-			ship.model = ship_model;
-			scene.renderables.push_back(ship);
-
 			if (obj["casts-shadow"] == "yes") {
-				const float near_plane = 1.0f, far_plane = 10.0f;
+				const float near_plane = 0.1f, far_plane = 30.0f;
+				const glm::vec3 position = parse_vec3(obj["position"]);
 
 				DirectionalShadowCaster caster{
 					OrthographicProjection{glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f,
@@ -287,16 +263,6 @@ auto load_scene_from_path(std::filesystem::path const path,
 					UpVector{world_up}};
 				scene.shadowcasters.directional_caster = caster;
 				
-				std::cout
-					<< std::format("Post Creation pos {} {} {} dir {} {} {}",
-								   caster.m_position.get()[0],
-								   caster.m_position.get()[1],
-								   caster.m_position.get()[2],
-								   caster.light().direction[0],
-								   caster.light().direction[1],
-								   caster.light().direction[2])
-					<< std::endl;
-				
 				MaterialRenderable ship{};
 				ship.mesh = &resources.transformship.mesh;
 				ship.has_shadow = false;
@@ -304,11 +270,11 @@ auto load_scene_from_path(std::filesystem::path const path,
 				ship.texture.diffuse = &resources.transformship.diffuse;
 				ship.texture.specular = nullptr;
 				ship.texture.normal = nullptr;
-				ship.model = caster.model().value();
-				//ship.model = ship_model;
+				ship.model = caster.model();
 				scene.renderables.push_back(ship);
 
-				//TODO: DO NOT PUSH IT HERE ASWELL
+				//TODO: DO NOT PUSH A NORMAL LIGHT ONCE Casters are implemented in
+				// materialpass
 				scene.lights.push_back(p);
 			}
 			else {
