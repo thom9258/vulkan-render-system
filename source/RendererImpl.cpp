@@ -248,17 +248,13 @@ auto render_geometry_pass(GeometryPass& pass,
 											  caster_data,
 											  sorted.materialrenderables);
 		}
-#if 0
+
 		//TODO: have multiple directional casters
 		if (!shadowcasters.spot_casters.empty()) {
 			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
 			PerspectiveShadowPass::CameraUniformData caster_data;
-			if (!caster.view().has_value())
-				logger->warn(std::source_location::current(),
-							 "spot shadow caster has no view!");
-
-			caster_data.view = caster.view().value();
-			caster_data.proj = caster.projection.get();
+			caster_data.view = caster.view();
+			caster_data.proj = caster.projection().get();
 			shadow_passes.perspective.record(logger,
 											 device,
 											 CurrentFlightFrame{current_frame_in_flight},
@@ -266,7 +262,6 @@ auto render_geometry_pass(GeometryPass& pass,
 											 caster_data,
 											 sorted.materialrenderables);
 		}
-#endif
 	};
 
 	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier

@@ -24,6 +24,7 @@ struct DirectionalShadowCaster
 	OrthographicProjection projection() const noexcept;
 	DirectionalLight light() const noexcept;
 
+private:
 	OrthographicProjection m_projection;
 	DirectionalLight m_light{};
 	PositionVector m_position{glm::vec3(0.0f, 5.0f, 0.0f)};
@@ -33,15 +34,18 @@ struct DirectionalShadowCaster
 struct SpotShadowCaster
 {
 	SpotShadowCaster(PerspectiveProjection projection,
-					 SpotLight Light,
+					 SpotLight light,
 					 UpVector up) noexcept;
 
-	std::optional<glm::mat4> view() const noexcept;
-	std::optional<glm::mat4> model() const noexcept;
+	glm::mat4 view() const noexcept;
+	glm::mat4 model() const noexcept;
+	PerspectiveProjection projection() const noexcept;
+	SpotLight light() const noexcept;
 
-	PerspectiveProjection projection;
-	SpotLight light;
-	UpVector up;
+private:
+	PerspectiveProjection m_projection;
+	SpotLight m_light;
+	UpVector m_up;
 };
 
 struct ShadowCasters

@@ -52,6 +52,21 @@
 			"ambient": [0.03, 0.03, 0.03],
 			"casts-shadow": "yes",
 			"position": [0, 6, 0]
+		},
+		{
+			"type": "spot", 
+			"casts-shadow": "yes",
+			"draw-gizmo": "yes",
+			"position": [-1, 1, -1],
+			"direction": [1, 0, 1],
+			"diffuse": [2, 2, 2],
+			"specular": [1, 1, 1],
+			"ambient": [0, 0, 0],
+			"attenuation-constant" : 1,
+			"attenuation-linear" : 0.09,
+			"attenuation-quadratic" : 0.32,
+			"cutoff-inner-degrees" : 30,
+			"cutoff-outer-degrees" : 35
 		}
 	],
 	"ignored" :

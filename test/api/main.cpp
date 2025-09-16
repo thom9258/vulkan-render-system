@@ -296,19 +296,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 			p.cutoff.outer =
 				glm::cos(glm::radians(static_cast<float>(obj["cutoff-outer-degrees"])));
 			
-			glm::mat4 ship_view = 
-				glm::lookAt(p.position, p.position + p.direction, world_up);
-			glm::mat4 ship_model = glm::inverse(ship_view);
-			MaterialRenderable ship{};
-			ship.mesh = &resources.transformship.mesh;
-			ship.has_shadow = false;
-			ship.texture.ambient = nullptr;
-			ship.texture.diffuse = &resources.transformship.diffuse;
-			ship.texture.specular = nullptr;
-			ship.texture.normal = nullptr;
-			ship.model = ship_model;
-			scene.renderables.push_back(ship);
-	
+
 			if (obj["casts-shadow"] == "yes") {
 				const float aspect = 1;
 				const float near_plane = 1.0f, far_plane = 20.0f;
@@ -321,8 +309,21 @@ auto load_scene_from_path(std::filesystem::path const path,
 					p,
 					UpVector{world_up}};
 				
-				scene.shadowcasters.spot_casters.push_back(caster);
+				MaterialRenderable ship{};
+				ship.mesh = &resources.transformship.mesh;
+				ship.has_shadow = false;
+				ship.texture.ambient = nullptr;
+				ship.texture.diffuse = &resources.transformship.diffuse;
+				ship.texture.specular = nullptr;
+				ship.texture.normal = nullptr;
+				ship.model = caster.model();
+				scene.renderables.push_back(ship);
 				
+				scene.shadowcasters.spot_casters.push_back(caster);
+
+				//TODO: DO NOT PUSH A NORMAL LIGHT ONCE Casters are implemented in
+				// materialpass
+				scene.lights.push_back(p);
 			}
 			else {
 				scene.lights.push_back(p);
