@@ -1,5 +1,7 @@
 #include "RendererImpl.hpp"
 
+#include "MaterialPipeline.hpp"
+
 auto create_texture_view(vk::Device& device,
 						 Texture2D& texture,
 						 const vk::ImageAspectFlags aspect)
@@ -46,193 +48,6 @@ void sort_renderable(Logger* logger,
 	}
 }
 
-ShadowPass::ShadowPass(Render::Context::Impl* context,
-					   U32Extent extent,
-					   const bool debug_print)
-	: m_extent{extent}
-{
-	auto constexpr color_format = vk::Format::eR8Srgb;
-    const auto color_attachment = vk::AttachmentDescription{}
-		.setFlags(vk::AttachmentDescriptionFlags())
-		.setFormat(color_format)
-		.setSamples(vk::SampleCountFlagBits::e1)
-		.setLoadOp(vk::AttachmentLoadOp::eClear)
-		.setStoreOp(vk::AttachmentStoreOp::eStore)
-		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-		// NOTE these are important, as they determine the layout of the image before and after
-		// the renderpass
-		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
-
-	auto constexpr depth_format = vk::Format::eD32Sfloat;
-    const auto depth_attachment = vk::AttachmentDescription{}
-		.setFlags(vk::AttachmentDescriptionFlags())
-		.setFormat(depth_format)
-		.setSamples(vk::SampleCountFlagBits::e1)
-		.setLoadOp(vk::AttachmentLoadOp::eClear)
-		.setStoreOp(vk::AttachmentStoreOp::eDontCare)
-		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-		// NOTE these are important, as they determine the layout of the image before and after
-		// the renderpass
-		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-	const auto color_reference = vk::AttachmentReference{}
-		.setAttachment(0)
-		.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-	const auto depth_reference = vk::AttachmentReference{}
-		.setAttachment(1)
-		.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-	
-    auto subpass = vk::SubpassDescription{}
-		.setFlags(vk::SubpassDescriptionFlags())
-		.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-		.setInputAttachments({})
-		.setResolveAttachments({})
-		.setColorAttachments(color_reference)
-		.setPDepthStencilAttachment(&depth_reference);
-	
-	auto color_depth_dependency = vk::SubpassDependency{}
-		.setSrcSubpass(vk::SubpassExternal)
-		.setDstSubpass(0)
-		.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput
-						 | vk::PipelineStageFlagBits::eEarlyFragmentTests)
-		.setSrcAccessMask(vk::AccessFlags())
-		.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput
-						 | vk::PipelineStageFlagBits::eEarlyFragmentTests)
-		.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite
-						  | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-
-	
-	std::array<vk::AttachmentDescription, 2> attachments {
-		color_attachment,
-		depth_attachment
-	};
-	std::array<vk::SubpassDependency, 1> dependencies {
-		color_depth_dependency
-	};
-    auto renderPassCreateInfo = vk::RenderPassCreateInfo{}
-		.setFlags(vk::RenderPassCreateFlags())
-		.setAttachments(attachments)
-		.setDependencies(dependencies)
-		.setSubpasses(subpass);
-
-	m_renderpass = context->device.get().createRenderPassUnique(renderPassCreateInfo);
-	context->logger.info(std::source_location::current(),
-						 "Created Shadowmap Render Pass!");
-
-	for (FrameTextures& textures: m_framestextures) {
-		/* Setup the rendertarget and its view for the render pass
-		 */
-		textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
-														 context,
-														 m_extent,
-														 vkformat_to_textureformat(color_format)));
-		
-		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
-		{
-			textures.colorbuffer.impl->layout =
-				transition_image_for_color_override(textures.colorbuffer.impl->allocated.image.get(),
-													commandbuffer);
-		};
-		
-		with_buffer_submit(context->device.get(),
-						   context->commandpool.get(),
-						   context->graphics_queue(),
-						   transition_to_transfer_src);
-		
-		textures.colorbuffer_view
-			= textures.colorbuffer.impl->create_view(context,
-													 vk::ImageAspectFlagBits::eColor);
-
-
-		
-		/* Setup the depthbuffer and its view for the render pass
-		 */
-		textures.depthbuffer = Texture2D(std::make_unique<Texture2D::Impl>(DepthBufferTexture,
-																		   context,
-																		   m_extent));
-														 
-		/* Setup the depthbuffer view
-		 */
-		textures.depthbuffer_view = 
-			textures.depthbuffer.impl->create_view(context,
-												   vk::ImageAspectFlagBits::eDepth);
-		
-		/* Setup the FrameBuffer
-		 */
-		std::array<vk::ImageView, 2> attachments{
-			textures.colorbuffer_view.get(),
-			textures.depthbuffer_view.get(),
-		};
-		auto framebufferCreateInfo = vk::FramebufferCreateInfo{}
-			.setFlags(vk::FramebufferCreateFlags())
-			.setAttachments(attachments)
-			.setWidth(m_extent.width())
-			.setHeight(m_extent.height())
-			.setRenderPass(m_renderpass.get())
-			.setLayers(1);
-
-		textures.framebuffer = 
-			context->device.get().createFramebufferUnique(framebufferCreateInfo);
-	}
-
-	context->logger.info(std::source_location::current(),
-						 "Created Shadowpass FramePasses!");
-	
-}
-
-void ShadowPass::record(Logger* logger,
-						std::uint32_t current_flightframe,
-						vk::CommandBuffer& commandbuffer)
-{
-	
- 	const auto render_area = vk::Rect2D{}
-		.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
-		.setExtent(vk::Extent2D{m_extent.width(), m_extent.height()});
-
-	std::array<vk::ClearValue, 2> clearvalues{
-		vk::ClearValue{}.setColor({1.0f, 1.0f, 1.0f, 1.0f}),
-		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
-	};
-	
-	const auto renderPassInfo = vk::RenderPassBeginInfo{}
-		.setRenderPass(m_renderpass.get())
-		.setFramebuffer(m_framestextures[current_flightframe].framebuffer.get())
-		.setRenderArea(render_area)
-		.setClearValues(clearvalues);
-	
-	commandbuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-	
-	std::array<vk::Viewport, 1> const viewports{
-		vk::Viewport{}
-		.setX(0.0f)
-		.setY(0.0f)
-		.setWidth(m_extent.width())
-		.setHeight(m_extent.height())
-		.setMinDepth(0.0f)
-		.setMaxDepth(1.0f)
-	};
-	uint32_t const viewport_start = 0;
-	commandbuffer.setViewport(viewport_start, viewports);
-	
-	std::array<vk::Rect2D, 1> const scissors{
-		vk::Rect2D{}
-		.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
-		.setExtent(vk::Extent2D{m_extent.width(), m_extent.height()}),
-	};
-	const uint32_t scissor_start = 0;
-	commandbuffer.setScissor(scissor_start, scissors);
-	
-
-	//TODO: DRAW OBJECTS HERE USING PIPELINE
-	
-
-	commandbuffer.endRenderPass();
-}
 
 auto create_geometry_pass(Render::Context::Impl* context,
 						  vk::Extent2D render_extent,
@@ -388,6 +203,7 @@ auto create_geometry_pass(Render::Context::Impl* context,
 }
 
 auto render_geometry_pass(GeometryPass& pass,
+						  Renderer::Impl::ShadowPasses& shadow_passes,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...
 						  GeometryPipelines* pipelines,
@@ -401,7 +217,8 @@ auto render_geometry_pass(GeometryPass& pass,
 						  vk::Queue& queue,
 						  const WorldRenderInfo& world_info,
 						  std::vector<Renderable>& renderables,
-						  std::vector<Light>& lights)
+						  std::vector<Light>& lights,
+						  ShadowCasters& shadowcasters)
 	-> Texture2D::Impl*
 {
 	//TODO: Pull clearvalues out!
@@ -410,6 +227,48 @@ auto render_geometry_pass(GeometryPass& pass,
 		vk::ClearValue{}.setColor({0.0f, 0.0f, flash, 1.0f}),
 		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
 	};
+	
+	SortedRenderables sorted{};
+	std::ranges::for_each(renderables,
+						  std::bind_front(sort_renderable, logger, &sorted));
+	
+
+	auto generate_shadow_passes = [&] (vk::CommandBuffer& commandbuffer) 
+	{
+		//TODO: have multiple directional casters
+		if (shadowcasters.directional_caster.has_value()) {
+			DirectionalShadowCaster& caster = shadowcasters.directional_caster.value();
+			OrthographicShadowPass::CameraUniformData caster_data;
+			caster_data.view = caster.view();
+			caster_data.proj = caster.projection().get();
+			shadow_passes.orthographic.record(logger,
+											  device,
+											  CurrentFlightFrame{current_frame_in_flight},
+											  commandbuffer,
+											  caster_data,
+											  sorted.materialrenderables);
+		}
+
+		//TODO: have multiple directional casters
+		if (!shadowcasters.spot_casters.empty()) {
+			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
+			PerspectiveShadowPass::CameraUniformData caster_data;
+			caster_data.view = caster.view();
+			caster_data.proj = caster.projection().get();
+			shadow_passes.perspective.record(logger,
+											 device,
+											 CurrentFlightFrame{current_frame_in_flight},
+											 commandbuffer,
+											 caster_data,
+											 sorted.materialrenderables);
+		}
+	};
+
+	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier
+	with_buffer_submit(device,
+					   command_pool,
+					   queue,
+					   generate_shadow_passes);
 	
 	auto generate_frame = [&] (vk::CommandBuffer& commandbuffer) 
 	{
@@ -444,10 +303,6 @@ auto render_geometry_pass(GeometryPass& pass,
 		const uint32_t scissor_start = 0;
 		commandbuffer.setScissor(scissor_start, scissors);
 		
-		SortedRenderables sorted{};
-		auto sort = std::bind_front(sort_renderable, logger, &sorted);
-		std::ranges::for_each(renderables, sort);
-	
 		NormColorRenderInfo normcolor_info{};
 		normcolor_info.view = world_info.view;
 		normcolor_info.proj = world_info.projection;
@@ -521,6 +376,20 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	//TODO: Allow debug print to be set externally
 	vk::Extent2D const render_extent = context->get_window_extent();
 	bool const debug_print = true;
+	shadow_passes.orthographic = OrthographicShadowPass(logger,
+														context,
+														presenter,
+														U32Extent{1024, 1024},
+														shaders_root,
+														debug_print);
+
+	shadow_passes.perspective = PerspectiveShadowPass(logger,
+													  context,
+													  presenter,
+													  U32Extent{1024, 1024},
+													  shaders_root,
+													  debug_print);
+
 	geometry_pass = create_geometry_pass(context,
 										 render_extent,
 										 presenter->max_frames_in_flight,
@@ -576,10 +445,12 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 							const uint64_t total_frames,
 							const WorldRenderInfo& world_info,
 							std::vector<Renderable>& renderables,
-							std::vector<Light>& lights)
+							std::vector<Light>& lights,
+							ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*
 {
 	return render_geometry_pass(geometry_pass,
+								shadow_passes,
 								&geometry_pipelines,
 								&logger,
 								current_frame_in_flight,
@@ -591,21 +462,24 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 								context->graphics_queue(),
 								world_info,
 								renderables,
-								lights);
+								lights,
+								shadowcasters);
 }
 
 auto Renderer::render(const uint32_t current_frame_in_flight,
 					  const uint64_t total_frames,
 					  const WorldRenderInfo& world_info,
 					  std::vector<Renderable>& renderables,
-					  std::vector<Light>& lights)
+					  std::vector<Light>& lights,
+					  ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*
 {
 	return impl->render(current_frame_in_flight,
 						total_frames,
 						world_info,
 						renderables,
-						lights);
+						lights,
+						shadowcasters);
 }
 
 Renderer::Renderer(Render::Context& context,

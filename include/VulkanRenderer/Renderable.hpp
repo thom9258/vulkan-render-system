@@ -37,7 +37,7 @@ struct MaterialRenderable
 		TextureSamplerReadOnly* normal;
 	} texture;
 	glm::mat4 model;
-	bool casts_shadow;
+	bool has_shadow;
 };
 
 

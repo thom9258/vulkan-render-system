@@ -4,6 +4,7 @@
 		{
 			"name": "smg", 
 			"draw-mode": "material",
+			"has-shadow": "yes",
 			"position": [1.3, 0.8, 1.3],
 			"rotation-wxyz": [ 0.7071068, 0, -0.7071068, 0 ],
 			"scale": [0.2, 0.2, 0.2]
@@ -11,6 +12,7 @@
 		{
 			"name": "chest", 
 			"draw-mode": "material",
+			"has-shadow": "yes",
 			"position": [-3, 0, 4],
 			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
 			"scale": [0.03, 0.03, 0.03]
@@ -18,6 +20,7 @@
 		{
 			"name": "box", 
 			"draw-mode": "material",
+			"has-shadow": "yes",
 			"position": [0, -0.2, 0],
 			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 0.2, 10]
@@ -25,6 +28,7 @@
 		{
 			"name": "floor", 
 			"draw-mode": "material",
+			"has-shadow": "yes",
 			"position": [0, 2, 5],
 			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 5, 0.2]
@@ -32,6 +36,7 @@
 		{
 			"name": "floor", 
 			"draw-mode": "material",
+			"has-shadow": "yes",
 			"position": [5, 2, 0],
 			"rotation-wxyz": [ 0.7071068, 0, -0.7071068, 0 ],
 			"scale": [10, 5, 0.2]
@@ -41,13 +46,51 @@
 	[
 		{
 			"type": "directional", 
-			"direction": [0.0, -1, 0.0],
-			"diffuse": [0.5, 0.5, 0.5],
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0.2, 0.2, 0.2],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.03, 0.03, 0.03],
+			"casts-shadow": "yes",
+			"position": [0, 6, 0]
+		},
+		{
+			"type": "spot", 
+			"casts-shadow": "yes",
+			"draw-gizmo": "yes",
+			"position": [-1, 1, -1],
+			"direction": [1, 0, 1],
+			"diffuse": [2, 2, 2],
+			"specular": [1, 1, 1],
+			"ambient": [0, 0, 0],
+			"attenuation-constant" : 1,
+			"attenuation-linear" : 0.09,
+			"attenuation-quadratic" : 0.32,
+			"cutoff-inner-degrees" : 30,
+			"cutoff-outer-degrees" : 35
+		}
+	],
+	"ignored" :
+	[
+		{
+			"type": "directional", 
+			"direction": [1, -0.5, 1.0],
+			"diffuse": [0.2, 0.2, 0.2],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.03, 0.03, 0.03],
+			"casts-shadow": "yes",
+			"position": [-6, 4, -6]
+		},
+		{
+			"type": "directional", 
+			"casts-shadow": "yes",
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0.2, 0.2, 0.2],
 			"specular": [0.0, 0.0, 0.0],
 			"ambient": [0.03, 0.03, 0.03]
 		},
 		{
 			"type": "spot", 
+			"casts-shadow": "yes",
 			"draw-gizmo": "yes",
 			"position": [-1, 0.5, -1],
 			"direction": [1, 0, 1],
@@ -62,10 +105,11 @@
 		},
 		{
 			"type": "spot", 
+			"casts-shadow": "no",
 			"draw-gizmo": "yes",
 			"position": [-3, 4, 4],
-			"direction": [0, -1, 0],
-			"diffuse": [1, 0.2, 1],
+			"direction": [0, -1, 0.01],
+			"diffuse": [3, 0, 0],
 			"specular": [1, 1, 1],
 			"ambient": [0, 0, 0],
 			"attenuation-constant" : 1,
@@ -73,10 +117,7 @@
 			"attenuation-quadratic" : 0.32,
 			"cutoff-inner-degrees" : 30,
 			"cutoff-outer-degrees" : 35
-		}
-	],
-	"ignored" :
-	[
+		},
 		{
 			"type": "point", 
 			"draw-gizmo": "yes",
@@ -87,6 +128,15 @@
 			"attenuation-constant" : 1,
 			"attenuation-linear" : 0.09,
 			"attenuation-quadratic" : 0.32
+		},
+		{
+			"name": "transformship", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [0, 0, 0],
+			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [1, 1, 1]
 		}
+
 	]
 }
