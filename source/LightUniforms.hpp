@@ -1,6 +1,7 @@
 #pragma once
 
 #include <VulkanRenderer/Light.hpp>
+#include <VulkanRenderer/ShadowCaster.hpp>
 
 
 struct DirectionalLightUniformData
@@ -63,3 +64,23 @@ struct SpotLightUniformData
 	SpotLightUniformData(SpotLight light);
 	SpotLightUniformData& operator=(SpotLight light);
 };
+
+struct DirectionalShadowCasterUniformData
+{
+	glm::vec3 direction;
+	float _padding1{1.0f};
+	glm::vec3 ambient;
+	float _padding2{1.0f};
+	glm::vec3 diffuse;
+	float _padding3{1.0f};
+	glm::vec3 specular;
+	float _padding4{1.0f};
+	glm::mat4 model_matrix;
+	int exists{false};
+	float _padding5[3];
+	
+	DirectionalShadowCasterUniformData() = default;
+	DirectionalShadowCasterUniformData(DirectionalShadowCaster caster);
+};
+
+

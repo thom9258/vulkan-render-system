@@ -4,6 +4,7 @@ layout(location = 0) in vec2 texcoord;
 layout(location = 1) in vec3 vertex_normal;
 layout(location = 2) in vec3 frag_position;
 layout(location = 3) in vec3 view_position;
+layout(location = 4) in vec4 fragpos_dirshadowcaster_lightspace;
 
 layout(location = 0) out vec4 final_color;
 
@@ -65,6 +66,16 @@ uniform LightLengthsUniform {
 	// light_length.z = directionallight length
 };
 
+layout (set = 0, binding = 5)
+uniform DirectionalShadowCasterUniform 
+{
+	DirectionalLight light;
+	mat4 model_matrix;
+	bool exists;
+} directional_shadowcaster;
+
+
+
 layout(set = 1, binding = 0) 
 uniform sampler2D ambient;
 
@@ -77,9 +88,14 @@ uniform sampler2D specular;
 layout(set = 4, binding = 0) 
 uniform sampler2D normal;
 
+layout(set = 5, binding = 0) 
+uniform sampler2D directional_shadowmap;
+
+
 vec3 calculate_point_light(PointLight light);
 vec3 calculate_directional_light(DirectionalLight light);
 vec3 calculate_spot_light(SpotLight light);
+bool is_in_directional_shadow(vec4 fragpos_lightspace);
 
 void main() 
 {
@@ -97,11 +113,20 @@ void main()
 
 	for (int i = 0; i < directionallight_length; i++)
 		total_lighting += calculate_directional_light(directionallight[i]);
+		
+	if (directional_shadowcaster.exists) {
+	   if (!is_in_directional_shadow(fragpos_dirshadowcaster_lightspace)) {
+		  total_lighting += calculate_directional_light(directional_shadowcaster.light);
+	   }
+	}
 	
 	final_color = vec4(total_lighting, 1.0);
 }
 
-
+bool is_in_directional_shadow(vec4 fragpos_lightspace)
+{
+	return false;
+}
 
 #if 0
 //            ORIGINAL SOLUTIONS

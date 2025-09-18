@@ -149,32 +149,41 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 								sizeof(PushConstants)));
 	}
 	
-	std::array<vk::DescriptorSetLayoutBinding, 5> frame_uniform_bindings{
+	std::array<vk::DescriptorSetLayoutBinding, 6> frame_uniform_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
 		.setBinding(0)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(1)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(2)
-		//.setDescriptorCount(max_spotlights)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(3)
-		//.setDescriptorCount(max_directionallights)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		.setBinding(4)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment
+					   | vk::ShaderStageFlagBits::eVertex)
+		.setBinding(5)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 	};
@@ -376,6 +385,8 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	lightarray_lengths_init_data.point_length = 0;
 	lightarray_lengths_init_data.spot_length = 0;
 	lightarray_lengths_init_data.directional_length = 0;
+	
+	DirectionalShadowCasterUniformData directional_shadowcaster_init_data{};
 
 	for (auto& uniform: m_global_set_uniforms) {
 		uniform.camera =
@@ -420,10 +431,23 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 																   lightarray_lengths_count);
 		uniform.lightarray_lengths.write(context->device.get(),
 										 &lightarray_lengths_init_data,
-										 1);
+										 lightarray_lengths_count);
 
 		logger.info(std::source_location::current(),
 					"created frame uniform light array lengths descriptor memories");
+		
+	   uniform.directional_shadowcaster =
+		   UniformMemoryDirectWrite<DirectionalShadowCasterUniformData>(
+               context->physical_device,
+			   context->device.get(),
+			   directional_shadowcasters_count);
+
+		uniform.directional_shadowcaster.write(context->device.get(),
+											   &directional_shadowcaster_init_data,
+											   directional_shadowcasters_count);
+
+		logger.info(std::source_location::current(),
+					"created frame uniform directional shadowcaster descriptor memories");
 	}
 
 	// NOTE: Here we technically update the descriptor sets, but this is done to
@@ -431,7 +455,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
     //       as the uniforms are direct write uniforms, thus simply writing to the memory
 	//       is considered updating them
 	for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
-		std::array<vk::WriteDescriptorSet, 5> writes {
+		std::array<vk::WriteDescriptorSet, 6> writes {
 			vk::WriteDescriptorSet{}
 			.setDstSet(m_global_set_uniforms[i].set.get())
 			.setDstBinding(0)
@@ -471,6 +495,14 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 			.setDescriptorCount(1)
 			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
 			.setBufferInfo(m_global_set_uniforms[i].lightarray_lengths.buffer_info()),
+
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_global_set_uniforms[i].set.get())
+			.setDstBinding(5)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_global_set_uniforms[i].directional_shadowcaster.buffer_info()),
 		};
 
 		context->device.get().updateDescriptorSets(writes.size(),
@@ -521,7 +553,8 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							  CurrentFlightFrame const current_flightframe,
 							  MaxFlightFrames const max_frames_in_flight,
 							  std::vector<MaterialRenderable>& renderables,
-							  std::vector<Light>& lights)
+							  std::vector<Light>& lights,
+							  ShadowCasters shadowcasters)
 {
 	if (!m_ambient.sets.contains(&m_ambient.default_texture)) {
 		m_ambient.sets.insert({&m_ambient.default_texture,
@@ -609,7 +642,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 
 	m_global_set_uniforms[*current_flightframe].lightarray_lengths.write(device,
 																		 &lightarray_lengths_data,
-																		 1);
+																		 lightarray_lengths_count);
 
 #if 0
 	const auto msg = std::format("Pointlights: {}\nSpotlights: {}\n DirLights: {}",
@@ -619,6 +652,26 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	logger.info(std::source_location::current(),
 				msg.c_str());
 #endif	
+	
+	if (shadowcasters.directional_caster.has_value()) {
+		DirectionalShadowCasterUniformData data(shadowcasters.directional_caster.value());
+		m_global_set_uniforms[*current_flightframe]
+			.directional_shadowcaster.write(device,
+											&data,
+											directional_shadowcasters_count);
+	}
+	else {
+		DirectionalShadowCasterUniformData data{};
+		data.exists = false;
+		m_global_set_uniforms[*current_flightframe]
+			.directional_shadowcaster.write(device,
+											&data,
+											directional_shadowcasters_count);
+
+	}
+	
+	// TODO: BIND SHADOW MAP
+	// https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
 
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());

@@ -16,6 +16,16 @@ DirectionalLightUniformData& DirectionalLightUniformData::operator=(DirectionalL
 	return *this;
 }
 
+DirectionalShadowCasterUniformData::DirectionalShadowCasterUniformData(
+    DirectionalShadowCaster caster)
+	: direction{caster.light().direction}
+	, ambient{caster.light().ambient}
+	, diffuse{caster.light().diffuse}
+	, specular{caster.light().specular}
+	, model_matrix{caster.model()}
+	, exists{true}
+{}
+
 PointLightUniformData::PointLightUniformData(PointLight light)
 	: position{light.position}
 	, ambient{light.ambient}

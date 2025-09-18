@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include <VulkanRenderer/Renderable.hpp>
+#include <VulkanRenderer/ShadowCaster.hpp>
 
 #include "VertexImpl.hpp"
 #include "VertexBuffer.hpp"
@@ -70,7 +71,8 @@ struct MaterialPipeline
 				CurrentFlightFrame const current_flightframe,
 				MaxFlightFrames const max_frames_in_flight,
 				std::vector<MaterialRenderable>& renderables,
-				std::vector<Light>& lights);
+				std::vector<Light>& lights,
+				ShadowCasters shadowcasters);
 
 	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
 	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
@@ -101,6 +103,7 @@ private:
 
 	static constexpr size_t camera_uniform_count = 1;
 	static constexpr size_t lightarray_lengths_count = 1;
+	static constexpr size_t directional_shadowcasters_count = 1;
 
 	static constexpr size_t max_pointlights = 10;
 	static constexpr size_t max_spotlights = 10;
@@ -114,7 +117,7 @@ private:
 		UniformMemoryDirectWrite<SpotLightUniformData> spotlight; 
 		UniformMemoryDirectWrite<DirectionalLightUniformData> directionallight; 
 		UniformMemoryDirectWrite<LightArrayLengthsUniformData> lightarray_lengths; 
-		//TODO add 2+ samplers to set with shadow maps + a view matrix for them
+		UniformMemoryDirectWrite<DirectionalShadowCasterUniformData> directional_shadowcaster; 
 	};
 	
 	vk::UniqueDescriptorSetLayout m_global_set_layout;
@@ -125,5 +128,8 @@ private:
 	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
 	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
 	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
+
+	//TODO: this should be in GlobalSetUniform
+	TextureDescriptor<DescriptorSetIndex{5}> directional_shadowmap;
 };
 

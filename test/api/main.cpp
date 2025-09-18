@@ -275,7 +275,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 
 				//TODO: DO NOT PUSH A NORMAL LIGHT ONCE Casters are implemented in
 				// materialpass
-				scene.lights.push_back(p);
+				//scene.lights.push_back(p);
 			}
 			else {
 				scene.lights.push_back(p);

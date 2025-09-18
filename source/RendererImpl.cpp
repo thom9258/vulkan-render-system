@@ -348,7 +348,8 @@ auto render_geometry_pass(GeometryPass& pass,
 								   CurrentFlightFrame{current_frame_in_flight},
 								   MaxFlightFrames{max_frames_in_flight},
 								   sorted.materialrenderables,
-								   lights);
+								   lights,
+								   shadowcasters);
 
 		commandbuffer.endRenderPass();
 	};
