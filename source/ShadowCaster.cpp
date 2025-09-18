@@ -55,7 +55,6 @@ glm::mat4 SpotShadowCaster::view() const noexcept
 {
 	glm::mat4 view =
 		glm::lookAt(m_light.position, m_light.position + m_light.direction, m_up.get());
-	//view[1][1] *= -1;
 	return view;
 }
 
