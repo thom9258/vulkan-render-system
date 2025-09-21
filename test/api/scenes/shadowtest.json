@@ -51,6 +51,7 @@
 			"specular": [0.0, 0.0, 0.0],
 			"ambient": [0.03, 0.03, 0.03],
 			"casts-shadow": "yes",
+			"draw-gizmo": "yes",
 			"position": [0, 6, 0]
 		},
 		{
