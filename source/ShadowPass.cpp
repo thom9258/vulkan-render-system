@@ -1,5 +1,100 @@
 #include "ShadowPass.hpp"
 
+ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
+									 U32Extent extent)
+
+{
+	texture =
+		Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
+													context,
+													extent,
+													TextureFormat::R32Sfloat));
+		
+		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
+		{
+			transition_image_for_color_override(texture.impl->allocated.image.get(),
+												commandbuffer);
+		};
+		
+		with_buffer_submit(context->device.get(),
+						   context->commandpool.get(),
+						   context->graphics_queue(),
+						   transition_to_transfer_src);
+}
+
+ShadowPassTexture::ShadowPassTexture(ShadowPassTexture&& rhs)
+{
+	std::swap(texture, rhs.texture);
+	std::swap(sampler, rhs.sampler);
+	std::swap(state, rhs.state);
+}
+
+ShadowPassTexture& ShadowPassTexture::operator=(ShadowPassTexture&& rhs)
+{
+	std::swap(texture, rhs.texture);
+	std::swap(sampler, rhs.sampler);
+	std::swap(state, rhs.state);
+	return *this;
+}
+
+void ShadowPassTexture::transition_writeable(vk::CommandBuffer& commandbuffer)
+{
+	if (state != ShadowPassTextureState::Readable)
+		throw std::runtime_error("ShadowPassTexture state is already Writeable!");
+
+    auto range = vk::ImageSubresourceRange{}
+		.setAspectMask(vk::ImageAspectFlagBits::eColor)
+		.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setBaseArrayLayer(0)
+		.setLayerCount(1);
+
+	auto barrier = vk::ImageMemoryBarrier{}
+		.setOldLayout(readable_layout)
+		.setNewLayout(writeable_layout)
+		.setImage(texture.impl->image())
+		.setSubresourceRange(range)
+		.setSrcAccessMask(vk::AccessFlags())
+		.setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
+
+    commandbuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+								  vk::PipelineStageFlagBits::eTransfer,
+								  vk::DependencyFlags(),
+								  nullptr,
+								  nullptr,
+								  barrier);
+}
+
+
+void ShadowPassTexture::transition_readable(vk::CommandBuffer& commandbuffer)
+{
+	if (state != ShadowPassTextureState::Writeable)
+		throw std::runtime_error("ShadowPassTexture state is already Readable!");
+
+    auto range = vk::ImageSubresourceRange{}
+		.setAspectMask(vk::ImageAspectFlagBits::eColor)
+		.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setBaseArrayLayer(0)
+		.setLayerCount(1);
+
+	auto barrier = vk::ImageMemoryBarrier{}
+		.setOldLayout(writeable_layout)
+		.setNewLayout(readable_layout)
+		.setImage(texture.impl->image())
+		.setSubresourceRange(range)
+		.setSrcAccessMask(vk::AccessFlags())
+		.setDstAccessMask(vk::AccessFlagBits::eTransferRead);
+
+    commandbuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+								  vk::PipelineStageFlagBits::eTransfer,
+								  vk::DependencyFlags(),
+								  nullptr,
+								  nullptr,
+								  barrier);
+}
+
+
 
 OrthographicShadowPass::OrthographicShadowPass(Logger& logger,
 											   Render::Context::Impl* context,
@@ -63,6 +158,22 @@ void PerspectiveShadowPass::record(Logger* logger,
 							  renderables);
 }
 
+GenericShadowPass& GenericShadowPass::operator=(GenericShadowPass&& rhs)
+{
+	std::swap(m_extent, rhs.m_extent);
+	std::swap(m_renderpass, rhs.m_renderpass);
+	std::swap(m_framestextures, rhs.m_framestextures);
+	std::swap(m_pipeline, rhs.m_pipeline);
+	return *this;
+}
+
+GenericShadowPass::GenericShadowPass(GenericShadowPass&& rhs)
+{
+	std::swap(m_extent, rhs.m_extent);
+	std::swap(m_renderpass, rhs.m_renderpass);
+	std::swap(m_framestextures, rhs.m_framestextures);
+	std::swap(m_pipeline, rhs.m_pipeline);
+}
 
 
 GenericShadowPass::GenericShadowPass(Logger& logger,
@@ -154,26 +265,28 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 	for (FrameTextures& textures: m_framestextures) {
 		/* Setup the rendertarget and its view for the render pass
 		 */
-		textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
-														 context,
-														 m_extent,
-														 vkformat_to_textureformat(color_format)));
-		
-		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
-		{
-			textures.colorbuffer.impl->layout =
-				transition_image_for_color_override(textures.colorbuffer.impl->allocated.image.get(),
-													commandbuffer);
-		};
-		
-		with_buffer_submit(context->device.get(),
-						   context->commandpool.get(),
-						   context->graphics_queue(),
-						   transition_to_transfer_src);
+		textures.colorbuffer = ShadowPassTexture(context, m_extent);
+
+		//textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
+		//context,
+		//m_extent,
+		//vkformat_to_textureformat(color_format)));
+		//
+		//auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
+		//{
+		//textures.colorbuffer.impl->layout =
+		//transition_image_for_color_override(textures.colorbuffer.impl->allocated.image.get(),
+		//commandbuffer);
+	//};
+		//
+		//with_buffer_submit(context->device.get(),
+		//context->commandpool.get(),
+		//context->graphics_queue(),
+		//transition_to_transfer_src);
 		
 		textures.colorbuffer_view
-			= textures.colorbuffer.impl->create_view(context,
-													 vk::ImageAspectFlagBits::eColor);
+			= textures.colorbuffer.texture.impl->create_view(context,
+															 vk::ImageAspectFlagBits::eColor);
 
 		/* Setup the depthbuffer and its view for the render pass
 		 */
