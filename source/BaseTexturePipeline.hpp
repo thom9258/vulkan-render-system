@@ -59,44 +59,6 @@ struct BaseTextureRenderInfo
 	glm::mat4 proj;
 };
 
-std::vector<vk::UniqueDescriptorSet>
-create_descriptorset_for_texture(vk::Device device,
-								 vk::DescriptorSetLayout descriptorset_layout,
-								 vk::DescriptorPool descriptor_pool,
-								 size_t frames_in_flight,
-								 TextureSamplerReadOnly& texture)
-{
-	std::vector<vk::UniqueDescriptorSet> sets;
-	for (uint32_t i = 0; i < frames_in_flight; i++) {
-		const auto allocate_info = vk::DescriptorSetAllocateInfo{}
-			.setDescriptorPool(descriptor_pool)
-			.setDescriptorSetCount(1)
-			.setSetLayouts(descriptorset_layout);
-		
-		auto createdsets = device.allocateDescriptorSetsUnique(allocate_info);
-		sets.push_back(std::move(createdsets[0]));
-		
-		const auto image_info = vk::DescriptorImageInfo{}
-			.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
-			.setImageView(texture.impl->view.get())
-			.setSampler(texture.impl->sampler.get());
-		
-		const std::array<vk::WriteDescriptorSet, 1> write{
-			vk::WriteDescriptorSet{}
-			.setDstBinding(0)
-			.setDstArrayElement(0)
-			.setDstSet(sets.back().get())
-			.setDescriptorCount(1)
-			.setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
-			.setImageInfo(image_info),
-		};
-
-		device.updateDescriptorSets(write.size(), write.data(), 0, nullptr);
-	}
-
-	return sets;
-}
-
 BaseTexturePipeline
 create_base_texture_pipeline(Logger& logger,
 							 Render::Context::Impl* context,

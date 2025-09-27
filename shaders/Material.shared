@@ -1,103 +1,62 @@
-#version 450
+#define MAX_POINTLIGHTS 10
+#define MAX_SPOTLIGHTS 10
+#define MAX_DIRECTIONALLIGHTS 10
+#define SHININESS 32
 
-#include "Material.shared"
-
-#if 0
-layout(location = 0) in VertexOut in;
-#endif
-
-layout(location = 0) in vec2 texcoord;
-layout(location = 1) in vec3 vertex_normal;
-layout(location = 2) in vec3 frag_position;
-layout(location = 3) in vec3 view_position;
-layout(location = 4) in vec4 fragpos_dirshadowcaster_lightspace;
-
-layout(location = 0) out vec4 final_color;
-
-layout (set = 0, binding = 1)
-uniform PointLightUniform { PointLight pointlight[MAX_POINTLIGHTS]; };
-
-layout (set = 0, binding = 2)
-uniform SpotLightUniform { SpotLight spotlight[MAX_SPOTLIGHTS]; };
-
-layout (set = 0, binding = 3)
-uniform DirectionalLightUniform { DirectionalLight directionallight[MAX_DIRECTIONALLIGHTS]; };
-
-layout (set = 0, binding = 4)
-uniform LightLengthsUniform { 
-	ivec3 light_length;
-	// light_length.x = pointlight length
-	// light_length.y = spotlight length
-	// light_length.z = directionallight length
+struct VertexOut
+{
+	vec2 texcoord;
+	vec3 vertex_normal;
+	vec3 fragpos;
+	vec3 view_position;
+	vec4 dirshadowcaster_fragpos_lightspace;
 };
 
-layout (set = 0, binding = 5)
-uniform DirectionalShadowCasterUniform 
+struct DirectionalLight
 {
-	DirectionalLight light;
-	mat4 model_matrix;
-	bool exists;
-} directional_shadowcaster;
+	vec3 direction;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+};	
 
-
-
-layout(set = 1, binding = 0) 
-uniform sampler2D ambient;
-
-layout(set = 2, binding = 0) 
-uniform sampler2D diffuse;
-
-layout(set = 3, binding = 0) 
-uniform sampler2D specular;
-
-layout(set = 4, binding = 0) 
-uniform sampler2D normal;
-
-layout(set = 5, binding = 0) 
-uniform sampler2D directional_shadowmap;
-
-
-vec3 calculate_point_light(PointLight light);
-vec3 calculate_directional_light(DirectionalLight light);
-vec3 calculate_spot_light(SpotLight light);
-bool is_in_directional_shadow(vec4 fragpos_lightspace);
-
-void main() 
+struct PointLight
 {
-	const int pointlight_length = light_length.x;
-	const int spotlight_length = light_length.y;
-	const int directionallight_length = light_length.z;
+	vec3 position;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	vec3 attenuation;
+	// attenuation.x = constant
+	// attenuation.y = linear
+	// attenuation.z = quadratic
+};	
 
-	vec3 total_lighting = vec3(0.0);
+struct SpotLight
+{
+	vec3 position;
+	vec3 direction;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	vec3 attenuation;
+	// attenuation.x = constant
+	// attenuation.y = linear
+	// attenuation.z = quadratic
+	vec2 cutoff;
+	// cutoff.x = inner
+	// cutoff.y = outer
+};
 
-	for (int i = 0; i < pointlight_length; i++)
-		total_lighting += calculate_point_light(pointlight[i]);
 
-	for (int i = 0; i < spotlight_length; i++)
-		total_lighting += calculate_spot_light(spotlight[i]);
 
-	for (int i = 0; i < directionallight_length; i++)
-		total_lighting += calculate_directional_light(directionallight[i]);
-		
-	if (directional_shadowcaster.exists) {
-	   if (!is_in_directional_shadow(fragpos_dirshadowcaster_lightspace)) {
-		  total_lighting += calculate_directional_light(directional_shadowcaster.light);
-	   }
-	}
-	
-	final_color = vec4(total_lighting, 1.0);
-}
 
+//TODO Make shadow calculation portable functions!
+#if 0
 bool is_in_directional_shadow(vec4 fragpos_lightspace)
 {
-	vec3 normalized_projection_coords = fragpos_lightspace.xyz / fragpos_lightspace.w;
-	vec3 device_coords = normalized_projection_coords * 0.5 + 0.5;	
-	float closest_depth = texture(directional_shadowmap, device_coords.xy).r;
-	float current_depth = device_coords.z;
-	return current_depth > closest_depth;
+	return false;
 }
-
-#define SHININESS 32
 
 vec3 calculate_point_light(PointLight light)
 {
@@ -201,3 +160,4 @@ vec3 calculate_spot_light(SpotLight light)
 	else
 		return ambient;
 }
+#endif

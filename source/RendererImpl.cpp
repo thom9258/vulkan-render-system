@@ -261,6 +261,7 @@ auto render_geometry_pass(GeometryPass& pass,
 											 commandbuffer,
 											 caster_data,
 											 sorted.materialrenderables);
+			
 		}
 	};
 
@@ -380,6 +381,7 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	shadow_passes.orthographic = OrthographicShadowPass(logger,
 														context,
 														presenter,
+														descriptor_pool,
 														U32Extent{1024, 1024},
 														shaders_root,
 														debug_print);
@@ -387,6 +389,7 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	shadow_passes.perspective = PerspectiveShadowPass(logger,
 													  context,
 													  presenter,
+													  descriptor_pool,
 													  U32Extent{1024, 1024},
 													  shaders_root,
 													  debug_print);

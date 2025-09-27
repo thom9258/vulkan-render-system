@@ -30,6 +30,7 @@ public:
 	ShadowPassTexture& operator=(ShadowPassTexture&& rhs);
 
 	ShadowPassTexture(Render::Context::Impl* context,
+					  DescriptorPool::Impl* descriptor_pool,
 					  U32Extent extent);
 	
 	void transition_readable(vk::CommandBuffer& commandbuffer);
@@ -37,7 +38,11 @@ public:
 	
 	Texture2D texture;
 	vk::UniqueSampler sampler;
+	vk::UniqueImageView view;
+	vk::UniqueDescriptorSet descriptorset;
+	vk::UniqueDescriptorSetLayout descriptorset_layout;
 	ShadowPassTextureState state = ShadowPassTextureState::Writeable;
+
 
 	static const vk::ImageLayout readable_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 	static const vk::ImageLayout writeable_layout = vk::ImageLayout::eTransferDstOptimal;
@@ -54,6 +59,7 @@ public:
 	GenericShadowPass(Logger& logger,
 					  Render::Context::Impl* context,
 					  Presenter::Impl* presenter,
+					  DescriptorPool::Impl* descriptor_pool,
 					  U32Extent extent,
 					  VertexPath vertex_path,
 					  FragmentPath fragment_path,
@@ -120,6 +126,7 @@ public:
 	OrthographicShadowPass(Logger& logger,
 						   Render::Context::Impl* context,
 						   Presenter::Impl* presenter,
+						   DescriptorPool::Impl* descriptor_pool,
 						   U32Extent extent,
 						   std::filesystem::path shader_root_path,
 						   const bool debug_print);
@@ -143,6 +150,7 @@ public:
 	PerspectiveShadowPass(Logger& logger,
 						  Render::Context::Impl* context,
 						  Presenter::Impl* presenter,
+						  DescriptorPool::Impl* descriptor_pool,
 						  U32Extent extent,
 						  std::filesystem::path shader_root_path,
 						  const bool debug_print);

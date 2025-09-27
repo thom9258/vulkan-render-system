@@ -1,6 +1,9 @@
 #include "ShadowPass.hpp"
 
+#include "DescriptorPoolImpl.hpp"
+
 ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
+									 DescriptorPool::Impl* descriptor_pool,
 									 U32Extent extent)
 
 {
@@ -10,16 +13,85 @@ ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
 													extent,
 													TextureFormat::R32Sfloat));
 		
-		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
-		{
-			transition_image_for_color_override(texture.impl->allocated.image.get(),
-												commandbuffer);
-		};
+	auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
+	{
+		transition_image_for_color_override(texture.impl->allocated.image.get(),
+											commandbuffer);
+	};
+	
+	with_buffer_submit(context->device.get(),
+					   context->commandpool.get(),
+					   context->graphics_queue(),
+					   transition_to_transfer_src);
 		
-		with_buffer_submit(context->device.get(),
-						   context->commandpool.get(),
-						   context->graphics_queue(),
-						   transition_to_transfer_src);
+	const auto subresourceRange = vk::ImageSubresourceRange{}
+		.setAspectMask(vk::ImageAspectFlagBits::eColor)
+		.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setBaseArrayLayer(0)
+		.setLayerCount(1);
+
+	const auto componentMapping = vk::ComponentMapping{}
+		.setR(vk::ComponentSwizzle::eIdentity)		
+		.setG(vk::ComponentSwizzle::eIdentity)
+		.setB(vk::ComponentSwizzle::eIdentity)
+		.setA(vk::ComponentSwizzle::eIdentity);
+
+	const auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
+		.setImage(texture.impl->image())
+		.setFormat(texture.impl->format)
+		.setSubresourceRange(subresourceRange)
+		.setViewType(vk::ImageViewType::e2D)
+		.setComponents(componentMapping);
+
+	 view = context->device.get().createImageViewUnique(imageViewCreateInfo);
+	 
+
+	std::array<vk::DescriptorSetLayoutBinding, 1> const layout_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+	};
+	auto layout_createinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(layout_bindings);
+	
+	descriptorset_layout =
+		context->device.get().createDescriptorSetLayoutUnique(layout_createinfo,
+															  nullptr);
+
+	
+	const auto descriptorset_allocate_info = vk::DescriptorSetAllocateInfo{}
+		.setDescriptorPool(descriptor_pool->descriptor_pool.get())
+		.setDescriptorSetCount(1)
+		.setSetLayouts(descriptorset_layout.get());
+	
+	auto createdsets =
+		context->device.get().allocateDescriptorSetsUnique(descriptorset_allocate_info);
+	descriptorset = std::move(createdsets[0]);
+	
+
+	const auto descriptorimage_info = vk::DescriptorImageInfo{}
+		.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+		.setImageView(view.get())
+		.setSampler(sampler.get());
+	
+	const std::array<vk::WriteDescriptorSet, 1> descriptorwrite{
+		vk::WriteDescriptorSet{}
+		.setDstBinding(0)
+		.setDstArrayElement(0)
+		.setDstSet(descriptorset.get())
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+		.setImageInfo(descriptorimage_info),
+	};
+	
+	context->device.get().updateDescriptorSets(descriptorwrite.size(),
+											   descriptorwrite.data(),
+											   0,
+											   nullptr);
 }
 
 ShadowPassTexture::ShadowPassTexture(ShadowPassTexture&& rhs)
@@ -27,6 +99,8 @@ ShadowPassTexture::ShadowPassTexture(ShadowPassTexture&& rhs)
 	std::swap(texture, rhs.texture);
 	std::swap(sampler, rhs.sampler);
 	std::swap(state, rhs.state);
+	std::swap(view, rhs.view);
+	std::swap(descriptorset, rhs.descriptorset);
 }
 
 ShadowPassTexture& ShadowPassTexture::operator=(ShadowPassTexture&& rhs)
@@ -34,6 +108,8 @@ ShadowPassTexture& ShadowPassTexture::operator=(ShadowPassTexture&& rhs)
 	std::swap(texture, rhs.texture);
 	std::swap(sampler, rhs.sampler);
 	std::swap(state, rhs.state);
+	std::swap(view, rhs.view);
+	std::swap(descriptorset, rhs.descriptorset);
 	return *this;
 }
 
@@ -99,12 +175,14 @@ void ShadowPassTexture::transition_readable(vk::CommandBuffer& commandbuffer)
 OrthographicShadowPass::OrthographicShadowPass(Logger& logger,
 											   Render::Context::Impl* context,
 											   Presenter::Impl* presenter,
+											   DescriptorPool::Impl* descriptor_pool,
 											   U32Extent extent,
 											   std::filesystem::path shader_root_path,
 											   const bool debug_print)
 	: GenericShadowPass(logger,
 						context,
 						presenter,
+						descriptor_pool,
 						extent,
 						VertexPath{shader_root_path / "OrthographicDepth.vert.spv"},
 						FragmentPath{shader_root_path / "OrthographicDepth.frag.spv"},
@@ -130,12 +208,14 @@ void OrthographicShadowPass::record(Logger* logger,
 PerspectiveShadowPass::PerspectiveShadowPass(Logger& logger,
 											 Render::Context::Impl* context,
 											 Presenter::Impl* presenter,
+											 DescriptorPool::Impl* descriptor_pool,
 											 U32Extent extent,
 											 std::filesystem::path shader_root_path,
 											 const bool debug_print)
 	: GenericShadowPass(logger,
 						context,
 						presenter,
+						descriptor_pool,
 						extent,
 						VertexPath{shader_root_path / "PerspectiveDepth.vert.spv"},
 						FragmentPath{shader_root_path / "PerspectiveDepth.frag.spv"},
@@ -179,6 +259,7 @@ GenericShadowPass::GenericShadowPass(GenericShadowPass&& rhs)
 GenericShadowPass::GenericShadowPass(Logger& logger,
 									 Render::Context::Impl* context,
 									 Presenter::Impl* presenter,
+									 DescriptorPool::Impl* descriptor_pool,
 									 U32Extent extent,
 									 VertexPath vertex_path,
 									 FragmentPath fragment_path,
@@ -265,7 +346,7 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 	for (FrameTextures& textures: m_framestextures) {
 		/* Setup the rendertarget and its view for the render pass
 		 */
-		textures.colorbuffer = ShadowPassTexture(context, m_extent);
+		textures.colorbuffer = ShadowPassTexture(context, descriptor_pool, m_extent);
 
 		//textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
 		//context,
@@ -661,4 +742,5 @@ void GenericShadowPass::record(Logger* logger,
 	}
 
 	commandbuffer.endRenderPass();
+
 }
