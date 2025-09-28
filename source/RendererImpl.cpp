@@ -335,7 +335,21 @@ auto render_geometry_pass(GeometryPass& pass,
 									  max_frames_in_flight,
 									  texture_info,
 									  sorted.basetextures);
+		
 
+		CurrentFlightFrame const current_flightframe{ current_frame_in_flight };
+		MaxFlightFrames const max_flightframes{ max_frames_in_flight };
+		
+		ShadowPassTexture& dirshadowtexture =
+			shadow_passes.orthographic.get_shadowtexture(current_flightframe);
+
+		MaterialPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture 
+			directional_texture{
+			dirshadowtexture.descriptorset.get(),
+			shadowcasters.directional_caster.value()};
+		
+		MaterialPipeline::MaterialShadowCasters material_shadowcasters{};
+		material_shadowcasters.directional = directional_texture;
 		
 		MaterialPipeline::FrameInfo material_frame_info{};
 		material_frame_info.view = world_info.view;
@@ -346,11 +360,11 @@ auto render_geometry_pass(GeometryPass& pass,
 								   device,
 								   descriptor_pool,
 								   commandbuffer,
-								   CurrentFlightFrame{current_frame_in_flight},
-								   MaxFlightFrames{max_frames_in_flight},
+								   current_flightframe,
+								   max_flightframes,
 								   sorted.materialrenderables,
 								   lights,
-								   shadowcasters);
+								   material_shadowcasters);
 
 		commandbuffer.endRenderPass();
 	};

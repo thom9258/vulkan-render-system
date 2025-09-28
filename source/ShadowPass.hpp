@@ -33,8 +33,8 @@ public:
 					  DescriptorPool::Impl* descriptor_pool,
 					  U32Extent extent);
 	
-	void transition_readable(vk::CommandBuffer& commandbuffer);
-	void transition_writeable(vk::CommandBuffer& commandbuffer);
+	void record_transition_readable(vk::CommandBuffer& commandbuffer);
+	void record_transition_writeable(vk::CommandBuffer& commandbuffer);
 	
 	Texture2D texture;
 	vk::UniqueSampler sampler;
@@ -79,6 +79,9 @@ public:
 				vk::CommandBuffer& commandbuffer,
 				CameraUniformData camera_data,
 				std::vector<MaterialRenderable>& renderables);
+	
+	auto get_shadowtexture(CurrentFlightFrame current_flightframe)
+		-> ShadowPassTexture&;
 
 private:
 	U32Extent m_extent;
@@ -139,6 +142,9 @@ public:
 				vk::CommandBuffer& commandbuffer,
 				CameraUniformData camera_data,
 				std::vector<MaterialRenderable>& renderables);
+	
+	auto get_shadowtexture(CurrentFlightFrame current_flightframe)
+		-> ShadowPassTexture&;
 };
 
 class PerspectiveShadowPass 
@@ -163,5 +169,8 @@ public:
 				vk::CommandBuffer& commandbuffer,
 				CameraUniformData camera_data,
 				std::vector<MaterialRenderable>& renderables);
+
+	auto get_shadowtexture(CurrentFlightFrame current_flightframe)
+		-> ShadowPassTexture&;
 };
 

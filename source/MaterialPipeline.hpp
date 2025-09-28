@@ -63,6 +63,24 @@ struct MaterialPipeline
 		glm::vec3 camera_position;
 	};
 	
+	struct MaterialShadowCasters
+	{
+		struct DirectionalShadowCasterTexture
+		{
+			vk::DescriptorSet descriptorset;
+			DirectionalShadowCaster caster;
+		};
+		std::optional<DirectionalShadowCasterTexture> directional;
+		
+
+		struct SpotShadowCasterTexture
+		{
+			vk::DescriptorSet descriptorset;
+			SpotShadowCaster caster;
+		};
+		std::vector<SpotShadowCasterTexture> spots;
+	};
+	
 	void render(FrameInfo& frame_info,
 				Logger& logger,
 				vk::Device& device,
@@ -72,7 +90,7 @@ struct MaterialPipeline
 				MaxFlightFrames const max_frames_in_flight,
 				std::vector<MaterialRenderable>& renderables,
 				std::vector<Light>& lights,
-				ShadowCasters shadowcasters);
+				MaterialShadowCasters shadowcasters);
 
 	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
 	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
@@ -104,6 +122,7 @@ private:
 	static constexpr size_t camera_uniform_count = 1;
 	static constexpr size_t lightarray_lengths_count = 1;
 	static constexpr size_t directional_shadowcasters_count = 1;
+	static constexpr uint32_t directional_shadowcaster_set_index = 5;
 
 	static constexpr size_t max_pointlights = 10;
 	static constexpr size_t max_spotlights = 10;
@@ -129,7 +148,6 @@ private:
 	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
 	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
 
-	//TODO: this should be in GlobalSetUniform
-	TextureDescriptor<DescriptorSetIndex{5}> directional_shadowmap;
+	vk::UniqueDescriptorSetLayout m_directional_shadowmap_layout;
 };
 

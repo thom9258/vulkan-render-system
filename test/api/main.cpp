@@ -70,9 +70,9 @@ auto rotation_from_direction(glm::vec3 direction)
 
 
 
-constexpr bool slowframes = false;
-constexpr bool printframerate = false;
-constexpr size_t printframerateinterval = 100;
+constexpr bool slowframes = true;
+constexpr bool printframerate = true;
+constexpr size_t printframerateinterval = 1;
 
 std::vector<VertexPosNormColor> triangle_vertices = {
 	{{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},

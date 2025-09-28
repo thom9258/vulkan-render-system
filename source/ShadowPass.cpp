@@ -113,7 +113,7 @@ ShadowPassTexture& ShadowPassTexture::operator=(ShadowPassTexture&& rhs)
 	return *this;
 }
 
-void ShadowPassTexture::transition_writeable(vk::CommandBuffer& commandbuffer)
+void ShadowPassTexture::record_transition_writeable(vk::CommandBuffer& commandbuffer)
 {
 	if (state != ShadowPassTextureState::Readable)
 		throw std::runtime_error("ShadowPassTexture state is already Writeable!");
@@ -142,7 +142,7 @@ void ShadowPassTexture::transition_writeable(vk::CommandBuffer& commandbuffer)
 }
 
 
-void ShadowPassTexture::transition_readable(vk::CommandBuffer& commandbuffer)
+void ShadowPassTexture::record_transition_readable(vk::CommandBuffer& commandbuffer)
 {
 	if (state != ShadowPassTextureState::Writeable)
 		throw std::runtime_error("ShadowPassTexture state is already Readable!");
@@ -205,6 +205,13 @@ void OrthographicShadowPass::record(Logger* logger,
 							  renderables);
 }
 
+auto OrthographicShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)
+	-> ShadowPassTexture&
+{
+	return GenericShadowPass::get_shadowtexture(current_flightframe);
+}
+
+
 PerspectiveShadowPass::PerspectiveShadowPass(Logger& logger,
 											 Render::Context::Impl* context,
 											 Presenter::Impl* presenter,
@@ -237,6 +244,14 @@ void PerspectiveShadowPass::record(Logger* logger,
 							  camera_data,
 							  renderables);
 }
+
+auto PerspectiveShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)
+	-> ShadowPassTexture&
+{
+	return GenericShadowPass::get_shadowtexture(current_flightframe);
+}
+
+
 
 GenericShadowPass& GenericShadowPass::operator=(GenericShadowPass&& rhs)
 {
@@ -656,6 +671,13 @@ void GenericShadowPass::record(Logger* logger,
 		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
 	};
 	
+	if (m_framestextures[current_flightframe.get()].colorbuffer.state 
+		!= ShadowPassTextureState::Writeable)
+		{
+			m_framestextures[current_flightframe.get()]
+				.colorbuffer.record_transition_writeable(commandbuffer);
+		}
+	
 	const auto renderPassInfo = vk::RenderPassBeginInfo{}
 		.setRenderPass(m_renderpass.get())
 		.setFramebuffer(m_framestextures[current_flightframe.get()].framebuffer.get())
@@ -740,7 +762,15 @@ void GenericShadowPass::record(Logger* logger,
 						   firstVertex,
 						   firstInstance);
 	}
-
+	
 	commandbuffer.endRenderPass();
 
+	m_framestextures[current_flightframe.get()]
+		.colorbuffer.record_transition_readable(commandbuffer);
+}
+
+auto GenericShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)
+	-> ShadowPassTexture&
+{
+	return m_framestextures[current_flightframe.get()].colorbuffer;
 }

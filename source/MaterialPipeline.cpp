@@ -259,13 +259,31 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 															  nullptr);
 	
 	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
+	
 
-	std::array<vk::DescriptorSetLayout, 5> const descriptorset_layouts{
+	std::array<vk::DescriptorSetLayoutBinding, 1> directional_shadowmap_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+	};
+	auto directional_shadowmap_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(directional_shadowmap_bindings);
+	
+	m_directional_shadowmap_layout =
+		context->device.get().createDescriptorSetLayoutUnique(directional_shadowmap_setinfo,
+															  nullptr);
+
+
+	std::array<vk::DescriptorSetLayout, 6> const descriptorset_layouts{
 		m_global_set_layout.get(),
 		m_ambient.layout.get(),
 		m_diffuse.layout.get(),
 		m_specular.layout.get(),
 		m_normal.layout.get(),
+		m_directional_shadowmap_layout.get(),
 	};
 
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
@@ -554,7 +572,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							  MaxFlightFrames const max_frames_in_flight,
 							  std::vector<MaterialRenderable>& renderables,
 							  std::vector<Light>& lights,
-							  ShadowCasters shadowcasters)
+							  MaterialShadowCasters shadowcasters)
 {
 	if (!m_ambient.sets.contains(&m_ambient.default_texture)) {
 		m_ambient.sets.insert({&m_ambient.default_texture,
@@ -653,8 +671,8 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 				msg.c_str());
 #endif	
 	
-	if (shadowcasters.directional_caster.has_value()) {
-		DirectionalShadowCasterUniformData data(shadowcasters.directional_caster.value());
+	if (shadowcasters.directional.has_value()) {
+		DirectionalShadowCasterUniformData data(shadowcasters.directional.value().caster);
 		m_global_set_uniforms[*current_flightframe]
 			.directional_shadowcaster.write(device,
 											&data,
@@ -817,6 +835,21 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 											 0,
 											 nullptr);
 			last_normal_texture = normal_texture;
+			
+
+
+			if (shadowcasters.directional.has_value()) {
+				std::array<vk::DescriptorSet, 1> descriptorset{
+					shadowcasters.directional.value().descriptorset
+				};
+				commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+												 m_layout.get(),
+												 directional_shadowcaster_set_index,
+												 descriptorset.size(),
+												 descriptorset.data(),
+												 0,
+												 nullptr);
+			}
 		}
 	
 		PushConstants push{};
