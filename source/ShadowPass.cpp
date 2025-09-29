@@ -12,7 +12,7 @@ ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
 													context,
 													extent,
 													TextureFormat::R32Sfloat));
-		
+
 	auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
 	{
 		transition_image_for_color_override(texture.impl->allocated.image.get(),
@@ -43,9 +43,34 @@ ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
 		.setSubresourceRange(subresourceRange)
 		.setViewType(vk::ImageViewType::e2D)
 		.setComponents(componentMapping);
+	view = context->device.get().createImageViewUnique(imageViewCreateInfo);
+	
+	const auto properties = context->physical_device.getProperties();
+	const auto has_anisotropy = true; // TODO: set this from device
+	const auto max_anisotropy = has_anisotropy
+		? std::min(4.0f, properties.limits.maxSamplerAnisotropy)
+		: 1.0f;
+	
+	vk::Filter const filter = vk::Filter::eLinear;
+	vk::SamplerMipmapMode const mipmap_filter = vk::SamplerMipmapMode::eLinear;
 
-	 view = context->device.get().createImageViewUnique(imageViewCreateInfo);
-	 
+	const auto sampler_info = vk::SamplerCreateInfo{}
+		.setMagFilter(filter)
+		.setMinFilter(filter)
+		.setAddressModeU(vk::SamplerAddressMode::eRepeat)
+		.setAddressModeV(vk::SamplerAddressMode::eRepeat)
+		.setAddressModeW(vk::SamplerAddressMode::eRepeat)
+		.setAnisotropyEnable(has_anisotropy)
+		.setMaxAnisotropy(max_anisotropy)
+		.setBorderColor(vk::BorderColor::eIntOpaqueBlack)
+		.setUnnormalizedCoordinates(false)
+		.setCompareEnable(false)
+		.setCompareOp(vk::CompareOp::eAlways)
+		.setMipmapMode(mipmap_filter)
+		.setMipLodBias(0.0f)
+		.setMinLod(0.0f)
+		.setMaxLod(0.0f);
+	sampler = context->device.get().createSamplerUnique(sampler_info);
 
 	std::array<vk::DescriptorSetLayoutBinding, 1> const layout_bindings{
 		vk::DescriptorSetLayoutBinding{}
@@ -62,7 +87,6 @@ ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
 		context->device.get().createDescriptorSetLayoutUnique(layout_createinfo,
 															  nullptr);
 
-	
 	const auto descriptorset_allocate_info = vk::DescriptorSetAllocateInfo{}
 		.setDescriptorPool(descriptor_pool->descriptor_pool.get())
 		.setDescriptorSetCount(1)
@@ -112,65 +136,6 @@ ShadowPassTexture& ShadowPassTexture::operator=(ShadowPassTexture&& rhs)
 	std::swap(descriptorset, rhs.descriptorset);
 	return *this;
 }
-
-void ShadowPassTexture::record_transition_writeable(vk::CommandBuffer& commandbuffer)
-{
-	if (state != ShadowPassTextureState::Readable)
-		throw std::runtime_error("ShadowPassTexture state is already Writeable!");
-
-    auto range = vk::ImageSubresourceRange{}
-		.setAspectMask(vk::ImageAspectFlagBits::eColor)
-		.setBaseMipLevel(0)
-		.setLevelCount(1)
-		.setBaseArrayLayer(0)
-		.setLayerCount(1);
-
-	auto barrier = vk::ImageMemoryBarrier{}
-		.setOldLayout(readable_layout)
-		.setNewLayout(writeable_layout)
-		.setImage(texture.impl->image())
-		.setSubresourceRange(range)
-		.setSrcAccessMask(vk::AccessFlags())
-		.setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
-
-    commandbuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-								  vk::PipelineStageFlagBits::eTransfer,
-								  vk::DependencyFlags(),
-								  nullptr,
-								  nullptr,
-								  barrier);
-}
-
-
-void ShadowPassTexture::record_transition_readable(vk::CommandBuffer& commandbuffer)
-{
-	if (state != ShadowPassTextureState::Writeable)
-		throw std::runtime_error("ShadowPassTexture state is already Readable!");
-
-    auto range = vk::ImageSubresourceRange{}
-		.setAspectMask(vk::ImageAspectFlagBits::eColor)
-		.setBaseMipLevel(0)
-		.setLevelCount(1)
-		.setBaseArrayLayer(0)
-		.setLayerCount(1);
-
-	auto barrier = vk::ImageMemoryBarrier{}
-		.setOldLayout(writeable_layout)
-		.setNewLayout(readable_layout)
-		.setImage(texture.impl->image())
-		.setSubresourceRange(range)
-		.setSrcAccessMask(vk::AccessFlags())
-		.setDstAccessMask(vk::AccessFlagBits::eTransferRead);
-
-    commandbuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-								  vk::PipelineStageFlagBits::eTransfer,
-								  vk::DependencyFlags(),
-								  nullptr,
-								  nullptr,
-								  barrier);
-}
-
-
 
 OrthographicShadowPass::OrthographicShadowPass(Logger& logger,
 											   Render::Context::Impl* context,
@@ -298,7 +263,7 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 		// NOTE these are important, as they determine the layout of the image before and after
 		// the renderpass
 		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
     const auto depth_attachment = vk::AttachmentDescription{}
 		.setFlags(vk::AttachmentDescriptionFlags())
@@ -671,13 +636,6 @@ void GenericShadowPass::record(Logger* logger,
 		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
 	};
 	
-	if (m_framestextures[current_flightframe.get()].colorbuffer.state 
-		!= ShadowPassTextureState::Writeable)
-		{
-			m_framestextures[current_flightframe.get()]
-				.colorbuffer.record_transition_writeable(commandbuffer);
-		}
-	
 	const auto renderPassInfo = vk::RenderPassBeginInfo{}
 		.setRenderPass(m_renderpass.get())
 		.setFramebuffer(m_framestextures[current_flightframe.get()].framebuffer.get())
@@ -764,9 +722,6 @@ void GenericShadowPass::record(Logger* logger,
 	}
 	
 	commandbuffer.endRenderPass();
-
-	m_framestextures[current_flightframe.get()]
-		.colorbuffer.record_transition_readable(commandbuffer);
 }
 
 auto GenericShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)

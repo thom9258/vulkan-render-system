@@ -70,9 +70,9 @@ auto rotation_from_direction(glm::vec3 direction)
 
 
 
-constexpr bool slowframes = true;
-constexpr bool printframerate = true;
-constexpr size_t printframerateinterval = 1;
+constexpr bool slowframes = false;
+constexpr bool printframerate = false;
+constexpr size_t printframerateinterval = 30;
 
 std::vector<VertexPosNormColor> triangle_vertices = {
 	{{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
@@ -246,7 +246,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 
 		if (type == "directional") {
 			DirectionalLight p;
-			p.direction = parse_vec3(obj["direction"]);
+			p.direction = glm::normalize(parse_vec3(obj["direction"]));
 			p.ambient = parse_vec3(obj["ambient"]);
 			p.specular = parse_vec3(obj["specular"]);
 			p.diffuse = parse_vec3(obj["diffuse"]);

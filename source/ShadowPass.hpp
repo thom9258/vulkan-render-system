@@ -33,9 +33,6 @@ public:
 					  DescriptorPool::Impl* descriptor_pool,
 					  U32Extent extent);
 	
-	void record_transition_readable(vk::CommandBuffer& commandbuffer);
-	void record_transition_writeable(vk::CommandBuffer& commandbuffer);
-	
 	Texture2D texture;
 	vk::UniqueSampler sampler;
 	vk::UniqueImageView view;

@@ -22,7 +22,7 @@ DirectionalShadowCasterUniformData::DirectionalShadowCasterUniformData(
 	, ambient{caster.light().ambient}
 	, diffuse{caster.light().diffuse}
 	, specular{caster.light().specular}
-	, model_matrix{caster.model()}
+	, viewproj_matrix{caster.projection().get() * caster.view()}
 	, exists{true}
 {}
 

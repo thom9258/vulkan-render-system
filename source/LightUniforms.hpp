@@ -75,7 +75,7 @@ struct DirectionalShadowCasterUniformData
 	float _padding3{1.0f};
 	glm::vec3 specular;
 	float _padding4{1.0f};
-	glm::mat4 model_matrix;
+	glm::mat4 viewproj_matrix;
 	int exists{false};
 	float _padding5[3];
 	

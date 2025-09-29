@@ -35,7 +35,7 @@ layout (set = 0, binding = 5)
 uniform DirectionalShadowCasterUniform 
 {
 	DirectionalLight light;
-	mat4 model_matrix;
+	mat4 viewproj_matrix;
 	bool exists;
 } directional_shadowcaster;
 
@@ -50,9 +50,9 @@ void main()
 	 // world space vertex normal from model space vertex normal
 	 out_vertex_normal = mat3(transpose(inverse(push.model))) * vertex_normal;   
 	 out_fragpos = vec3(push.model * vec4(vertex_position, 1.0));
+ 	 out_view_position = vec3(global.camera_position);
 
 	 out_dirshadowcaster_fragpos_lightspace =
-	     directional_shadowcaster.model_matrix * vec4(vertex_position, 1.0);
+	     directional_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
 		 
- 	 out_view_position = vec3(global.camera_position);
 }
