@@ -35,7 +35,7 @@ layout (set = 0, binding = 5)
 uniform DirectionalShadowCasterUniform 
 {
 	DirectionalLight light;
-	mat4 model_matrix;
+	mat4 viewproj_matrix;
 	bool exists;
 } directional_shadowcaster;
 
@@ -76,28 +76,47 @@ void main()
 	for (int i = 0; i < spotlight_length; i++)
 		total_lighting += calculate_spot_light(spotlight[i]);
 
-	for (int i = 0; i < directionallight_length; i++)
+	for (int i = 0; i < directionallight_length; i++) {
 		total_lighting += calculate_directional_light(directionallight[i]);
-		
+	}
+
+	vec3 in_light = vec3(1.0, 1.0, 1.0);
+	vec3 in_shadow = vec3(0.0, 0.0, 0.0);
 	if (directional_shadowcaster.exists) {
+#if 0
+	   if (!is_in_directional_shadow(fragpos_dirshadowcaster_lightspace)) {
+	   		final_color = vec4(in_light, 1.0);
+	   }
+	   else {
+	   		final_color = vec4(in_shadow, 1.0);
+	   }
+
+#else		
 	   if (!is_in_directional_shadow(fragpos_dirshadowcaster_lightspace)) {
 		  total_lighting += calculate_directional_light(directional_shadowcaster.light);
 	   }
 	}
-	
+
 	final_color = vec4(total_lighting, 1.0);
+#endif
 }
+
+#define SHADOW_BIAS 0.005 
+#define SHININESS 32
 
 bool is_in_directional_shadow(vec4 fragpos_lightspace)
 {
-	vec3 normalized_projection_coords = fragpos_lightspace.xyz / fragpos_lightspace.w;
-	vec3 device_coords = normalized_projection_coords * 0.5 + 0.5;	
-	float closest_depth = texture(directional_shadowmap, device_coords.xy).r;
-	float current_depth = device_coords.z;
-	return current_depth > closest_depth;
+	vec3 projection_coords = fragpos_lightspace.xyz / fragpos_lightspace.w;
+	if (projection_coords.z > 1.0)
+	   return false;
+
+    // in vulkan only x and y needs to be converted as z is already from [0,1]
+	vec2 tex_coords = projection_coords.xy * 0.5 + 0.5;
+	float closest_depth = texture(directional_shadowmap, tex_coords).r;
+	float current_depth = projection_coords.z;
+	return (current_depth - SHADOW_BIAS) > closest_depth;
 }
 
-#define SHININESS 32
 
 vec3 calculate_point_light(PointLight light)
 {

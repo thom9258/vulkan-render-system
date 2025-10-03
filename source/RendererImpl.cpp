@@ -388,6 +388,11 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	, logger(logger)
 	, descriptor_pool(descriptor_pool)
 {
+	
+
+	U32Extent constexpr shadow_extent{1024, 1024};
+	//U32Extent constexpr shadow_extent{256, 256};
+
 	//TODO: Allow extent to be set externally
 	//TODO: Allow debug print to be set externally
 	vk::Extent2D const render_extent = context->get_window_extent();
@@ -396,7 +401,7 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 														context,
 														presenter,
 														descriptor_pool,
-														U32Extent{1024, 1024},
+														shadow_extent,
 														shaders_root,
 														debug_print);
 
@@ -404,7 +409,7 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 													  context,
 													  presenter,
 													  descriptor_pool,
-													  U32Extent{1024, 1024},
+													  shadow_extent,
 													  shaders_root,
 													  debug_print);
 
