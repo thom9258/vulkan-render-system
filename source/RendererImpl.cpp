@@ -238,8 +238,6 @@ auto render_geometry_pass(GeometryPass& pass,
 		std::optional<OrthographicShadowPass::CameraUniformData> ortho_caster_data;
 		if (shadowcasters.directional_caster.has_value()) {
 			ortho_caster_data.emplace();
-			if (!ortho_caster_data.has_value())
-				std::cout << "Could not emplace ortho caster data!" << std::endl;
 			DirectionalShadowCaster& dircaster = shadowcasters.directional_caster.value();
 			ortho_caster_data.value().view = dircaster.view();
 			ortho_caster_data.value().proj = dircaster.projection().get();
@@ -256,8 +254,6 @@ auto render_geometry_pass(GeometryPass& pass,
 		std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
 		if (shadowcasters.spot_caster.has_value()) {
 			pers_caster_data.emplace();
-			if (!pers_caster_data.has_value())
-				std::cout << "Could not emplace pers caster data!" << std::endl;
 			SpotShadowCaster& spotcaster = shadowcasters.spot_caster.value();
 			pers_caster_data.value().view = spotcaster.view();
 			pers_caster_data.value().proj = spotcaster.projection().get();

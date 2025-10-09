@@ -9,7 +9,7 @@ Required Features:
 - [X] Pimpl Abstraction Interface.
 - [X] Model & Texture support - includes loaders and renderer handling.
 - [X] LightCasters - support basic untextured lights (directional, point, spot)
-- [ ] Shadowmaps - simple support for a static amount of shadow maps (2-4) is fine.
+- [X] Shadowmaps - simple support for a single directional and spot light.
 - [ ] Animated meshes - limit support to gltf models.
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Add a gpu physical device selection method.
@@ -17,6 +17,7 @@ Required Features:
 - [ ] Windows support.
    
 Optional Features:
+- [ ] Shadowmaps - multiple spot lights.
 - [ ] Fix point interpolation for textures.
 - [ ] Fix screen extent and render extents, so they are disconnected.
 - [ ] Model tinting for post-lighting manipulation (useful for dark/light models).
