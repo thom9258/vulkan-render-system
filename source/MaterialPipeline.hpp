@@ -68,17 +68,16 @@ struct MaterialPipeline
 		struct DirectionalShadowCasterTexture
 		{
 			vk::DescriptorSet descriptorset;
-			DirectionalShadowCaster caster;
+			std::optional<DirectionalShadowCaster> caster;
 		};
-		std::optional<DirectionalShadowCasterTexture> directional;
-		
+		DirectionalShadowCasterTexture directional;
 
 		struct SpotShadowCasterTexture
 		{
 			vk::DescriptorSet descriptorset;
-			SpotShadowCaster caster;
+			std::optional<SpotShadowCaster> caster;
 		};
-		std::vector<SpotShadowCasterTexture> spots;
+		SpotShadowCasterTexture spot;
 	};
 	
 	void render(FrameInfo& frame_info,
@@ -122,7 +121,10 @@ private:
 	static constexpr size_t camera_uniform_count = 1;
 	static constexpr size_t lightarray_lengths_count = 1;
 	static constexpr size_t directional_shadowcasters_count = 1;
+	static constexpr size_t spot_shadowcasters_count = 1;
+
 	static constexpr uint32_t directional_shadowcaster_set_index = 5;
+	static constexpr uint32_t spot_shadowcaster_set_index = 6;
 
 	static constexpr size_t max_pointlights = 10;
 	static constexpr size_t max_spotlights = 10;
@@ -137,6 +139,7 @@ private:
 		UniformMemoryDirectWrite<DirectionalLightUniformData> directionallight; 
 		UniformMemoryDirectWrite<LightArrayLengthsUniformData> lightarray_lengths; 
 		UniformMemoryDirectWrite<DirectionalShadowCasterUniformData> directional_shadowcaster; 
+		UniformMemoryDirectWrite<SpotShadowCasterUniformData> spot_shadowcaster; 
 	};
 	
 	vk::UniqueDescriptorSetLayout m_global_set_layout;
@@ -149,5 +152,6 @@ private:
 	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
 
 	vk::UniqueDescriptorSetLayout m_directional_shadowmap_layout;
+	vk::UniqueDescriptorSetLayout m_spot_shadowmap_layout;
 };
 

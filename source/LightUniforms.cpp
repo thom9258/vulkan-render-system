@@ -16,16 +16,6 @@ DirectionalLightUniformData& DirectionalLightUniformData::operator=(DirectionalL
 	return *this;
 }
 
-DirectionalShadowCasterUniformData::DirectionalShadowCasterUniformData(
-    DirectionalShadowCaster caster)
-	: direction{caster.light().direction}
-	, ambient{caster.light().ambient}
-	, diffuse{caster.light().diffuse}
-	, specular{caster.light().specular}
-	, viewproj_matrix{caster.projection().get() * caster.view()}
-	, exists{true}
-{}
-
 PointLightUniformData::PointLightUniformData(PointLight light)
 	: position{light.position}
 	, ambient{light.ambient}
@@ -76,3 +66,31 @@ SpotLightUniformData& SpotLightUniformData::operator=(SpotLight light)
 	cutoff_outer = light.cutoff.outer;
 	return *this;
 }
+
+DirectionalShadowCasterUniformData::DirectionalShadowCasterUniformData(
+    DirectionalShadowCaster caster)
+	: direction{caster.light().direction}
+	, ambient{caster.light().ambient}
+	, diffuse{caster.light().diffuse}
+	, specular{caster.light().specular}
+	, viewproj_matrix{caster.projection().get() * caster.view()}
+	, exists{true}
+{}
+
+SpotShadowCasterUniformData::SpotShadowCasterUniformData(
+    SpotShadowCaster caster)
+	: position{caster.light().position}
+	, direction{caster.light().direction}
+	, ambient{caster.light().ambient}
+	, diffuse{caster.light().diffuse}
+	, specular{caster.light().specular}
+	, attenuation_constant(caster.light().attenuation.constant)
+	, attenuation_linear(caster.light().attenuation.linear)
+	, attenuation_quadratic(caster.light().attenuation.quadratic)
+	, cutoff_inner(caster.light().cutoff.inner)
+	, cutoff_outer(caster.light().cutoff.outer)
+	, viewproj_matrix{caster.projection().get() * caster.view()}
+	, exists{true}
+{}
+
+

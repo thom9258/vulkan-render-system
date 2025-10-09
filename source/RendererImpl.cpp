@@ -235,34 +235,41 @@ auto render_geometry_pass(GeometryPass& pass,
 
 	auto generate_shadow_passes = [&] (vk::CommandBuffer& commandbuffer) 
 	{
-		//TODO: have multiple directional casters
+		std::optional<OrthographicShadowPass::CameraUniformData> ortho_caster_data;
 		if (shadowcasters.directional_caster.has_value()) {
-			DirectionalShadowCaster& caster = shadowcasters.directional_caster.value();
-			OrthographicShadowPass::CameraUniformData caster_data;
-			caster_data.view = caster.view();
-			caster_data.proj = caster.projection().get();
-			shadow_passes.orthographic.record(logger,
-											  device,
-											  CurrentFlightFrame{current_frame_in_flight},
-											  commandbuffer,
-											  caster_data,
-											  sorted.materialrenderables);
+			ortho_caster_data.emplace();
+			if (!ortho_caster_data.has_value())
+				std::cout << "Could not emplace ortho caster data!" << std::endl;
+			DirectionalShadowCaster& dircaster = shadowcasters.directional_caster.value();
+			ortho_caster_data.value().view = dircaster.view();
+			ortho_caster_data.value().proj = dircaster.projection().get();
 		}
 
-		//TODO: have multiple directional casters
-		if (!shadowcasters.spot_casters.empty()) {
-			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
-			PerspectiveShadowPass::CameraUniformData caster_data;
-			caster_data.view = caster.view();
-			caster_data.proj = caster.projection().get();
-			shadow_passes.perspective.record(logger,
-											 device,
-											 CurrentFlightFrame{current_frame_in_flight},
-											 commandbuffer,
-											 caster_data,
-											 sorted.materialrenderables);
-			
+		shadow_passes.orthographic.record(logger,
+										  device,
+										  CurrentFlightFrame{current_frame_in_flight},
+										  commandbuffer,
+										  ortho_caster_data,
+										  sorted.materialrenderables);
+		
+		
+		std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
+		if (shadowcasters.spot_caster.has_value()) {
+			pers_caster_data.emplace();
+			if (!pers_caster_data.has_value())
+				std::cout << "Could not emplace pers caster data!" << std::endl;
+			SpotShadowCaster& spotcaster = shadowcasters.spot_caster.value();
+			pers_caster_data.value().view = spotcaster.view();
+			pers_caster_data.value().proj = spotcaster.projection().get();
 		}
+
+		//TODO: have multiple spot casters
+		shadow_passes.perspective.record(logger,
+										 device,
+										 CurrentFlightFrame{current_frame_in_flight},
+										 commandbuffer,
+										 pers_caster_data,
+										 sorted.materialrenderables);
 	};
 
 	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier
@@ -340,16 +347,25 @@ auto render_geometry_pass(GeometryPass& pass,
 		CurrentFlightFrame const current_flightframe{ current_frame_in_flight };
 		MaxFlightFrames const max_flightframes{ max_frames_in_flight };
 		
+
 		ShadowPassTexture& dirshadowtexture =
 			shadow_passes.orthographic.get_shadowtexture(current_flightframe);
-
+		
 		MaterialPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture 
 			directional_texture{
 			dirshadowtexture.descriptorset.get(),
-			shadowcasters.directional_caster.value()};
-		
-		MaterialPipeline::MaterialShadowCasters material_shadowcasters{};
-		material_shadowcasters.directional = directional_texture;
+			shadowcasters.directional_caster};
+
+		ShadowPassTexture& spotshadowtexture =
+			shadow_passes.perspective.get_shadowtexture(current_flightframe);
+		MaterialPipeline::MaterialShadowCasters::SpotShadowCasterTexture 
+			spot_texture{
+			spotshadowtexture.descriptorset.get(),
+			shadowcasters.spot_caster};
+
+		MaterialPipeline::MaterialShadowCasters material_shadowcasters{
+			directional_texture,
+			spot_texture};
 		
 		MaterialPipeline::FrameInfo material_frame_info{};
 		material_frame_info.view = world_info.view;

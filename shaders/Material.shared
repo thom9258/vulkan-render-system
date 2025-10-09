@@ -3,15 +3,6 @@
 #define MAX_DIRECTIONALLIGHTS 10
 #define SHININESS 32
 
-struct VertexOut
-{
-	vec2 texcoord;
-	vec3 vertex_normal;
-	vec3 fragpos;
-	vec3 view_position;
-	vec4 dirshadowcaster_fragpos_lightspace;
-};
-
 struct DirectionalLight
 {
 	vec3 direction;

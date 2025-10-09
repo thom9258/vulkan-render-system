@@ -7,15 +7,12 @@ layout(location = 1) in vec3 vertex_normal;
 layout(location = 2) in vec3 vertex_color;
 layout(location = 3) in vec2 vertex_texcoord;
 
-#if 0
-layout(location = 0) out VertexOut out;
-#endif
-
 layout(location = 0) out vec2 out_texcoord;
-layout(location = 1) out vec3 out_vertex_normal;
+layout(location = 1) out vec3 out_normal;
 layout(location = 2) out vec3 out_fragpos;
 layout(location = 3) out vec3 out_view_position;
-layout(location = 4) out vec4 out_dirshadowcaster_fragpos_lightspace;
+layout(location = 4) out vec4 out_dirshadowcaster_lightspace_fragpos;
+layout(location = 5) out vec4 out_spotshadowcaster_lightspace_fragpos;
 
 layout( push_constant )
 uniform constants
@@ -39,6 +36,15 @@ uniform DirectionalShadowCasterUniform
 	bool exists;
 } directional_shadowcaster;
 
+layout (set = 0, binding = 6)
+uniform SpotShadowCasterUniform 
+{
+	SpotLight light;
+	mat4 viewproj_matrix;
+	bool exists;
+} spot_shadowcaster;
+
+
 
 void main()
 {
@@ -48,11 +54,13 @@ void main()
 	 out_texcoord = vertex_texcoord;
 
 	 // world space vertex normal from model space vertex normal
-	 out_vertex_normal = mat3(transpose(inverse(push.model))) * vertex_normal;   
+	 out_normal = mat3(transpose(inverse(push.model))) * vertex_normal;   
 	 out_fragpos = vec3(push.model * vec4(vertex_position, 1.0));
  	 out_view_position = vec3(global.camera_position);
 
-	 out_dirshadowcaster_fragpos_lightspace =
+	 out_dirshadowcaster_lightspace_fragpos =
 	     directional_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
 		 
+	 out_spotshadowcaster_lightspace_fragpos =
+	     spot_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
 }

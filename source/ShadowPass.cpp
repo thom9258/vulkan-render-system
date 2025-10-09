@@ -159,7 +159,7 @@ void OrthographicShadowPass::record(Logger* logger,
 									vk::Device& device,
 									CurrentFlightFrame current_flightframe,
 									vk::CommandBuffer& commandbuffer,
-									CameraUniformData camera_data,
+									std::optional<CameraUniformData> camera_data,
 									std::vector<MaterialRenderable>& renderables)
 {
 	GenericShadowPass::record(logger,
@@ -199,7 +199,7 @@ void PerspectiveShadowPass::record(Logger* logger,
 								   vk::Device& device,
 								   CurrentFlightFrame current_flightframe,
 								   vk::CommandBuffer& commandbuffer,
-								   CameraUniformData camera_data,
+								   std::optional<CameraUniformData> camera_data,
 								   std::vector<MaterialRenderable>& renderables)
 {
 	GenericShadowPass::record(logger,
@@ -439,7 +439,9 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 		.setDepthClampEnable(false)
 		.setRasterizerDiscardEnable(false)
 		.setPolygonMode(vk::PolygonMode::eFill)
-		.setCullMode(vk::CullModeFlagBits::eBack)
+		//NOTE we cull front faces so we draw backfaces to the shadow depth.
+		//     this helps with peter panning where shadows makes objects seem to float.
+		.setCullMode(vk::CullModeFlagBits::eFront)
 		.setFrontFace(vk::FrontFace::eCounterClockwise)
 		.setDepthBiasEnable(false)
 		.setDepthBiasConstantFactor(0.0f)
@@ -624,7 +626,7 @@ void GenericShadowPass::record(Logger* logger,
 							   vk::Device& device,
 							   CurrentFlightFrame current_flightframe,
 							   vk::CommandBuffer& commandbuffer,
-							   CameraUniformData camera_data,
+							   std::optional<CameraUniformData> camera_data,
 							   std::vector<MaterialRenderable>& renderables)
 {
  	const auto render_area = vk::Rect2D{}
@@ -668,59 +670,61 @@ void GenericShadowPass::record(Logger* logger,
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.pipeline.get());
 
-	copy_to_allocated_memory(device,
-							 m_pipeline.descriptor_memories[current_flightframe.get()],
-							 reinterpret_cast<void*>(&camera_data),
-							 sizeof(camera_data));
-
-	const uint32_t first_set = 0;
-	const uint32_t descriptor_set_count = 1;
-	auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
-	const uint32_t dynamic_offset_count = 0;
-	const uint32_t* dynamic_offsets = nullptr;
-	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-									 m_pipeline.layout.get(),
-									 first_set,
-									 descriptor_set_count,
-									 descriptor_sets,
-									 dynamic_offset_count,
-									 dynamic_offsets);
-
-
-	for (auto renderable: renderables) {
-		if (!renderable.has_shadow) 
-			continue;
-
-		RenderPipeline::PushConstants push{};
-		push.model = renderable.model;
-		const uint32_t push_offset = 0;
-		commandbuffer.pushConstants(m_pipeline.layout.get(),
-									vk::ShaderStageFlagBits::eVertex,
-									push_offset,
-									sizeof(push),
-									&push);
-		
-		const uint32_t firstBinding = 0;
-		const uint32_t bindingCount = 1;
-		std::array<vk::DeviceSize, bindingCount> offsets = {0};
-		std::array<vk::Buffer, bindingCount> buffers {
-			renderable.mesh->vertexbuffer.impl->buffer.get(),
-		};
-		commandbuffer.bindVertexBuffers(firstBinding,
-										bindingCount,
-										buffers.data(),
-										offsets.data());
+	if (camera_data.has_value()) {
+		CameraUniformData camera_uniform_data = camera_data.value();
+		copy_to_allocated_memory(device,
+								 m_pipeline.descriptor_memories[current_flightframe.get()],
+								 reinterpret_cast<void*>(&camera_uniform_data),
+								 sizeof(camera_uniform_data));
+		const uint32_t first_set = 0;
+		const uint32_t descriptor_set_count = 1;
+		auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
+		const uint32_t dynamic_offset_count = 0;
+		const uint32_t* dynamic_offsets = nullptr;
+		commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+										 m_pipeline.layout.get(),
+										 first_set,
+										 descriptor_set_count,
+										 descriptor_sets,
+										 dynamic_offset_count,
+										 dynamic_offsets);
 		
 		
-		const uint32_t instanceCount = 1;
-		const uint32_t firstVertex = 0;
-		const uint32_t firstInstance = 0;
-		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
-						   instanceCount,
-						   firstVertex,
-						   firstInstance);
+		for (auto renderable: renderables) {
+			if (!renderable.has_shadow) 
+				continue;
+			
+			RenderPipeline::PushConstants push{};
+			push.model = renderable.model;
+			const uint32_t push_offset = 0;
+			commandbuffer.pushConstants(m_pipeline.layout.get(),
+										vk::ShaderStageFlagBits::eVertex,
+										push_offset,
+										sizeof(push),
+										&push);
+			
+			const uint32_t firstBinding = 0;
+			const uint32_t bindingCount = 1;
+			std::array<vk::DeviceSize, bindingCount> offsets = {0};
+			std::array<vk::Buffer, bindingCount> buffers {
+				renderable.mesh->vertexbuffer.impl->buffer.get(),
+			};
+			commandbuffer.bindVertexBuffers(firstBinding,
+											bindingCount,
+											buffers.data(),
+											offsets.data());
+			
+			
+			const uint32_t instanceCount = 1;
+			const uint32_t firstVertex = 0;
+			const uint32_t firstInstance = 0;
+			commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+							   instanceCount,
+							   firstVertex,
+							   firstInstance);
+		}
 	}
-	
+
 	commandbuffer.endRenderPass();
 }
 

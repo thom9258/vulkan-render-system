@@ -149,7 +149,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 								sizeof(PushConstants)));
 	}
 	
-	std::array<vk::DescriptorSetLayoutBinding, 6> frame_uniform_bindings{
+	std::array<vk::DescriptorSetLayoutBinding, 7> frame_uniform_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
 		.setBinding(0)
@@ -184,6 +184,13 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment
 					   | vk::ShaderStageFlagBits::eVertex)
 		.setBinding(5)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
+		
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment
+					   | vk::ShaderStageFlagBits::eVertex)
+		.setBinding(6)
 		.setDescriptorCount(1)
 		.setDescriptorType(vk::DescriptorType::eUniformBuffer),
 	};
@@ -260,7 +267,6 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	
 	logger.info(std::source_location::current(), "Created texture descriptorset layouts");
 	
-
 	std::array<vk::DescriptorSetLayoutBinding, 1> directional_shadowmap_bindings{
 		vk::DescriptorSetLayoutBinding{}
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
@@ -275,15 +281,32 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	m_directional_shadowmap_layout =
 		context->device.get().createDescriptorSetLayoutUnique(directional_shadowmap_setinfo,
 															  nullptr);
+	
+	std::array<vk::DescriptorSetLayoutBinding, 1> spot_shadowmap_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+	};
+	auto spot_shadowmap_setinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(spot_shadowmap_bindings);
+	
+	m_spot_shadowmap_layout =
+		context->device.get().createDescriptorSetLayoutUnique(spot_shadowmap_setinfo,
+															  nullptr);
 
 
-	std::array<vk::DescriptorSetLayout, 6> const descriptorset_layouts{
+
+	std::array<vk::DescriptorSetLayout, 7> const descriptorset_layouts{
 		m_global_set_layout.get(),
 		m_ambient.layout.get(),
 		m_diffuse.layout.get(),
 		m_specular.layout.get(),
 		m_normal.layout.get(),
 		m_directional_shadowmap_layout.get(),
+		m_spot_shadowmap_layout.get(),
 	};
 
     auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
@@ -405,6 +428,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 	lightarray_lengths_init_data.directional_length = 0;
 	
 	DirectionalShadowCasterUniformData directional_shadowcaster_init_data{};
+	SpotShadowCasterUniformData spot_shadowcaster_init_data{};
 
 	for (auto& uniform: m_global_set_uniforms) {
 		uniform.camera =
@@ -466,6 +490,19 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 
 		logger.info(std::source_location::current(),
 					"created frame uniform directional shadowcaster descriptor memories");
+		
+	   uniform.spot_shadowcaster =
+		   UniformMemoryDirectWrite<SpotShadowCasterUniformData>(
+               context->physical_device,
+			   context->device.get(),
+			   spot_shadowcasters_count);
+
+		uniform.spot_shadowcaster.write(context->device.get(),
+											   &spot_shadowcaster_init_data,
+											   spot_shadowcasters_count);
+
+		logger.info(std::source_location::current(),
+					"created frame uniform spot shadowcaster descriptor memories");
 	}
 
 	// NOTE: Here we technically update the descriptor sets, but this is done to
@@ -473,7 +510,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
     //       as the uniforms are direct write uniforms, thus simply writing to the memory
 	//       is considered updating them
 	for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
-		std::array<vk::WriteDescriptorSet, 6> writes {
+		std::array<vk::WriteDescriptorSet, 7> writes {
 			vk::WriteDescriptorSet{}
 			.setDstSet(m_global_set_uniforms[i].set.get())
 			.setDstBinding(0)
@@ -521,6 +558,14 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 			.setDescriptorCount(1)
 			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
 			.setBufferInfo(m_global_set_uniforms[i].directional_shadowcaster.buffer_info()),
+			
+			vk::WriteDescriptorSet{}
+			.setDstSet(m_global_set_uniforms[i].set.get())
+			.setDstBinding(6)
+			.setDstArrayElement(0)
+			.setDescriptorCount(1)
+			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+			.setBufferInfo(m_global_set_uniforms[i].spot_shadowcaster.buffer_info()),
 		};
 
 		context->device.get().updateDescriptorSets(writes.size(),
@@ -671,8 +716,8 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 				msg.c_str());
 #endif	
 	
-	if (shadowcasters.directional.has_value()) {
-		DirectionalShadowCasterUniformData data(shadowcasters.directional.value().caster);
+	if (shadowcasters.directional.caster.has_value()) {
+		DirectionalShadowCasterUniformData data(shadowcasters.directional.caster.value());
 		m_global_set_uniforms[*current_flightframe]
 			.directional_shadowcaster.write(device,
 											&data,
@@ -685,11 +730,23 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			.directional_shadowcaster.write(device,
 											&data,
 											directional_shadowcasters_count);
-
 	}
 	
-	// TODO: BIND SHADOW MAP
-	// https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
+	if (shadowcasters.spot.caster.has_value()) {
+		SpotShadowCasterUniformData data(shadowcasters.spot.caster.value());
+		m_global_set_uniforms[*current_flightframe]
+			.spot_shadowcaster.write(device,
+									 &data,
+									 spot_shadowcasters_count);
+	}
+	else {
+		SpotShadowCasterUniformData data{};
+		data.exists = false;
+		m_global_set_uniforms[*current_flightframe]
+			.spot_shadowcaster.write(device,
+									 &data,
+									 spot_shadowcasters_count);
+	}
 
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.get());
@@ -824,6 +881,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							"Added new normal texture to cache");
 			}	
 
+			{
 			std::array<vk::DescriptorSet, 1> descriptorset{
 				m_normal.sets[normal_texture][*current_flightframe].get()
 			};
@@ -835,20 +893,32 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 											 0,
 											 nullptr);
 			last_normal_texture = normal_texture;
+			}
 			
-
-
-			if (shadowcasters.directional.has_value()) {
-				std::array<vk::DescriptorSet, 1> descriptorset{
-					shadowcasters.directional.value().descriptorset
-				};
-				commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-												 m_layout.get(),
-												 directional_shadowcaster_set_index,
-												 descriptorset.size(),
-												 descriptorset.data(),
-												 0,
-												 nullptr);
+			{
+			std::array<vk::DescriptorSet, 1> descriptorset{
+				shadowcasters.directional.descriptorset
+			};
+			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+											 m_layout.get(),
+											 directional_shadowcaster_set_index,
+											 descriptorset.size(),
+											 descriptorset.data(),
+											 0,
+											 nullptr);
+			}
+			
+			{
+			std::array<vk::DescriptorSet, 1> descriptorset{
+				shadowcasters.spot.descriptorset
+			};
+			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+											 m_layout.get(),
+											 spot_shadowcaster_set_index,
+											 descriptorset.size(),
+											 descriptorset.data(),
+											 0,
+											 nullptr);
 			}
 		}
 	

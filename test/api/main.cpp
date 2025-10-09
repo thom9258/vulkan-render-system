@@ -308,10 +308,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 
 
 			if (obj["casts-shadow"] == "yes") {
-				scene.shadowcasters.spot_casters.push_back(caster);
-				//TODO: DO NOT PUSH A NORMAL LIGHT ONCE Casters are implemented in
-				// materialpass
-				scene.lights.push_back(p);
+				scene.shadowcasters.spot_caster = caster;
 			}
 			else {
 				scene.lights.push_back(p);
@@ -364,7 +361,12 @@ auto load_scene_from_path(std::filesystem::path const path,
 int main()
 {
 	WindowConfig window_config;
-	//window_config.size = U32Extent{400, 300};
+	
+	//RenderConfig render_config;
+	//render_config.window_name = "Test Renderer";
+	//render_config.window_extent = U32Extent{1200, 800};
+	//render_config.render_extent = U32Extent{1200, 800};
+	//render_config.shadow_extent = U32Extent{256, 256};
 
 	Logger logger;
 	

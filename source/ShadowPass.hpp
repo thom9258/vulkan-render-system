@@ -74,7 +74,7 @@ public:
 				vk::Device& device,
 				CurrentFlightFrame current_flightframe,
 				vk::CommandBuffer& commandbuffer,
-				CameraUniformData camera_data,
+				std::optional<CameraUniformData> camera_data,
 				std::vector<MaterialRenderable>& renderables);
 	
 	auto get_shadowtexture(CurrentFlightFrame current_flightframe)
@@ -137,7 +137,7 @@ public:
 				vk::Device& device,
 				CurrentFlightFrame current_flightframe,
 				vk::CommandBuffer& commandbuffer,
-				CameraUniformData camera_data,
+				std::optional<CameraUniformData> camera_data,
 				std::vector<MaterialRenderable>& renderables);
 	
 	auto get_shadowtexture(CurrentFlightFrame current_flightframe)
@@ -164,7 +164,7 @@ public:
 				vk::Device& device,
 				CurrentFlightFrame current_flightframe,
 				vk::CommandBuffer& commandbuffer,
-				CameraUniformData camera_data,
+				std::optional<CameraUniformData> camera_data,
 				std::vector<MaterialRenderable>& renderables);
 
 	auto get_shadowtexture(CurrentFlightFrame current_flightframe)
