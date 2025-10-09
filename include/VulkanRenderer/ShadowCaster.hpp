@@ -51,5 +51,5 @@ private:
 struct ShadowCasters
 {
 	std::optional<DirectionalShadowCaster> directional_caster;
-	std::vector<SpotShadowCaster> spot_casters;
+	std::optional<SpotShadowCaster> spot_caster;
 };

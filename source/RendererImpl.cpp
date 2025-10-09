@@ -235,33 +235,37 @@ auto render_geometry_pass(GeometryPass& pass,
 
 	auto generate_shadow_passes = [&] (vk::CommandBuffer& commandbuffer) 
 	{
-		//TODO: have multiple directional casters
+		std::optional<OrthographicShadowPass::CameraUniformData> ortho_caster_data;
 		if (shadowcasters.directional_caster.has_value()) {
-			DirectionalShadowCaster& caster = shadowcasters.directional_caster.value();
-			OrthographicShadowPass::CameraUniformData caster_data;
-			caster_data.view = caster.view();
-			caster_data.proj = caster.projection().get();
-			shadow_passes.orthographic.record(logger,
-											  device,
-											  CurrentFlightFrame{current_frame_in_flight},
-											  commandbuffer,
-											  caster_data,
-											  sorted.materialrenderables);
+			ortho_caster_data.emplace();
+			DirectionalShadowCaster& dircaster = shadowcasters.directional_caster.value();
+			ortho_caster_data.value().view = dircaster.view();
+			ortho_caster_data.value().proj = dircaster.projection().get();
 		}
 
-		//TODO: have multiple directional casters
-		if (!shadowcasters.spot_casters.empty()) {
-			SpotShadowCaster& caster = shadowcasters.spot_casters.front();
-			PerspectiveShadowPass::CameraUniformData caster_data;
-			caster_data.view = caster.view();
-			caster_data.proj = caster.projection().get();
-			shadow_passes.perspective.record(logger,
-											 device,
-											 CurrentFlightFrame{current_frame_in_flight},
-											 commandbuffer,
-											 caster_data,
-											 sorted.materialrenderables);
+		shadow_passes.orthographic.record(logger,
+										  device,
+										  CurrentFlightFrame{current_frame_in_flight},
+										  commandbuffer,
+										  ortho_caster_data,
+										  sorted.materialrenderables);
+		
+		
+		std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
+		if (shadowcasters.spot_caster.has_value()) {
+			pers_caster_data.emplace();
+			SpotShadowCaster& spotcaster = shadowcasters.spot_caster.value();
+			pers_caster_data.value().view = spotcaster.view();
+			pers_caster_data.value().proj = spotcaster.projection().get();
 		}
+
+		//TODO: have multiple spot casters
+		shadow_passes.perspective.record(logger,
+										 device,
+										 CurrentFlightFrame{current_frame_in_flight},
+										 commandbuffer,
+										 pers_caster_data,
+										 sorted.materialrenderables);
 	};
 
 	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier
@@ -334,7 +338,30 @@ auto render_geometry_pass(GeometryPass& pass,
 									  max_frames_in_flight,
 									  texture_info,
 									  sorted.basetextures);
+		
 
+		CurrentFlightFrame const current_flightframe{ current_frame_in_flight };
+		MaxFlightFrames const max_flightframes{ max_frames_in_flight };
+		
+
+		ShadowPassTexture& dirshadowtexture =
+			shadow_passes.orthographic.get_shadowtexture(current_flightframe);
+		
+		MaterialPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture 
+			directional_texture{
+			dirshadowtexture.descriptorset.get(),
+			shadowcasters.directional_caster};
+
+		ShadowPassTexture& spotshadowtexture =
+			shadow_passes.perspective.get_shadowtexture(current_flightframe);
+		MaterialPipeline::MaterialShadowCasters::SpotShadowCasterTexture 
+			spot_texture{
+			spotshadowtexture.descriptorset.get(),
+			shadowcasters.spot_caster};
+
+		MaterialPipeline::MaterialShadowCasters material_shadowcasters{
+			directional_texture,
+			spot_texture};
 		
 		MaterialPipeline::FrameInfo material_frame_info{};
 		material_frame_info.view = world_info.view;
@@ -345,10 +372,11 @@ auto render_geometry_pass(GeometryPass& pass,
 								   device,
 								   descriptor_pool,
 								   commandbuffer,
-								   CurrentFlightFrame{current_frame_in_flight},
-								   MaxFlightFrames{max_frames_in_flight},
+								   current_flightframe,
+								   max_flightframes,
 								   sorted.materialrenderables,
-								   lights);
+								   lights,
+								   material_shadowcasters);
 
 		commandbuffer.endRenderPass();
 	};
@@ -372,6 +400,11 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	, logger(logger)
 	, descriptor_pool(descriptor_pool)
 {
+	
+
+	U32Extent constexpr shadow_extent{1024, 1024};
+	//U32Extent constexpr shadow_extent{256, 256};
+
 	//TODO: Allow extent to be set externally
 	//TODO: Allow debug print to be set externally
 	vk::Extent2D const render_extent = context->get_window_extent();
@@ -379,14 +412,16 @@ Renderer::Impl::Impl(Render::Context::Impl* context,
 	shadow_passes.orthographic = OrthographicShadowPass(logger,
 														context,
 														presenter,
-														U32Extent{1024, 1024},
+														descriptor_pool,
+														shadow_extent,
 														shaders_root,
 														debug_print);
 
 	shadow_passes.perspective = PerspectiveShadowPass(logger,
 													  context,
 													  presenter,
-													  U32Extent{1024, 1024},
+													  descriptor_pool,
+													  shadow_extent,
 													  shaders_root,
 													  debug_print);
 

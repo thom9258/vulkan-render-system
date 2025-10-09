@@ -19,6 +19,13 @@ using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
 using DescriptorSetBindingIndex = StrongType<uint32_t, struct DescriptorSetBindingIndexTag>;
 
 
+auto create_descriptorset_for_texture(vk::Device device,
+									  vk::DescriptorSetLayout descriptorset_layout,
+									  vk::DescriptorPool descriptor_pool,
+									  size_t frames_in_flight,
+									  TextureSamplerReadOnly& texture)
+	-> std::vector<vk::UniqueDescriptorSet>;
+
 auto create_texture_descriptorset(vk::Device device,
 								  vk::DescriptorSetLayout descriptorset_layout,
 								  vk::DescriptorPool descriptor_pool,
@@ -197,6 +204,11 @@ struct TextureDescriptor
 	std::map<TextureSamplerReadOnly*, FlightFramesArray<vk::UniqueDescriptorSet>> sets;
 };
 
+
+
+//TODO: This was an attempt at making it nice to automatically get textures
+//      for a material, but it was abandoned..
+#if 0
 struct TextureMaterial
 {
 	TextureSamplerReadOnly* ambient;
@@ -236,4 +248,4 @@ struct TextureMaterialDescriptorSet
 		return std::nullopt;
 	}
 };
-
+#endif

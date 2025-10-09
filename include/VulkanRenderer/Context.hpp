@@ -43,6 +43,18 @@ struct WindowConfig
 	std::optional<std::int32_t> fps;
 };
 
+struct RenderConfig
+{
+	std::optional<std::string> window_name{ std::nullopt };
+	std::optional<U32Extent> window_extent{ std::nullopt };
+	std::optional<U32Extent> render_extent{ std::nullopt };
+	std::optional<U32Extent> shadow_extent{ std::nullopt };
+	std::optional<I32Extent> window_position{ std::nullopt };
+	std::optional<std::int32_t> render_fps{ std::nullopt };
+};
+
+
+
 
 
 //TODO: We need a minimal context that is only devices otherwise we get roundabout dependencies

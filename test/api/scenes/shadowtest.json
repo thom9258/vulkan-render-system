@@ -46,17 +46,31 @@
 	[
 		{
 			"type": "directional", 
+			"casts-shadow": "no",
+			"draw-gizmo": "no",
+			"position": [0, 0, 0],
+
 			"direction": [-0.3, -1.0, -0.2],
-			"diffuse": [0.2, 0.2, 0.2],
+			"diffuse": [0, 0, 0],
 			"specular": [0.0, 0.0, 0.0],
-			"ambient": [0.03, 0.03, 0.03],
+			"ambient": [0.01, 0.01, 0.01]
+		},
+		{
+			"type": "directional", 
 			"casts-shadow": "yes",
-			"position": [0, 6, 0]
+			"draw-gizmo": "yes",
+			"position": [0, 8, 0],
+
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0.5, 0.5, 0.5],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.03, 0.03, 0.03]
 		},
 		{
 			"type": "spot", 
 			"casts-shadow": "yes",
 			"draw-gizmo": "yes",
+
 			"position": [-1, 1, -1],
 			"direction": [1, 0, 1],
 			"diffuse": [2, 2, 2],

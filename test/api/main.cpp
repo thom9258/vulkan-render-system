@@ -72,7 +72,7 @@ auto rotation_from_direction(glm::vec3 direction)
 
 constexpr bool slowframes = false;
 constexpr bool printframerate = false;
-constexpr size_t printframerateinterval = 100;
+constexpr size_t printframerateinterval = 30;
 
 std::vector<VertexPosNormColor> triangle_vertices = {
 	{{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
@@ -246,23 +246,26 @@ auto load_scene_from_path(std::filesystem::path const path,
 
 		if (type == "directional") {
 			DirectionalLight p;
-			p.direction = parse_vec3(obj["direction"]);
+			p.direction = glm::normalize(parse_vec3(obj["direction"]));
 			p.ambient = parse_vec3(obj["ambient"]);
 			p.specular = parse_vec3(obj["specular"]);
 			p.diffuse = parse_vec3(obj["diffuse"]);
+			
+			const float near_plane = 0.1f, far_plane = 30.0f;
+			const glm::vec3 position = parse_vec3(obj["position"]);
+			
+			DirectionalShadowCaster caster{
+				OrthographicProjection{glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f,
+												  near_plane, far_plane)},
+				p,
+				PositionVector{position},
+				UpVector{world_up}};
 
 			if (obj["casts-shadow"] == "yes") {
-				const float near_plane = 0.1f, far_plane = 30.0f;
-				const glm::vec3 position = parse_vec3(obj["position"]);
-
-				DirectionalShadowCaster caster{
-					OrthographicProjection{glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f,
-													  near_plane, far_plane)},
-					p,
-					PositionVector{position},
-					UpVector{world_up}};
 				scene.shadowcasters.directional_caster = caster;
+			}
 				
+			if (obj["draw-gizmo"] == "yes") {
 				MaterialRenderable ship{};
 				ship.mesh = &resources.transformship.mesh;
 				ship.has_shadow = false;
@@ -272,10 +275,6 @@ auto load_scene_from_path(std::filesystem::path const path,
 				ship.texture.normal = nullptr;
 				ship.model = caster.model();
 				scene.renderables.push_back(ship);
-
-				//TODO: DO NOT PUSH A NORMAL LIGHT ONCE Casters are implemented in
-				// materialpass
-				scene.lights.push_back(p);
 			}
 			else {
 				scene.lights.push_back(p);
@@ -296,19 +295,26 @@ auto load_scene_from_path(std::filesystem::path const path,
 			p.cutoff.outer =
 				glm::cos(glm::radians(static_cast<float>(obj["cutoff-outer-degrees"])));
 			
+			const float aspect = 1;
+			const float near_plane = 1.0f, far_plane = 20.0f;
+			
+			SpotShadowCaster caster{
+				PerspectiveProjection{glm::perspective(glm::radians(70.f),
+													   aspect,
+													   near_plane,
+													   far_plane)},
+				p,
+				UpVector{world_up}};
+
 
 			if (obj["casts-shadow"] == "yes") {
-				const float aspect = 1;
-				const float near_plane = 1.0f, far_plane = 20.0f;
-				
-				SpotShadowCaster caster{
-					PerspectiveProjection{glm::perspective(glm::radians(70.f),
-														   aspect,
-														   near_plane,
-														   far_plane)},
-					p,
-					UpVector{world_up}};
-				
+				scene.shadowcasters.spot_caster = caster;
+			}
+			else {
+				scene.lights.push_back(p);
+			}
+
+			if (obj["draw-gizmo"] == "yes") {
 				MaterialRenderable ship{};
 				ship.mesh = &resources.transformship.mesh;
 				ship.has_shadow = false;
@@ -318,64 +324,6 @@ auto load_scene_from_path(std::filesystem::path const path,
 				ship.texture.normal = nullptr;
 				ship.model = caster.model();
 				scene.renderables.push_back(ship);
-				
-				scene.shadowcasters.spot_casters.push_back(caster);
-
-				//TODO: DO NOT PUSH A NORMAL LIGHT ONCE Casters are implemented in
-				// materialpass
-				scene.lights.push_back(p);
-			}
-			else {
-				scene.lights.push_back(p);
-			}
-
-			if (obj["draw-gizmo"] == "yes") {
-				WireframeRenderable center{};
-				center.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
-				center.mesh = &resources.gizmo_sphere.mesh;
-				center.model = glm::translate(glm::mat4(1.0f), p.position)
-					* glm::scale(glm::mat4(1.0f), glm::vec3(0.05f));
-				scene.renderables.push_back(center);
-				
-				WireframeRenderable forward{};
-				forward.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
-				forward.mesh = &resources.gizmo_sphere.mesh;
-				forward.model = glm::translate(glm::mat4(1.0f), p.position + p.direction)
-					* glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
-				scene.renderables.push_back(forward);
-
-				WireframeRenderable cone{};
-				cone.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
-				cone.mesh = &resources.gizmo_cone.mesh;
-				float const length = p.attenuation.approximate_distance(0.02f);
-				
-#if 0
-				glm::mat4 const cone_model = 
-					glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -length/2, 0.0f))
-					* glm::scale(cone.model, glm::vec3(2, length, 2));
-
-				glm::mat4 const light_model = 
-					glm::translate(glm::mat4(1.0f), p.position);
-
-				cone.model = light_model * cone_model;
-				
-				glm::mat4 const light_model = 
-					glm::inverse(glm::lookAt(p.position, p.position + p.direction, glm::vec3(0.0f, 1.0f, 0.0f)));
-				
-				
-				glm::mat4 local_model = glm::mat4(1.0f);
-				local_model = glm::translate(local_model, glm::vec3(0.0f, -length/2, 0.0f));
-				local_model = glm::scale(local_model, glm::vec3(length, length, length));
-
-				cone.model = light_model * local_model;
-#else
-				cone.model = glm::mat4(1.0f);
-				cone.model = glm::translate(cone.model, p.position);
-				
-				cone.model = glm::translate(cone.model, glm::vec3(0.0f, -length/2, 0.0f));
-				cone.model = glm::scale(cone.model, glm::vec3(length, length, length));
-#endif
-				scene.renderables.push_back(cone);
 			}
 		}
 		else if (type == "point") {
@@ -413,7 +361,12 @@ auto load_scene_from_path(std::filesystem::path const path,
 int main()
 {
 	WindowConfig window_config;
-	//window_config.size = U32Extent{400, 300};
+	
+	//RenderConfig render_config;
+	//render_config.window_name = "Test Renderer";
+	//render_config.window_extent = U32Extent{1200, 800};
+	//render_config.render_extent = U32Extent{1200, 800};
+	//render_config.shadow_extent = U32Extent{256, 256};
 
 	Logger logger;
 	

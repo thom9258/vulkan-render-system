@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include <VulkanRenderer/Renderable.hpp>
+#include <VulkanRenderer/ShadowCaster.hpp>
 
 #include "VertexImpl.hpp"
 #include "VertexBuffer.hpp"
@@ -62,6 +63,23 @@ struct MaterialPipeline
 		glm::vec3 camera_position;
 	};
 	
+	struct MaterialShadowCasters
+	{
+		struct DirectionalShadowCasterTexture
+		{
+			vk::DescriptorSet descriptorset;
+			std::optional<DirectionalShadowCaster> caster;
+		};
+		DirectionalShadowCasterTexture directional;
+
+		struct SpotShadowCasterTexture
+		{
+			vk::DescriptorSet descriptorset;
+			std::optional<SpotShadowCaster> caster;
+		};
+		SpotShadowCasterTexture spot;
+	};
+	
 	void render(FrameInfo& frame_info,
 				Logger& logger,
 				vk::Device& device,
@@ -70,7 +88,8 @@ struct MaterialPipeline
 				CurrentFlightFrame const current_flightframe,
 				MaxFlightFrames const max_frames_in_flight,
 				std::vector<MaterialRenderable>& renderables,
-				std::vector<Light>& lights);
+				std::vector<Light>& lights,
+				MaterialShadowCasters shadowcasters);
 
 	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
 	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
@@ -101,6 +120,11 @@ private:
 
 	static constexpr size_t camera_uniform_count = 1;
 	static constexpr size_t lightarray_lengths_count = 1;
+	static constexpr size_t directional_shadowcasters_count = 1;
+	static constexpr size_t spot_shadowcasters_count = 1;
+
+	static constexpr uint32_t directional_shadowcaster_set_index = 5;
+	static constexpr uint32_t spot_shadowcaster_set_index = 6;
 
 	static constexpr size_t max_pointlights = 10;
 	static constexpr size_t max_spotlights = 10;
@@ -114,7 +138,8 @@ private:
 		UniformMemoryDirectWrite<SpotLightUniformData> spotlight; 
 		UniformMemoryDirectWrite<DirectionalLightUniformData> directionallight; 
 		UniformMemoryDirectWrite<LightArrayLengthsUniformData> lightarray_lengths; 
-		//TODO add 2+ samplers to set with shadow maps + a view matrix for them
+		UniformMemoryDirectWrite<DirectionalShadowCasterUniformData> directional_shadowcaster; 
+		UniformMemoryDirectWrite<SpotShadowCasterUniformData> spot_shadowcaster; 
 	};
 	
 	vk::UniqueDescriptorSetLayout m_global_set_layout;
@@ -125,5 +150,8 @@ private:
 	TextureDescriptor<DescriptorSetIndex{2}> m_diffuse;
 	TextureDescriptor<DescriptorSetIndex{3}> m_specular;
 	TextureDescriptor<DescriptorSetIndex{4}> m_normal;
+
+	vk::UniqueDescriptorSetLayout m_directional_shadowmap_layout;
+	vk::UniqueDescriptorSetLayout m_spot_shadowmap_layout;
 };
 

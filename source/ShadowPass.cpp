@@ -1,15 +1,153 @@
 #include "ShadowPass.hpp"
 
+#include "DescriptorPoolImpl.hpp"
+
+ShadowPassTexture::ShadowPassTexture(Render::Context::Impl* context,
+									 DescriptorPool::Impl* descriptor_pool,
+									 U32Extent extent)
+
+{
+	texture =
+		Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
+													context,
+													extent,
+													TextureFormat::R32Sfloat));
+
+	auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
+	{
+		transition_image_for_color_override(texture.impl->allocated.image.get(),
+											commandbuffer);
+	};
+	
+	with_buffer_submit(context->device.get(),
+					   context->commandpool.get(),
+					   context->graphics_queue(),
+					   transition_to_transfer_src);
+		
+	const auto subresourceRange = vk::ImageSubresourceRange{}
+		.setAspectMask(vk::ImageAspectFlagBits::eColor)
+		.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setBaseArrayLayer(0)
+		.setLayerCount(1);
+
+	const auto componentMapping = vk::ComponentMapping{}
+		.setR(vk::ComponentSwizzle::eIdentity)		
+		.setG(vk::ComponentSwizzle::eIdentity)
+		.setB(vk::ComponentSwizzle::eIdentity)
+		.setA(vk::ComponentSwizzle::eIdentity);
+
+	const auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
+		.setImage(texture.impl->image())
+		.setFormat(texture.impl->format)
+		.setSubresourceRange(subresourceRange)
+		.setViewType(vk::ImageViewType::e2D)
+		.setComponents(componentMapping);
+	view = context->device.get().createImageViewUnique(imageViewCreateInfo);
+	
+	const auto properties = context->physical_device.getProperties();
+	const auto has_anisotropy = true; // TODO: set this from device
+	const auto max_anisotropy = has_anisotropy
+		? std::min(4.0f, properties.limits.maxSamplerAnisotropy)
+		: 1.0f;
+	
+	vk::Filter const filter = vk::Filter::eLinear;
+	vk::SamplerMipmapMode const mipmap_filter = vk::SamplerMipmapMode::eLinear;
+
+	const auto sampler_info = vk::SamplerCreateInfo{}
+		.setMagFilter(filter)
+		.setMinFilter(filter)
+		.setAddressModeU(vk::SamplerAddressMode::eRepeat)
+		.setAddressModeV(vk::SamplerAddressMode::eRepeat)
+		.setAddressModeW(vk::SamplerAddressMode::eRepeat)
+		.setAnisotropyEnable(has_anisotropy)
+		.setMaxAnisotropy(max_anisotropy)
+		.setBorderColor(vk::BorderColor::eIntOpaqueBlack)
+		.setUnnormalizedCoordinates(false)
+		.setCompareEnable(false)
+		.setCompareOp(vk::CompareOp::eAlways)
+		.setMipmapMode(mipmap_filter)
+		.setMipLodBias(0.0f)
+		.setMinLod(0.0f)
+		.setMaxLod(0.0f);
+	sampler = context->device.get().createSamplerUnique(sampler_info);
+
+	std::array<vk::DescriptorSetLayoutBinding, 1> const layout_bindings{
+		vk::DescriptorSetLayoutBinding{}
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+		.setBinding(0)
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler),
+	};
+	auto layout_createinfo = vk::DescriptorSetLayoutCreateInfo{}
+		.setFlags(vk::DescriptorSetLayoutCreateFlags())
+		.setBindings(layout_bindings);
+	
+	descriptorset_layout =
+		context->device.get().createDescriptorSetLayoutUnique(layout_createinfo,
+															  nullptr);
+
+	const auto descriptorset_allocate_info = vk::DescriptorSetAllocateInfo{}
+		.setDescriptorPool(descriptor_pool->descriptor_pool.get())
+		.setDescriptorSetCount(1)
+		.setSetLayouts(descriptorset_layout.get());
+	
+	auto createdsets =
+		context->device.get().allocateDescriptorSetsUnique(descriptorset_allocate_info);
+	descriptorset = std::move(createdsets[0]);
+	
+
+	const auto descriptorimage_info = vk::DescriptorImageInfo{}
+		.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+		.setImageView(view.get())
+		.setSampler(sampler.get());
+	
+	const std::array<vk::WriteDescriptorSet, 1> descriptorwrite{
+		vk::WriteDescriptorSet{}
+		.setDstBinding(0)
+		.setDstArrayElement(0)
+		.setDstSet(descriptorset.get())
+		.setDescriptorCount(1)
+		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+		.setImageInfo(descriptorimage_info),
+	};
+	
+	context->device.get().updateDescriptorSets(descriptorwrite.size(),
+											   descriptorwrite.data(),
+											   0,
+											   nullptr);
+}
+
+ShadowPassTexture::ShadowPassTexture(ShadowPassTexture&& rhs)
+{
+	std::swap(texture, rhs.texture);
+	std::swap(sampler, rhs.sampler);
+	std::swap(state, rhs.state);
+	std::swap(view, rhs.view);
+	std::swap(descriptorset, rhs.descriptorset);
+}
+
+ShadowPassTexture& ShadowPassTexture::operator=(ShadowPassTexture&& rhs)
+{
+	std::swap(texture, rhs.texture);
+	std::swap(sampler, rhs.sampler);
+	std::swap(state, rhs.state);
+	std::swap(view, rhs.view);
+	std::swap(descriptorset, rhs.descriptorset);
+	return *this;
+}
 
 OrthographicShadowPass::OrthographicShadowPass(Logger& logger,
 											   Render::Context::Impl* context,
 											   Presenter::Impl* presenter,
+											   DescriptorPool::Impl* descriptor_pool,
 											   U32Extent extent,
 											   std::filesystem::path shader_root_path,
 											   const bool debug_print)
 	: GenericShadowPass(logger,
 						context,
 						presenter,
+						descriptor_pool,
 						extent,
 						VertexPath{shader_root_path / "OrthographicDepth.vert.spv"},
 						FragmentPath{shader_root_path / "OrthographicDepth.frag.spv"},
@@ -21,7 +159,7 @@ void OrthographicShadowPass::record(Logger* logger,
 									vk::Device& device,
 									CurrentFlightFrame current_flightframe,
 									vk::CommandBuffer& commandbuffer,
-									CameraUniformData camera_data,
+									std::optional<CameraUniformData> camera_data,
 									std::vector<MaterialRenderable>& renderables)
 {
 	GenericShadowPass::record(logger,
@@ -32,15 +170,24 @@ void OrthographicShadowPass::record(Logger* logger,
 							  renderables);
 }
 
+auto OrthographicShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)
+	-> ShadowPassTexture&
+{
+	return GenericShadowPass::get_shadowtexture(current_flightframe);
+}
+
+
 PerspectiveShadowPass::PerspectiveShadowPass(Logger& logger,
 											 Render::Context::Impl* context,
 											 Presenter::Impl* presenter,
+											 DescriptorPool::Impl* descriptor_pool,
 											 U32Extent extent,
 											 std::filesystem::path shader_root_path,
 											 const bool debug_print)
 	: GenericShadowPass(logger,
 						context,
 						presenter,
+						descriptor_pool,
 						extent,
 						VertexPath{shader_root_path / "PerspectiveDepth.vert.spv"},
 						FragmentPath{shader_root_path / "PerspectiveDepth.frag.spv"},
@@ -52,7 +199,7 @@ void PerspectiveShadowPass::record(Logger* logger,
 								   vk::Device& device,
 								   CurrentFlightFrame current_flightframe,
 								   vk::CommandBuffer& commandbuffer,
-								   CameraUniformData camera_data,
+								   std::optional<CameraUniformData> camera_data,
 								   std::vector<MaterialRenderable>& renderables)
 {
 	GenericShadowPass::record(logger,
@@ -63,11 +210,36 @@ void PerspectiveShadowPass::record(Logger* logger,
 							  renderables);
 }
 
+auto PerspectiveShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)
+	-> ShadowPassTexture&
+{
+	return GenericShadowPass::get_shadowtexture(current_flightframe);
+}
+
+
+
+GenericShadowPass& GenericShadowPass::operator=(GenericShadowPass&& rhs)
+{
+	std::swap(m_extent, rhs.m_extent);
+	std::swap(m_renderpass, rhs.m_renderpass);
+	std::swap(m_framestextures, rhs.m_framestextures);
+	std::swap(m_pipeline, rhs.m_pipeline);
+	return *this;
+}
+
+GenericShadowPass::GenericShadowPass(GenericShadowPass&& rhs)
+{
+	std::swap(m_extent, rhs.m_extent);
+	std::swap(m_renderpass, rhs.m_renderpass);
+	std::swap(m_framestextures, rhs.m_framestextures);
+	std::swap(m_pipeline, rhs.m_pipeline);
+}
 
 
 GenericShadowPass::GenericShadowPass(Logger& logger,
 									 Render::Context::Impl* context,
 									 Presenter::Impl* presenter,
+									 DescriptorPool::Impl* descriptor_pool,
 									 U32Extent extent,
 									 VertexPath vertex_path,
 									 FragmentPath fragment_path,
@@ -91,7 +263,7 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 		// NOTE these are important, as they determine the layout of the image before and after
 		// the renderpass
 		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
     const auto depth_attachment = vk::AttachmentDescription{}
 		.setFlags(vk::AttachmentDescriptionFlags())
@@ -154,26 +326,28 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 	for (FrameTextures& textures: m_framestextures) {
 		/* Setup the rendertarget and its view for the render pass
 		 */
-		textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
-														 context,
-														 m_extent,
-														 vkformat_to_textureformat(color_format)));
-		
-		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
-		{
-			textures.colorbuffer.impl->layout =
-				transition_image_for_color_override(textures.colorbuffer.impl->allocated.image.get(),
-													commandbuffer);
-		};
-		
-		with_buffer_submit(context->device.get(),
-						   context->commandpool.get(),
-						   context->graphics_queue(),
-						   transition_to_transfer_src);
+		textures.colorbuffer = ShadowPassTexture(context, descriptor_pool, m_extent);
+
+		//textures.colorbuffer = Texture2D(std::make_unique<Texture2D::Impl>(RenderTargetTexture,
+		//context,
+		//m_extent,
+		//vkformat_to_textureformat(color_format)));
+		//
+		//auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
+		//{
+		//textures.colorbuffer.impl->layout =
+		//transition_image_for_color_override(textures.colorbuffer.impl->allocated.image.get(),
+		//commandbuffer);
+	//};
+		//
+		//with_buffer_submit(context->device.get(),
+		//context->commandpool.get(),
+		//context->graphics_queue(),
+		//transition_to_transfer_src);
 		
 		textures.colorbuffer_view
-			= textures.colorbuffer.impl->create_view(context,
-													 vk::ImageAspectFlagBits::eColor);
+			= textures.colorbuffer.texture.impl->create_view(context,
+															 vk::ImageAspectFlagBits::eColor);
 
 		/* Setup the depthbuffer and its view for the render pass
 		 */
@@ -265,7 +439,9 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 		.setDepthClampEnable(false)
 		.setRasterizerDiscardEnable(false)
 		.setPolygonMode(vk::PolygonMode::eFill)
-		.setCullMode(vk::CullModeFlagBits::eBack)
+		//NOTE we cull front faces so we draw backfaces to the shadow depth.
+		//     this helps with peter panning where shadows makes objects seem to float.
+		.setCullMode(vk::CullModeFlagBits::eFront)
 		.setFrontFace(vk::FrontFace::eCounterClockwise)
 		.setDepthBiasEnable(false)
 		.setDepthBiasConstantFactor(0.0f)
@@ -450,7 +626,7 @@ void GenericShadowPass::record(Logger* logger,
 							   vk::Device& device,
 							   CurrentFlightFrame current_flightframe,
 							   vk::CommandBuffer& commandbuffer,
-							   CameraUniformData camera_data,
+							   std::optional<CameraUniformData> camera_data,
 							   std::vector<MaterialRenderable>& renderables)
 {
  	const auto render_area = vk::Rect2D{}
@@ -494,58 +670,66 @@ void GenericShadowPass::record(Logger* logger,
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.pipeline.get());
 
-	copy_to_allocated_memory(device,
-							 m_pipeline.descriptor_memories[current_flightframe.get()],
-							 reinterpret_cast<void*>(&camera_data),
-							 sizeof(camera_data));
-
-	const uint32_t first_set = 0;
-	const uint32_t descriptor_set_count = 1;
-	auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
-	const uint32_t dynamic_offset_count = 0;
-	const uint32_t* dynamic_offsets = nullptr;
-	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-									 m_pipeline.layout.get(),
-									 first_set,
-									 descriptor_set_count,
-									 descriptor_sets,
-									 dynamic_offset_count,
-									 dynamic_offsets);
-
-
-	for (auto renderable: renderables) {
-		if (!renderable.has_shadow) 
-			continue;
-
-		RenderPipeline::PushConstants push{};
-		push.model = renderable.model;
-		const uint32_t push_offset = 0;
-		commandbuffer.pushConstants(m_pipeline.layout.get(),
-									vk::ShaderStageFlagBits::eVertex,
-									push_offset,
-									sizeof(push),
-									&push);
-		
-		const uint32_t firstBinding = 0;
-		const uint32_t bindingCount = 1;
-		std::array<vk::DeviceSize, bindingCount> offsets = {0};
-		std::array<vk::Buffer, bindingCount> buffers {
-			renderable.mesh->vertexbuffer.impl->buffer.get(),
-		};
-		commandbuffer.bindVertexBuffers(firstBinding,
-										bindingCount,
-										buffers.data(),
-										offsets.data());
+	if (camera_data.has_value()) {
+		CameraUniformData camera_uniform_data = camera_data.value();
+		copy_to_allocated_memory(device,
+								 m_pipeline.descriptor_memories[current_flightframe.get()],
+								 reinterpret_cast<void*>(&camera_uniform_data),
+								 sizeof(camera_uniform_data));
+		const uint32_t first_set = 0;
+		const uint32_t descriptor_set_count = 1;
+		auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
+		const uint32_t dynamic_offset_count = 0;
+		const uint32_t* dynamic_offsets = nullptr;
+		commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+										 m_pipeline.layout.get(),
+										 first_set,
+										 descriptor_set_count,
+										 descriptor_sets,
+										 dynamic_offset_count,
+										 dynamic_offsets);
 		
 		
-		const uint32_t instanceCount = 1;
-		const uint32_t firstVertex = 0;
-		const uint32_t firstInstance = 0;
-		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
-						   instanceCount,
-						   firstVertex,
-						   firstInstance);
+		for (auto renderable: renderables) {
+			if (!renderable.has_shadow) 
+				continue;
+			
+			RenderPipeline::PushConstants push{};
+			push.model = renderable.model;
+			const uint32_t push_offset = 0;
+			commandbuffer.pushConstants(m_pipeline.layout.get(),
+										vk::ShaderStageFlagBits::eVertex,
+										push_offset,
+										sizeof(push),
+										&push);
+			
+			const uint32_t firstBinding = 0;
+			const uint32_t bindingCount = 1;
+			std::array<vk::DeviceSize, bindingCount> offsets = {0};
+			std::array<vk::Buffer, bindingCount> buffers {
+				renderable.mesh->vertexbuffer.impl->buffer.get(),
+			};
+			commandbuffer.bindVertexBuffers(firstBinding,
+											bindingCount,
+											buffers.data(),
+											offsets.data());
+			
+			
+			const uint32_t instanceCount = 1;
+			const uint32_t firstVertex = 0;
+			const uint32_t firstInstance = 0;
+			commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+							   instanceCount,
+							   firstVertex,
+							   firstInstance);
+		}
 	}
 
 	commandbuffer.endRenderPass();
+}
+
+auto GenericShadowPass::get_shadowtexture(CurrentFlightFrame current_flightframe)
+	-> ShadowPassTexture&
+{
+	return m_framestextures[current_flightframe.get()].colorbuffer;
 }
