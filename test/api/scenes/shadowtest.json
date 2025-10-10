@@ -49,15 +49,14 @@
 			"casts-shadow": "no",
 			"draw-gizmo": "no",
 			"position": [0, 0, 0],
-
-			"direction": [-0.3, -1.0, -0.2],
+			"direction": [0.0, -1.0, 0.0],
 			"diffuse": [0, 0, 0],
 			"specular": [0.0, 0.0, 0.0],
 			"ambient": [0.01, 0.01, 0.01]
 		},
 		{
 			"type": "directional", 
-			"casts-shadow": "yes",
+			"casts-shadow": "no",
 			"draw-gizmo": "yes",
 			"position": [0, 8, 0],
 
@@ -82,75 +81,5 @@
 			"cutoff-inner-degrees" : 30,
 			"cutoff-outer-degrees" : 35
 		}
-	],
-	"ignored" :
-	[
-		{
-			"type": "directional", 
-			"direction": [1, -0.5, 1.0],
-			"diffuse": [0.2, 0.2, 0.2],
-			"specular": [0.0, 0.0, 0.0],
-			"ambient": [0.03, 0.03, 0.03],
-			"casts-shadow": "yes",
-			"position": [-6, 4, -6]
-		},
-		{
-			"type": "directional", 
-			"casts-shadow": "yes",
-			"direction": [-0.3, -1.0, -0.2],
-			"diffuse": [0.2, 0.2, 0.2],
-			"specular": [0.0, 0.0, 0.0],
-			"ambient": [0.03, 0.03, 0.03]
-		},
-		{
-			"type": "spot", 
-			"casts-shadow": "yes",
-			"draw-gizmo": "yes",
-			"position": [-1, 0.5, -1],
-			"direction": [1, 0, 1],
-			"diffuse": [2, 2, 2],
-			"specular": [1, 1, 1],
-			"ambient": [0, 0, 0],
-			"attenuation-constant" : 1,
-			"attenuation-linear" : 0.09,
-			"attenuation-quadratic" : 0.32,
-			"cutoff-inner-degrees" : 30,
-			"cutoff-outer-degrees" : 35
-		},
-		{
-			"type": "spot", 
-			"casts-shadow": "no",
-			"draw-gizmo": "yes",
-			"position": [-3, 4, 4],
-			"direction": [0, -1, 0.01],
-			"diffuse": [3, 0, 0],
-			"specular": [1, 1, 1],
-			"ambient": [0, 0, 0],
-			"attenuation-constant" : 1,
-			"attenuation-linear" : 0.09,
-			"attenuation-quadratic" : 0.32,
-			"cutoff-inner-degrees" : 30,
-			"cutoff-outer-degrees" : 35
-		},
-		{
-			"type": "point", 
-			"draw-gizmo": "yes",
-			"position": [-3, 0.3, 3],
-			"diffuse": [0.8, 0.2, 0.8],
-			"specular": [1, 1, 1],
-			"ambient": [0, 0, 0],
-			"attenuation-constant" : 1,
-			"attenuation-linear" : 0.09,
-			"attenuation-quadratic" : 0.32
-		},
-		{
-			"name": "transformship", 
-			"draw-mode": "material",
-			"has-shadow": "yes",
-			"position": [0, 0, 0],
-			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
-			"scale": [1, 1, 1]
-		}
-
 	]
 }

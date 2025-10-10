@@ -264,7 +264,10 @@ auto load_scene_from_path(std::filesystem::path const path,
 			if (obj["casts-shadow"] == "yes") {
 				scene.shadowcasters.directional_caster = caster;
 			}
-				
+			else {
+				scene.lights.push_back(p);
+			}
+			
 			if (obj["draw-gizmo"] == "yes") {
 				MaterialRenderable ship{};
 				ship.mesh = &resources.transformship.mesh;
@@ -275,9 +278,6 @@ auto load_scene_from_path(std::filesystem::path const path,
 				ship.texture.normal = nullptr;
 				ship.model = caster.model();
 				scene.renderables.push_back(ship);
-			}
-			else {
-				scene.lights.push_back(p);
 			}
 		}
 		else if (type == "spot") {
@@ -578,8 +578,9 @@ int main()
 			-> std::optional<Texture2D::Impl*>
 			{
 				
-				std::array<std::filesystem::path, 2> const scenes {
+				std::array<std::filesystem::path, 3> const scenes {
 					scenes_root / "shadowtest.json",
+					scenes_root / "animation.json",
 					scenes_root / "normaltest.json"
 				};
 
