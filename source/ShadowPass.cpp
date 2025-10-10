@@ -646,6 +646,16 @@ void GenericShadowPass::record(Logger* logger,
 	
 	commandbuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 	
+
+	// if there is no shadow camera we end the renderpass immediately
+	// we still need to begin/end it so that the implicit shadow texture
+	// commands are applied.
+	// commands are applied.
+	if (!camera_data.has_value()) {
+		commandbuffer.endRenderPass();
+		return;
+	}
+	
 	std::array<vk::Viewport, 1> const viewports{
 		vk::Viewport{}
 		.setX(0.0f)
@@ -666,63 +676,61 @@ void GenericShadowPass::record(Logger* logger,
 	const uint32_t scissor_start = 0;
 	commandbuffer.setScissor(scissor_start, scissors);
 	
-
+	
 	commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 							   m_pipeline.pipeline.get());
-
-	if (camera_data.has_value()) {
-		CameraUniformData camera_uniform_data = camera_data.value();
-		copy_to_allocated_memory(device,
-								 m_pipeline.descriptor_memories[current_flightframe.get()],
-								 reinterpret_cast<void*>(&camera_uniform_data),
-								 sizeof(camera_uniform_data));
-		const uint32_t first_set = 0;
-		const uint32_t descriptor_set_count = 1;
-		auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
-		const uint32_t dynamic_offset_count = 0;
-		const uint32_t* dynamic_offsets = nullptr;
-		commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-										 m_pipeline.layout.get(),
-										 first_set,
-										 descriptor_set_count,
-										 descriptor_sets,
-										 dynamic_offset_count,
-										 dynamic_offsets);
+	
+	CameraUniformData camera_uniform_data = camera_data.value();
+	copy_to_allocated_memory(device,
+							 m_pipeline.descriptor_memories[current_flightframe.get()],
+							 reinterpret_cast<void*>(&camera_uniform_data),
+							 sizeof(camera_uniform_data));
+	const uint32_t first_set = 0;
+	const uint32_t descriptor_set_count = 1;
+	auto descriptor_sets = &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
+	const uint32_t dynamic_offset_count = 0;
+	const uint32_t* dynamic_offsets = nullptr;
+	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+									 m_pipeline.layout.get(),
+									 first_set,
+									 descriptor_set_count,
+									 descriptor_sets,
+									 dynamic_offset_count,
+									 dynamic_offsets);
+	
+	
+	for (auto renderable: renderables) {
+		if (!renderable.has_shadow) 
+			continue;
+		
+		RenderPipeline::PushConstants push{};
+		push.model = renderable.model;
+		const uint32_t push_offset = 0;
+		commandbuffer.pushConstants(m_pipeline.layout.get(),
+									vk::ShaderStageFlagBits::eVertex,
+									push_offset,
+									sizeof(push),
+									&push);
+		
+		const uint32_t firstBinding = 0;
+		const uint32_t bindingCount = 1;
+		std::array<vk::DeviceSize, bindingCount> offsets = {0};
+		std::array<vk::Buffer, bindingCount> buffers {
+			renderable.mesh->vertexbuffer.impl->buffer.get(),
+		};
+		commandbuffer.bindVertexBuffers(firstBinding,
+										bindingCount,
+										buffers.data(),
+										offsets.data());
 		
 		
-		for (auto renderable: renderables) {
-			if (!renderable.has_shadow) 
-				continue;
-			
-			RenderPipeline::PushConstants push{};
-			push.model = renderable.model;
-			const uint32_t push_offset = 0;
-			commandbuffer.pushConstants(m_pipeline.layout.get(),
-										vk::ShaderStageFlagBits::eVertex,
-										push_offset,
-										sizeof(push),
-										&push);
-			
-			const uint32_t firstBinding = 0;
-			const uint32_t bindingCount = 1;
-			std::array<vk::DeviceSize, bindingCount> offsets = {0};
-			std::array<vk::Buffer, bindingCount> buffers {
-				renderable.mesh->vertexbuffer.impl->buffer.get(),
-			};
-			commandbuffer.bindVertexBuffers(firstBinding,
-											bindingCount,
-											buffers.data(),
-											offsets.data());
-			
-			
-			const uint32_t instanceCount = 1;
-			const uint32_t firstVertex = 0;
-			const uint32_t firstInstance = 0;
-			commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
-							   instanceCount,
-							   firstVertex,
-							   firstInstance);
-		}
+		const uint32_t instanceCount = 1;
+		const uint32_t firstVertex = 0;
+		const uint32_t firstInstance = 0;
+		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+						   instanceCount,
+						   firstVertex,
+						   firstInstance);
 	}
 
 	commandbuffer.endRenderPass();
