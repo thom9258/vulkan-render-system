@@ -36,6 +36,9 @@ class VulkanRendererRecipe(ConanFile):
         self.requires("polymorph/1.1", transitive_headers=True)
         self.requires("simple-geometry/1.0", transitive_headers=True)
         self.requires("glm/1.0.1", transitive_headers=True)
+        #self.requires("tinygltf/2.9.0", transitive_headers=True)
+        self.requires("assimp/6.0.2", transitive_headers=True)
+        # visible=False
         #self.requires("sdl/[~2.28]", transitive_headers=True)
         #self.requires("vulkan-headers/1.4.309.0", transitive_headers=True)
 

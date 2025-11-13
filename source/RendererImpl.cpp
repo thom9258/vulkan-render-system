@@ -42,10 +42,40 @@ void sort_renderable(Logger* logger,
 		sorted->basetextures.push_back(*p);
 	else if (auto p = std::get_if<MaterialRenderable>(&renderable))
 		sorted->materialrenderables.push_back(*p);
+	else if (auto p = std::get_if<RenderableTree>(&renderable))
+		sorted->renderabletrees.push_back(*p);
 	else {
 		logger->warn(std::source_location::current(),
 					 "Found unknown Renderable that can not be sorted and drawn");
 	}
+}
+
+auto unwind_renderabletree_node(std::vector<MaterialRenderable>& renderables,
+								RenderableTree::Node* node) 
+	-> void
+{
+	if (!node) return;
+
+	for (auto& mesh: node->meshes) {
+		MaterialRenderable renderable;
+		renderable.model = node->model;
+		//renderable.model = glm::mat4(1.0f);
+		renderable.mesh = &mesh.mesh;
+		renderable.has_shadow = true;
+		renderables.push_back(renderable);
+	}
+	
+	for (auto& child: node->children) {
+		unwind_renderabletree_node(renderables, child.get());
+	}
+}
+
+auto unwind_renderabletree(RenderableTree& tree)
+	-> std::vector<MaterialRenderable>
+{
+	std::vector<MaterialRenderable> renderables;
+	unwind_renderabletree_node(renderables, tree.root.get());
+	return renderables;
 }
 
 
@@ -232,6 +262,14 @@ auto render_geometry_pass(GeometryPass& pass,
 	std::ranges::for_each(renderables,
 						  std::bind_front(sort_renderable, logger, &sorted));
 	
+	//TODO: this is PROBABLY dirty to do, but we need to unwind the tree into something
+	//      simple the render pipelines can understand...
+	for (auto& renderabletree: sorted.renderabletrees) {
+		std::vector<MaterialRenderable> renderables = unwind_renderabletree(renderabletree);
+		for (auto& renderable: renderables) {
+			sorted.materialrenderables.push_back(renderable);
+		}
+	}
 
 	auto generate_shadow_passes = [&] (vk::CommandBuffer& commandbuffer) 
 	{

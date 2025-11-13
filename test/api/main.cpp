@@ -23,6 +23,7 @@
 #include <VulkanRenderer/ShaderTexture.hpp>
 #include <VulkanRenderer/Utils.hpp>
 #include <VulkanRenderer/Transform.hpp>
+#include <VulkanRenderer/ModelLoader.hpp>
 
 #include "LoadResources.hpp"
 
@@ -31,7 +32,7 @@ using json = nlohmann::json;
 
 std::filesystem::path root = "../../../";
 std::filesystem::path shaders_root = root / "compiled_shaders/";
-std::filesystem::path scenes_root = "../scenes/";
+//std::filesystem::path scenes_root = "../scenes/";
 std::filesystem::path assets_root = root / "assets/";
 std::filesystem::path models_root = assets_root / "models/";
 std::filesystem::path textures_root = assets_root / "textures/";
@@ -72,7 +73,7 @@ auto rotation_from_direction(glm::vec3 direction)
 
 constexpr bool slowframes = false;
 constexpr bool printframerate = false;
-constexpr size_t printframerateinterval = 30;
+constexpr size_t printframerateinterval = 100;
 
 std::vector<VertexPosNormColor> triangle_vertices = {
 	{{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
@@ -104,7 +105,7 @@ auto parse_transform(json j)
 	-> Render::Transform
 {
 	glm::vec3 const pos = parse_vec3(j["position"]);
-	glm::quat const rot = parse_quat(j["rotation-wxyz"]);
+	glm::quat const rot = parse_quat(j["rotation-quat-wxyz"]);
 	glm::vec3 const scale = parse_vec3(j["scale"]);
 	return {pos, rot, scale};
 }
@@ -235,6 +236,22 @@ auto load_scene_from_path(std::filesystem::path const path,
 				std::cout << "Unknown draw mode for " << name << std::endl;
 			}
 		}
+		else if (name == "backpack") {
+			if (prefab["draw-mode"] == "material") {
+				scene.renderables.push_back(resources.backpack);
+			}
+			else {
+				std::cout << "Unknown draw mode for " << name << std::endl;
+			}
+		}
+		else if (name == "monster") {
+			if (prefab["draw-mode"] == "material") {
+				scene.renderables.push_back(resources.monster);
+			}
+			else {
+				std::cout << "Unknown draw mode for " << name << std::endl;
+			}
+		}
 		else {
 			std::cout << "Unknown renderable " << name << std::endl;
 		}
@@ -358,8 +375,17 @@ auto load_scene_from_path(std::filesystem::path const path,
 	return scene;
 }
 
-int main()
+int main(int argc, char** argv)
 {
+	
+	if (argc != 2) {
+		std::cout << std::format("Please provide a path to a scene file..")
+				  << std::endl;
+		return 1;
+	}
+	
+	std::filesystem::path scene_path{argv[1]};
+
 	WindowConfig window_config;
 	
 	//RenderConfig render_config;
@@ -455,9 +481,7 @@ int main()
 					  shaders_root);
 	
 	Resources resources{context, assets_root};
-
-
-
+	
 	std::cout << "STARTING DRAW LOOP" << std::endl;
 	/** ************************************************************************
 	 * Frame Loop
@@ -465,7 +489,7 @@ int main()
 	SDL_Event event{};
 	bool exit = false;
 	uint64_t framecount = 0;
-	std::size_t scene_index = 0;
+	//std::size_t scene_index = 0;
 
 	while (!exit) {
 		/** ************************************************************************
@@ -489,9 +513,9 @@ int main()
 					exit = true;
 					break;
 					
-				case SDLK_n:
-					scene_index++;
-					break;
+//			case SDLK_n:
+//				scene_index++;
+//				break;
 				case SDLK_w:
 					camera.position += camera_forward * move_speed;
 					break;
@@ -550,27 +574,7 @@ int main()
 
 		world_info.camera_position = camera.position;
 		world_info.view = camera.view();
-#if 0		
-		std::cout << std::format("Camera forward  {} {} {}\n"
-								 "       right    {} {} {}\n"
-								 "       up       {} {} {}\n"
-								 "       position {} {} {}",
-								 camera_forward[0],
-								 camera_forward[1],
-								 camera_forward[2],
-								 camera_right[0],
-								 camera_right[1],
-								 camera_right[2],
-								 camera_up[0],
-								 camera_up[1],
-								 camera_up[2],
-								 world_info.camera_position[0],
-								 world_info.camera_position[1],
-								 world_info.camera_position[2]
-								 )
-			<< std::endl;
-#endif		
-			
+		
 		/** ************************************************************************
 		 * Render Loop
 		 */
@@ -578,6 +582,7 @@ int main()
 			-> std::optional<Texture2D::Impl*>
 			{
 				
+#if 0
 				std::array<std::filesystem::path, 3> const scenes {
 					scenes_root / "shadowtest.json",
 					scenes_root / "animation.json",
@@ -586,10 +591,10 @@ int main()
 
 				if (scene_index > scenes.size() - 1)
 					scene_index = 0;
-				
-				Scene scene	= load_scene_from_path(scenes.at(scene_index),
+#endif				
+				Scene scene	= load_scene_from_path(scene_path,
 												   resources);
-
+				
 				auto* textureptr = renderer.render(frameInfo.current_flight_frame_index,
 												   frameInfo.total_frame_count,
 												   world_info,

@@ -781,6 +781,11 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			? renderable.texture.ambient 
 			: &m_ambient.default_texture;
 		
+
+		if (ambient_texture == nullptr) {
+			ambient_texture = &m_ambient.default_texture;
+		}
+
 		if (ambient_texture != last_ambient_texture) {
 			if (!m_ambient.sets.contains(ambient_texture)) {
 				m_ambient.sets.insert({ambient_texture,
@@ -792,6 +797,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 				logger.info(std::source_location::current(),
 							"Added new ambient texture to cache");
 			}	
+
 
 			std::array<vk::DescriptorSet, 1> descriptorset{
 				m_ambient.sets[ambient_texture][*current_flightframe].get()
@@ -810,6 +816,10 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			? renderable.texture.diffuse 
 			: &m_diffuse.default_texture;
 		
+		if (diffuse_texture == nullptr) {
+			diffuse_texture = &m_diffuse.default_texture;
+		}
+
 		if (diffuse_texture != last_diffuse_texture) {
 			if (!m_diffuse.sets.contains(diffuse_texture)) {
 				m_diffuse.sets.insert({diffuse_texture,
@@ -840,6 +850,10 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			? renderable.texture.specular 
 			: &m_specular.default_texture;
 		
+		if (specular_texture == nullptr) {
+			specular_texture = &m_specular.default_texture;
+		}
+
 		if (specular_texture != last_specular_texture) {
 			if (!m_specular.sets.contains(specular_texture)) {
 				m_specular.sets.insert({specular_texture,

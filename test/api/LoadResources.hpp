@@ -72,8 +72,10 @@ struct Resources
 		TextureSamplerReadOnly lulu;
 		TextureSamplerReadOnly statue;
 	} textures;
+	
+	RenderableTree backpack;
+	RenderableTree monster;
 };
-
 
 auto get_textured_cube_vertices()
 	-> std::vector<VertexPosNormColorUV> 
@@ -351,9 +353,7 @@ Resources::Resources(Render::Context& context,
 		throw std::runtime_error(std::string("TinyOBJ error: ") + p->msg);
 	}
 
-	
 	std::cout << "loading smg textures!" << std::endl;
-
 	smg.diffuse =
 		load_bitmap(models_root / "smg/D.tga", 
 					BitmapPixelFormat::RGBA,
@@ -389,8 +389,32 @@ Resources::Resources(Render::Context& context,
 		| get_bitmap()
 		| move_bitmap_to_gpu(&context)
 		| make_shader_readonly(&context, InterpolationType::Linear);
-
 	
+	
+	std::optional<RenderableTree> loaded_backpack = 
+		load_model(context,
+				   models_root / "backpack/backpack.obj");
+	
+	if (loaded_backpack.has_value()) {
+		backpack = loaded_backpack.value();
+		std::cout << "Loaded backpack obj" << std::endl;
+	}
+	else {
+		std::cout << "COULD NOT backpack obj" << std::endl;
+	}
+	
+	std::optional<RenderableTree> loaded_monster = 
+		load_model(context,
+				   models_root / "glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb");
+
+	if (loaded_monster.has_value()) {
+		monster = loaded_monster.value();
+		std::cout << "Loaded monster obj" << std::endl;
+	}
+	else {
+		std::cout << "COULD NOT monster obj" << std::endl;
+	}
+
 	std::cout << "loading statue jpg!" << std::endl;
 	textures.statue = 
 		load_bitmap(textures_root / "texture.jpg",

@@ -38,6 +38,7 @@ struct SortedRenderables
 	std::vector<NormColorRenderable> normcolors;
 	std::vector<WireframeRenderable> wireframes;
 	std::vector<MaterialRenderable> materialrenderables;
+	std::vector<RenderableTree> renderabletrees;
 };
 
 class Renderer::Impl 
