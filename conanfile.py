@@ -22,27 +22,28 @@ class VulkanRendererRecipe(ConanFile):
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
-
-    def layout(self):
-        cmake_layout(self)
-
-    def generate(self):
-        deps = CMakeDeps(self)
-        deps.generate()
-        tc = CMakeToolchain(self)
-        tc.generate()
+            
+    def package_info(self):
+        self.cpp_info.libs = ["vulkan-renderer"]
         
     def requirements(self):
         self.requires("polymorph/1.1", transitive_headers=True)
         self.requires("simple-geometry/1.0", transitive_headers=True)
         self.requires("glm/1.0.1", transitive_headers=True)
-        #self.requires("tinygltf/2.9.0", transitive_headers=True)
         self.requires("assimp/6.0.2", transitive_headers=True)
-        # visible=False
         #self.requires("sdl/[~2.28]", transitive_headers=True)
         #self.requires("vulkan-headers/1.4.309.0", transitive_headers=True)
 
+    def generate(self):
+        deps = CMakeDeps(self)
+        deps.generate()
+        tc = CMakeToolchain(self)
+        tc.cache_variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = "ON"
+        tc.generate()
 
+    def layout(self):
+        cmake_layout(self)
+        
     def build(self):
         cmake = CMake(self)
         cmake.configure()
@@ -51,6 +52,3 @@ class VulkanRendererRecipe(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-
-    def package_info(self):
-        self.cpp_info.libs = ["vulkan-renderer"]

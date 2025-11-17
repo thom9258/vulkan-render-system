@@ -9,7 +9,7 @@ class TestVulkanRenderer(ConanFile):
 
     def requirements(self):
         self.requires("vulkan-renderer/1.4")
-        #self.requires("nlohmann_json/3.12.0", override=True)
+        self.requires("nlohmann_json/3.12.0")
         
     def layout(self):
         cmake_layout(self)
@@ -18,6 +18,7 @@ class TestVulkanRenderer(ConanFile):
         deps = CMakeDeps(self)
         deps.generate()
         tc = CMakeToolchain(self)
+        tc.cache_variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = "ON"
         tc.generate()
 
     def build(self):

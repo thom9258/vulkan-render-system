@@ -22,11 +22,12 @@ auto unindex_vertices(std::vector<VertexPosNormColorUV> vertices,
 	return unindexed;
 }
 
+#if 0
 void loadMaterialTextures(Render::Context& context,
 						  RenderableTree::MaterialMap& materials,
 						  aiMaterial* mat,
 						  aiTextureType type,
-						  string typeName)
+						  std::string typeName)
 {
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)
     {
@@ -40,8 +41,7 @@ void loadMaterialTextures(Render::Context& context,
     }
     return textures;
 }  
-
-
+#endif
 
 auto process_mesh(Render::Context& context,
 						  RenderableTree::MaterialMap& materials,
@@ -87,16 +87,14 @@ auto process_mesh(Render::Context& context,
 	if (mesh->mMaterialIndex >= 0) {
 		std::cout << "MODEL HAS MATERIAL" << std::endl;
 
-		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-		vector<Texture> diffuseMaps = loadMaterialTextures(material, 
-														   aiTextureType_DIFFUSE, "texture_diffuse");
-		textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-		vector<Texture> specularMaps = loadMaterialTextures(material, 
-															aiTextureType_SPECULAR, "texture_specular");
-		textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+//	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+//	vector<Texture> diffuseMaps = loadMaterialTextures(material, 
+//													   aiTextureType_DIFFUSE, "texture_diffuse");
+//	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+//	vector<Texture> specularMaps = loadMaterialTextures(material, 
+//														aiTextureType_SPECULAR, "texture_specular");
+//	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 	}  
-
-
 	
 	RenderableTree::Node::MaterialMesh drawable_mesh{
 		VertexBuffer::create<VertexPosNormColorUV>(context, unindexed),
