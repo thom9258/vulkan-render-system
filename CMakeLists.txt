@@ -54,6 +54,7 @@ set(PUBLIC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Light.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ShadowCaster.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ShaderTexture.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/TextureSamplerCache.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/StrongType.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Texture.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Vertex.hpp
@@ -76,6 +77,7 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/DescriptorPoolImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexBufferImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShaderTextureImpl.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/TextureSamplerCache.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PipelineUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp

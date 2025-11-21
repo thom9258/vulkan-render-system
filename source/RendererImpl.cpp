@@ -42,16 +42,17 @@ void sort_renderable(Logger* logger,
 		sorted->basetextures.push_back(*p);
 	else if (auto p = std::get_if<MaterialRenderable>(&renderable))
 		sorted->materialrenderables.push_back(*p);
-	else if (auto p = std::get_if<RenderableTree>(&renderable))
-		sorted->renderabletrees.push_back(*p);
+	else if (auto p = std::get_if<RenderableNodePtr>(&renderable))
+		sorted->renderablenodes.push_back(*p);
 	else {
 		logger->warn(std::source_location::current(),
 					 "Found unknown Renderable that can not be sorted and drawn");
 	}
 }
 
-auto unwind_renderabletree_node(std::vector<MaterialRenderable>& renderables,
-								RenderableTree::Node* node) 
+auto unwind_renderablenode(std::vector<MaterialRenderable>& renderables,
+						   TextureSamplerCache& texture_cache,
+						   RenderableNode* node) 
 	-> void
 {
 	if (!node) return;
@@ -59,22 +60,57 @@ auto unwind_renderabletree_node(std::vector<MaterialRenderable>& renderables,
 	for (auto& mesh: node->meshes) {
 		MaterialRenderable renderable;
 		renderable.model = node->model;
-		//renderable.model = glm::mat4(1.0f);
 		renderable.mesh = &mesh.mesh;
 		renderable.has_shadow = true;
+		
+		if (mesh.ambient.has_value()) {
+			TextureSamplerCache::TextureInfo* info =
+				texture_cache.get_texture(mesh.ambient.value());
+			if (info) {
+				renderable.texture.ambient = &(info->texture);
+			}
+			else {
+				renderable.texture.ambient = nullptr;
+			}
+		}
+
+		if (mesh.diffuse.has_value()) {
+			TextureSamplerCache::TextureInfo* info =
+				texture_cache.get_texture(mesh.diffuse.value());
+			if (info) {
+				renderable.texture.diffuse = &(info->texture);
+			}
+			else {
+				renderable.texture.diffuse = nullptr;
+			}
+		}
+	
+		if (mesh.specular.has_value()) {
+			TextureSamplerCache::TextureInfo* info =
+				texture_cache.get_texture(mesh.specular.value());
+			if (info) {
+				renderable.texture.specular = &(info->texture);
+			}
+			else {
+				renderable.texture.specular = nullptr;
+			}
+		}
+
+		renderable.texture.normal = nullptr;
 		renderables.push_back(renderable);
 	}
 	
 	for (auto& child: node->children) {
-		unwind_renderabletree_node(renderables, child.get());
+		unwind_renderablenode(renderables, texture_cache, child.get());
 	}
 }
 
-auto unwind_renderabletree(RenderableTree& tree)
+auto unwind_renderablenode(TextureSamplerCache &texture_cache,
+                           RenderableNode* node)
 	-> std::vector<MaterialRenderable>
 {
 	std::vector<MaterialRenderable> renderables;
-	unwind_renderabletree_node(renderables, tree.root.get());
+	unwind_renderablenode(renderables, texture_cache, node);
 	return renderables;
 }
 
@@ -238,6 +274,7 @@ auto render_geometry_pass(GeometryPass& pass,
 						  //       does not want to capture a reference for it...
 						  GeometryPipelines* pipelines,
 						  Logger* logger,
+						  TextureSamplerCache& texture_cache,
 						  const uint32_t current_frame_in_flight,
 						  const uint32_t max_frames_in_flight,
 						  const uint64_t total_frames,
@@ -262,10 +299,12 @@ auto render_geometry_pass(GeometryPass& pass,
 	std::ranges::for_each(renderables,
 						  std::bind_front(sort_renderable, logger, &sorted));
 	
-	//TODO: this is PROBABLY dirty to do, but we need to unwind the tree into something
+	//TODO: this is PROBABLY dirty to do, but we need to unwind the node tree into something
 	//      simple the render pipelines can understand...
-	for (auto& renderabletree: sorted.renderabletrees) {
-		std::vector<MaterialRenderable> renderables = unwind_renderabletree(renderabletree);
+	for (auto& renderablenode: sorted.renderablenodes) {
+          std::vector<MaterialRenderable> renderables =
+              unwind_renderablenode(texture_cache,
+                                    renderablenode.get());
 		for (auto& renderable: renderables) {
 			sorted.materialrenderables.push_back(renderable);
 		}
@@ -514,7 +553,8 @@ Renderer::Impl::~Impl()
 {
 }
 
-auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
+auto Renderer::Impl::render(TextureSamplerCache& texture_cache,
+							const uint32_t current_frame_in_flight,
 							const uint64_t total_frames,
 							const WorldRenderInfo& world_info,
 							std::vector<Renderable>& renderables,
@@ -526,6 +566,7 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 								shadow_passes,
 								&geometry_pipelines,
 								&logger,
+								texture_cache,
 								current_frame_in_flight,
 								presenter->max_frames_in_flight,
 								total_frames,
@@ -539,7 +580,8 @@ auto Renderer::Impl::render(const uint32_t current_frame_in_flight,
 								shadowcasters);
 }
 
-auto Renderer::render(const uint32_t current_frame_in_flight,
+auto Renderer::render(TextureSamplerCache &texture_cache,
+                      const uint32_t current_frame_in_flight,
 					  const uint64_t total_frames,
 					  const WorldRenderInfo& world_info,
 					  std::vector<Renderable>& renderables,
@@ -547,7 +589,8 @@ auto Renderer::render(const uint32_t current_frame_in_flight,
 					  ShadowCasters& shadowcasters)
 		-> Texture2D::Impl*
 {
-	return impl->render(current_frame_in_flight,
+  return impl->render(texture_cache,
+                      current_frame_in_flight,
 						total_frames,
 						world_info,
 						renderables,

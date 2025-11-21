@@ -5,4 +5,6 @@
 #include <filesystem>
 
 
-std::optional<RenderableTree> load_model(Render::Context& context, std::filesystem::path path);
+RenderableNodePtr load_model(Render::Context& context,
+							 TextureSamplerCache& texture_cache,
+							 std::filesystem::path path);

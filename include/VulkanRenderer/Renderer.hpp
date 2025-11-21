@@ -29,14 +29,15 @@ public:
 			 const std::filesystem::path shaders_root);
 
 	~Renderer();
-	
-	auto render(const uint32_t current_frame_in_flight,
-				const uint64_t total_frames,
-				const WorldRenderInfo& world_info,
-				std::vector<Renderable>& renderables,
-				std::vector<Light>& lights,
-				ShadowCasters& shadowcasters)
-		-> Texture2D::Impl*;
+
+        auto render(TextureSamplerCache &texture_cache,
+                    const uint32_t current_frame_in_flight,
+					const uint64_t total_frames,
+					const WorldRenderInfo& world_info,
+					std::vector<Renderable>& renderables,
+					std::vector<Light>& lights,
+					ShadowCasters& shadowcasters)
+			-> Texture2D::Impl*;
 
 	class Impl;
 	std::unique_ptr<Impl> impl;

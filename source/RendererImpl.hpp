@@ -38,7 +38,7 @@ struct SortedRenderables
 	std::vector<NormColorRenderable> normcolors;
 	std::vector<WireframeRenderable> wireframes;
 	std::vector<MaterialRenderable> materialrenderables;
-	std::vector<RenderableTree> renderabletrees;
+	std::vector<RenderableNodePtr> renderablenodes;
 };
 
 class Renderer::Impl 
@@ -50,8 +50,9 @@ public:
 				  DescriptorPool::Impl* descriptor_pool,
 				  const std::filesystem::path shaders_root);
     ~Impl();
-	
-	auto render(const uint32_t current_frame_in_flight,
+
+    auto render(TextureSamplerCache &texture_cache,
+                const uint32_t current_frame_in_flight,
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
 				std::vector<Renderable>& renderables,

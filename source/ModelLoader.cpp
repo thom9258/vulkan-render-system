@@ -44,10 +44,10 @@ void loadMaterialTextures(Render::Context& context,
 #endif
 
 auto process_mesh(Render::Context& context,
-						  RenderableTree::MaterialMap& materials,
-						  aiMesh* mesh,
-						  const aiScene* scene)
-	-> RenderableTree::Node::MaterialMesh
+				  TextureSamplerCache& texture_cache,
+				  aiMesh* mesh,
+				  const aiScene* scene)
+	-> RenderableNode::MaterialMesh
 {
 	std::vector<VertexPosNormColorUV> vertices{};
 	for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
@@ -96,9 +96,13 @@ auto process_mesh(Render::Context& context,
 //	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 	}  
 	
-	RenderableTree::Node::MaterialMesh drawable_mesh{
-		VertexBuffer::create<VertexPosNormColorUV>(context, unindexed),
-		""};
+	RenderableNode::MaterialMesh drawable_mesh{
+		VertexBuffer::create<VertexPosNormColorUV>(context, unindexed)};
+	drawable_mesh.ambient = std::nullopt;
+	drawable_mesh.diffuse = std::nullopt;
+	drawable_mesh.specular = std::nullopt;
+	drawable_mesh.normal = std::nullopt;
+
     return drawable_mesh;
 }
 
@@ -114,13 +118,13 @@ glm::mat4 glm_matrix(aiMatrix4x4 other)
 
 [[nodiscard]]
 auto process_node(Render::Context& context,
-				  RenderableTree::MaterialMap& materials,
+				  TextureSamplerCache& texture_cache,
 				  aiNode* node,
 				  const aiScene* scene)
-	-> std::shared_ptr<RenderableTree::Node>
+	-> RenderableNodePtr
 {
 	if (!node || !scene) return nullptr;
-	auto drawable_node = std::make_shared<RenderableTree::Node>();
+	auto drawable_node = std::make_shared<RenderableNodePtr::element_type>();
 	drawable_node->name = node->mName.C_Str();
 	drawable_node->model = glm_matrix(node->mTransformation);
 
@@ -129,17 +133,18 @@ auto process_node(Render::Context& context,
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 		if (!mesh) continue;
         drawable_node->meshes.push_back(process_mesh(context,
-													 materials,
+													 texture_cache,
 													 mesh,
 													 scene));			
     }
 
     for (unsigned int i = 0; i < node->mNumChildren; i++)
     {
-		std::shared_ptr<RenderableTree::Node> child = process_node(context,
-																   materials,
-																   node->mChildren[i],
-																   scene);
+		RenderableNodePtr child = process_node(context,
+											   texture_cache,
+											   node->mChildren[i],
+											   scene);
+
 		if (child != nullptr)
 			drawable_node->children.push_back(std::move(child));
     }
@@ -147,11 +152,14 @@ auto process_node(Render::Context& context,
 	return drawable_node;
 }
 
-std::optional<RenderableTree> load_model(Render::Context& context, std::filesystem::path path)
+
+RenderableNodePtr load_model(Render::Context& context,
+							 TextureSamplerCache& texture_cache,
+							 std::filesystem::path path)
 {
 	if (!std::filesystem::exists(path)) {
 		std::cout << "FAILED Loading Model at path: " << path.string() << std::endl;
-		return std::nullopt;
+		return nullptr;
 	}
 
 	Assimp::Importer importer;
@@ -165,13 +173,12 @@ std::optional<RenderableTree> load_model(Render::Context& context, std::filesyst
 	if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) 
     {
         std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
-        return std::nullopt;
+		return nullptr;
     }
 
-	RenderableTree tree;
-	tree.root = process_node(context,
-							 tree.materials,
-							 scene->mRootNode,
-							 scene);
-	return tree;
+	RenderableNodePtr root = process_node(context,
+										  texture_cache,
+										  scene->mRootNode,
+										  scene);
+	return root;
 }

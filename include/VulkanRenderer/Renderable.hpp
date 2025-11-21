@@ -1,7 +1,7 @@
 #pragma once
 
 #include "glm.hpp"
-#include "TextureCache.hpp"
+#include "TextureSamplerCache.hpp"
 #include "Mesh.hpp"
 
 #include <variant>
@@ -60,11 +60,15 @@ struct RenderableNode
 	std::string name;
 	glm::mat4 model;
 	std::vector<MaterialMesh> meshes;
-	std::vector<std::shared_ptr<RenderableNode>> children;
+	
+	using NodePtr = std::shared_ptr<RenderableNode>;
+	std::vector<NodePtr> children;
 };
+
+using RenderableNodePtr = RenderableNode::NodePtr;
 
 using Renderable = std::variant<NormColorRenderable,
 								WireframeRenderable,
 								BaseTextureRenderable,
 								MaterialRenderable,
-								RenderableNode>;
+								RenderableNodePtr>;
