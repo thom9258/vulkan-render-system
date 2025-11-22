@@ -57,7 +57,7 @@ struct RenderableNode
 		std::optional<TextureSamplerRef> normal;
 	};
 
-	std::string name;
+	std::optional<std::string> name;
 	glm::mat4 model;
 	std::vector<MaterialMesh> meshes;
 	
@@ -72,3 +72,27 @@ using Renderable = std::variant<NormColorRenderable,
 								BaseTextureRenderable,
 								MaterialRenderable,
 								RenderableNodePtr>;
+
+
+
+struct NoRenderable {};
+struct MaterialRenderable2
+{
+		//TexturedMeshRef vertices;
+		//std::optional<IndicesRef> indices;
+		std::optional<TextureSamplerRef> ambient;
+		std::optional<TextureSamplerRef> diffuse;
+		std::optional<TextureSamplerRef> specular;
+		std::optional<TextureSamplerRef> normal;
+};
+
+using Renderable2 = std::variant < NoRenderable,
+								   MaterialRenderable2>;
+
+struct RenderableNode2
+{
+	glm::mat4 model_matrix;
+	std::optional<std::string> name;
+	Renderable2 renderable;
+	std::vector<RenderableNode2> children;
+};      

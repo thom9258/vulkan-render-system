@@ -6,4 +6,5 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake -
 cmake --build .
 
 cd ..
+[[ -f compile_commands.json  ]] && rm compile_commands.json
 ln -s ./build/compile_commands.json .

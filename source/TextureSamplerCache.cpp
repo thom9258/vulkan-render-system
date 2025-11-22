@@ -53,4 +53,17 @@ auto TextureSamplerCache::get_texture(TextureSamplerRef ref)
 	}
 	
 	return &(found->second);
+}
+
+
+auto TextureSamplerCache::get_ref_from_path(std::filesystem::path path)
+    -> std::optional<TextureSamplerRef>
+{
+
+  for (auto &[ref, texture] : m_cache) {
+    if (texture.path == path) {
+		return ref;
+    }
+  }
+  return std::nullopt;
 }    

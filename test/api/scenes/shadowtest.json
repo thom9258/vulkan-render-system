@@ -10,6 +10,14 @@
 			"scale": [0.2, 0.2, 0.2]
 		},
 		{
+			"name": "corset", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [0, 0.2, 0],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [30, 30, 30]
+		},
+		{
 			"name": "chest", 
 			"draw-mode": "material",
 			"has-shadow": "yes",
@@ -70,7 +78,7 @@
 			"casts-shadow": "yes",
 			"draw-gizmo": "yes",
 
-			"position": [-1, 1, -1],
+			"position": [-2, 1, -2],
 			"direction": [1, 0, 1],
 			"diffuse": [2, 2, 2],
 			"specular": [1, 1, 1],

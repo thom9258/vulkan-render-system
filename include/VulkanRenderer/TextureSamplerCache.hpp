@@ -30,6 +30,7 @@ public:
 		std::optional<std::filesystem::path> path;
 	};
 
+	[[nodiscard]]
 	auto add_texture(Render::Context* context,
 					 InterpolationType interpolation,
 					 std::string_view name,
@@ -37,8 +38,8 @@ public:
 					 Texture2D&& texture)
 		-> TextureSamplerRef;
 
-	
 	TextureInfo* get_texture(TextureSamplerRef ref);
+	std::optional<TextureSamplerRef> get_ref_from_path(std::filesystem::path path);
 
 private:        
 	std::map<TextureSamplerRef, TextureInfo> m_cache;
