@@ -138,11 +138,18 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 
       std::filesystem::path path =
           base_directory / std::filesystem::path(pathstring);
+
+	  if (!std::filesystem::exists(path) || !std::filesystem::is_regular_file(path))
+		  return std::nullopt;
+
       return path;
     };
 
     int constexpr first_texture{0};
     aiMaterial *first_material = scene->mMaterials[mesh->mMaterialIndex];
+
+    // ------------------------------------------
+    // Diffuse texture
     std::string const diffuse_name = first_material->GetName().C_Str();
     std::optional<std::filesystem::path> diffuse_path =
         get_texture_path(first_material, aiTextureType_DIFFUSE, first_texture);
@@ -151,33 +158,112 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
       std::optional<TextureSamplerRef> cached =
           texture_cache.get_ref_from_path(diffuse_path.value());
 
-	  if (cached.has_value()) {
-		  std::cout << std::format("Model has cached Diffuse name: {} path: {}",
-								   diffuse_name, diffuse_path.value().string())
-					<< std::endl;
-		  drawable_mesh.diffuse = cached.value();
-	  } else {
-      std::cout << std::format("Model has Diffuse name: {} path: {}",
-                               diffuse_name, diffuse_path.value().string())
-                << std::endl;
+      if (cached.has_value()) {
+        std::cout << std::format("Model has cached Diffuse name: {} path: {}",
+                                 diffuse_name, diffuse_path.value().string())
+                  << std::endl;
+        drawable_mesh.diffuse = cached.value();
+      } else {
+        std::cout << std::format("Model has Diffuse name: {} path: {}",
+                                 diffuse_name, diffuse_path.value().string())
+                  << std::endl;
 
-      Texture2D texture =
-          load_bitmap(diffuse_path.value(), BitmapPixelFormat::RGBA,
-                      VerticalFlipOnLoad::No) |
-          throw_on_bitmap_error() | get_bitmap() | move_bitmap_to_gpu(&context);
+        Texture2D texture =
+            load_bitmap(diffuse_path.value(), BitmapPixelFormat::RGBA,
+                        VerticalFlipOnLoad::No) |
+            throw_on_bitmap_error() | get_bitmap() |
+            move_bitmap_to_gpu(&context);
 
-      TextureSamplerRef ref = texture_cache.add_texture(
-          &context, InterpolationType::Linear, diffuse_name,
-          diffuse_path.value(), std::move(texture));
+        TextureSamplerRef ref = texture_cache.add_texture(
+            &context, InterpolationType::Linear, diffuse_name,
+            diffuse_path.value(), std::move(texture));
 
-      drawable_mesh.diffuse = ref;
-    }
+        drawable_mesh.diffuse = ref;
+      }
     } else {
       std::cout << std::format("Model has invalid Diffuse name: {}",
                                diffuse_name)
                 << std::endl;
     }
+
+    // ------------------------------------------
+    // Specular texture
+    std::string const specular_name = first_material->GetName().C_Str();
+    std::optional<std::filesystem::path> specular_path =
+        get_texture_path(first_material, aiTextureType_SPECULAR, first_texture);
+
+    if (specular_path.has_value()) {
+      std::optional<TextureSamplerRef> cached =
+          texture_cache.get_ref_from_path(specular_path.value());
+
+      if (cached.has_value()) {
+        std::cout << std::format("Model has cached Specular name: {} path: {}",
+                                 specular_name, specular_path.value().string())
+                  << std::endl;
+        drawable_mesh.specular = cached.value();
+      } else {
+        std::cout << std::format("Model has Specular name: {} path: {}",
+                                 specular_name, specular_path.value().string())
+                  << std::endl;
+
+        Texture2D texture =
+            load_bitmap(specular_path.value(), BitmapPixelFormat::RGBA,
+                        VerticalFlipOnLoad::No) |
+            throw_on_bitmap_error() | get_bitmap() |
+            move_bitmap_to_gpu(&context);
+
+        TextureSamplerRef ref = texture_cache.add_texture(
+            &context, InterpolationType::Linear, specular_name,
+            specular_path.value(), std::move(texture));
+
+        drawable_mesh.specular = ref;
+      }
+    } else {
+      std::cout << std::format("Model has invalid Specular name: {}",
+                               specular_name)
+                << std::endl;
+    }
+
+    // ------------------------------------------
+    // Ambient texture
+    std::string const ambient_name = first_material->GetName().C_Str();
+    std::optional<std::filesystem::path> ambient_path =
+        get_texture_path(first_material, aiTextureType_AMBIENT, first_texture);
+
+    if (ambient_path.has_value()) {
+      std::optional<TextureSamplerRef> cached =
+          texture_cache.get_ref_from_path(ambient_path.value());
+
+      if (cached.has_value()) {
+        std::cout << std::format("Model has cached Ambient name: {} path: {}",
+                                 ambient_name, ambient_path.value().string())
+                  << std::endl;
+        drawable_mesh.ambient = cached.value();
+      } else {
+        std::cout << std::format("Model has Ambient name: {} path: {}",
+                                 ambient_name, ambient_path.value().string())
+                  << std::endl;
+
+        Texture2D texture =
+            load_bitmap(ambient_path.value(), BitmapPixelFormat::RGBA,
+                        VerticalFlipOnLoad::No) |
+            throw_on_bitmap_error() | get_bitmap() |
+            move_bitmap_to_gpu(&context);
+
+        TextureSamplerRef ref = texture_cache.add_texture(
+            &context, InterpolationType::Linear, ambient_name,
+            ambient_path.value(), std::move(texture));
+
+        drawable_mesh.ambient = ref;
+      }
+    } else {
+      std::cout << std::format("Model has invalid Ambient name: {}",
+                               ambient_name)
+                << std::endl;
+    }
   }
+
+  aiTextureType_
 
   return drawable_mesh;
 }

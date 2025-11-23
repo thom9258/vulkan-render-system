@@ -91,6 +91,8 @@ auto parse_transform(json j) -> Render::Transform {
 }
 
 auto load_scene_from_path(std::filesystem::path const path,
+						  Render::Context &context,
+						  TextureSamplerCache &texture_cache,
                           Resources &resources) -> Scene {
   std::ifstream fs(path.string());
   std::string content;
@@ -102,10 +104,32 @@ auto load_scene_from_path(std::filesystem::path const path,
                  std::istreambuf_iterator<char>());
 
   json j = json::parse(content);
-  Scene scene;
+  
+  std::map<std::string, RenderableNodePtr> loaded_assets;
 
-  json prefabs = j["prefabs"];
-  for (auto &prefab : prefabs) {
+  json assets = j["assets"];
+  for (auto &asset : assets) {
+	  std::string name = asset["name"];
+	  std::string path = asset["path"];
+	  
+	  RenderableNodePtr loaded_model = load_model(context,
+												  texture_cache,
+												  path);
+	  
+	  if (loaded_model) {
+		  loaded_assets[name] = loaded_model;
+		  std::cout << std::format("Loaded asset {} from path: {}", name, path) << std::endl;
+	  } else {
+		  std::cout << std::format("Could NOT Load asset {} from path: {}", name, path) << std::endl;
+	  }
+
+
+
+  }
+
+  Scene scene;
+  json level = j["level"];
+  for (auto &prefab : level) {
     std::string name = prefab["name"];
     Render::Transform transform = parse_transform(prefab);
 
@@ -202,29 +226,16 @@ auto load_scene_from_path(std::filesystem::path const path,
       } else {
         std::cout << "Unknown draw mode for " << name << std::endl;
       }
-    } else if (name == "backpack") {
-      if (prefab["draw-mode"] == "material") {
-        // TODO: We need to figure out how to set transforms on this thing
-        RenderableNodePtr renderable = resources.backpack;
-        scene.renderables.push_back(renderable);
-      } else {
-        std::cout << "Unknown draw mode for " << name << std::endl;
-      }
-    } else if (name == "monster") {
-      if (prefab["draw-mode"] == "material") {
-        scene.renderables.push_back(resources.monster);
-      } else {
-        std::cout << "Unknown draw mode for " << name << std::endl;
-      }
-    } else if (name == "corset") {
-      if (prefab["draw-mode"] == "material") {
-        resources.corset->model = transform.as_matrix();
-        scene.renderables.push_back(resources.corset);
-      } else {
-        std::cout << "Unknown draw mode for " << name << std::endl;
-      }
     } else {
-      std::cout << "Unknown renderable " << name << std::endl;
+		auto found = loaded_assets.find(name);
+		if (found == loaded_assets.end()) {
+			std::cout << "Unknown renderable " << name << std::endl;
+			continue;
+		}
+
+		RenderableNodePtr renderable = found->second;
+        renderable->model = transform.as_matrix();
+        scene.renderables.push_back(renderable);
     }
   }
 
@@ -444,6 +455,8 @@ int main(int argc, char **argv) {
    * Frame Loop
    */
   SDL_Event event{};
+  bool reload_scene = false;
+  Scene scene = load_scene_from_path(scene_path, context, texture_cache, resources);
   bool exit = false;
   uint64_t framecount = 0;
   // std::size_t scene_index = 0;
@@ -491,6 +504,9 @@ int main(int argc, char **argv) {
         case SDLK_q:
           camera.position += camera_up * move_speed;
           break;
+        case SDLK_r:
+          reload_scene = true;
+          break;
         case SDLK_LEFT:
           camera.rotation =
               glm::mat3(glm::rotate(glm::mat4(camera.rotation),
@@ -537,7 +553,12 @@ int main(int argc, char **argv) {
      */
     FrameProducer frameGenerator =
         [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
-      Scene scene = load_scene_from_path(scene_path, resources);
+		
+		if (reload_scene) {
+			scene = load_scene_from_path(scene_path, context, texture_cache, resources);
+			reload_scene = false;
+		}
+
 
       auto *textureptr =
           renderer.render(texture_cache, frameInfo.current_flight_frame_index,

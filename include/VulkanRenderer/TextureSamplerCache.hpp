@@ -15,7 +15,6 @@ private:
 	std::uint64_t m_id;
 };
 
-
 bool operator==(const TextureSamplerRef lhs, const TextureSamplerRef rhs) noexcept; 
 bool operator<(const TextureSamplerRef lhs, const TextureSamplerRef rhs) noexcept; 
 

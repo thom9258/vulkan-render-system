@@ -71,10 +71,6 @@ struct Resources {
     TextureSamplerReadOnly lulu;
     TextureSamplerReadOnly statue;
   } textures;
-
-  RenderableNodePtr backpack;
-  RenderableNodePtr monster;
-  RenderableNodePtr corset;
 };
 
 auto get_textured_cube_vertices() -> std::vector<VertexPosNormColorUV> {
@@ -330,40 +326,8 @@ Resources::Resources(Render::Context &context,
       throw_on_bitmap_error() | get_bitmap() | move_bitmap_to_gpu(&context) |
       make_shader_readonly(&context, InterpolationType::Linear);
 
-  RenderableNodePtr loaded_backpack =
-      load_model(context, texture_cache, models_root / "backpack/backpack.obj");
-
-  if (loaded_backpack) {
-    backpack = loaded_backpack;
-    std::cout << "Loaded backpack obj" << std::endl;
-  } else {
-    std::cout << "COULD NOT backpack obj" << std::endl;
-  }
-
   // TODO: this is a glb model so textures are embedded! see
   // ModelLoader.cpp for more info and provide a fix!
-
-  RenderableNodePtr loaded_monster = load_model(
-      context, texture_cache,
-      models_root / "glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb");
-
-  if (loaded_monster) {
-    monster = loaded_monster;
-    std::cout << "Loaded monster obj" << std::endl;
-  } else {
-    std::cout << "COULD NOT monster obj" << std::endl;
-  }
-
-  RenderableNodePtr loaded_corset = load_model(
-      context, texture_cache,
-      models_root / "glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf");
-
-  if (loaded_corset) {
-    corset = loaded_corset;
-    std::cout << "Loaded corset glb" << std::endl;
-  } else {
-    std::cout << "COULD NOT corset glb" << std::endl;
-  }
 
   std::cout << "loading statue jpg!" << std::endl;
   textures.statue =
