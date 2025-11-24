@@ -79,6 +79,14 @@
 			"position": [5, 2, 0],
 			"rotation-quat-wxyz": [ 0.7071068, 0, -0.7071068, 0 ],
 			"scale": [10, 5, 0.2]
+		},
+		{
+			"name": "pixelart", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [-5, 2, 0],
+			"rotation-quat-wxyz": [ 0.7071068, 0, -0.7071068, 0 ],
+			"scale": [10, 5, 0.2]
 		}
 	],
     "lights" : 

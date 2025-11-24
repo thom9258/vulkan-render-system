@@ -52,6 +52,7 @@ public:
     ~Impl();
 
     auto render(TextureSamplerCache &texture_cache,
+				TexturedMeshCache& texturedmesh_cache,
                 const uint32_t current_frame_in_flight,
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,

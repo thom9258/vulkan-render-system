@@ -93,6 +93,7 @@ auto parse_transform(json j) -> Render::Transform {
 auto load_scene_from_path(std::filesystem::path const path,
 						  Render::Context &context,
 						  TextureSamplerCache &texture_cache,
+						  TexturedMeshCache &texturedmesh_cache,
                           Resources &resources) -> Scene {
   std::ifstream fs(path.string());
   std::string content;
@@ -113,6 +114,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 	  std::string path = asset["path"];
 	  
 	  RenderableNodePtr loaded_model = load_model(context,
+												  texturedmesh_cache,
 												  texture_cache,
 												  path);
 	  
@@ -207,6 +209,22 @@ auto load_scene_from_path(std::filesystem::path const path,
         box.mesh = &resources.cube.mesh;
         box.model = transform.as_matrix();
         scene.renderables.push_back(box);
+      } else {
+        std::cout << "Unknown draw mode for " << name << std::endl;
+      }
+    } else if (name == "pixelart") {
+      if (prefab["draw-mode"] == "material") {
+        MaterialRenderable pixelart{};
+        pixelart.mesh = &resources.cube.textured_mesh;
+        if (prefab["has-shadow"] == "yes") {
+          pixelart.has_shadow = true;
+        }
+
+        pixelart.texture.diffuse = &resources.textures.pixelart;
+        pixelart.texture.specular = nullptr;
+        pixelart.texture.normal = nullptr;
+        pixelart.model = transform.as_matrix();
+        scene.renderables.push_back(pixelart);
       } else {
         std::cout << "Unknown draw mode for " << name << std::endl;
       }
@@ -446,8 +464,8 @@ int main(int argc, char **argv) {
   DescriptorPool descriptor_pool(descriptor_pool_info, context);
 
   TextureSamplerCache texture_cache;
+  TexturedMeshCache texturedmesh_cache;
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
-
   Resources resources{context, texture_cache, assets_root};
 
   std::cout << "STARTING DRAW LOOP" << std::endl;
@@ -456,7 +474,7 @@ int main(int argc, char **argv) {
    */
   SDL_Event event{};
   bool reload_scene = false;
-  Scene scene = load_scene_from_path(scene_path, context, texture_cache, resources);
+  Scene scene = load_scene_from_path(scene_path, context, texture_cache, texturedmesh_cache, resources);
   bool exit = false;
   uint64_t framecount = 0;
   // std::size_t scene_index = 0;
@@ -555,13 +573,13 @@ int main(int argc, char **argv) {
         [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
 		
 		if (reload_scene) {
-			scene = load_scene_from_path(scene_path, context, texture_cache, resources);
+			scene = load_scene_from_path(scene_path, context, texture_cache, texturedmesh_cache, resources);
 			reload_scene = false;
 		}
 
 
       auto *textureptr =
-          renderer.render(texture_cache, frameInfo.current_flight_frame_index,
+          renderer.render(texture_cache, texturedmesh_cache, frameInfo.current_flight_frame_index,
                           frameInfo.total_frame_count, world_info,
                           scene.renderables, scene.lights, scene.shadowcasters);
 

@@ -2,615 +2,501 @@
 
 #include "MaterialPipeline.hpp"
 
-auto create_texture_view(vk::Device& device,
-						 Texture2D& texture,
-						 const vk::ImageAspectFlags aspect)
-	-> vk::UniqueImageView
-{
-	const auto subresourceRange = vk::ImageSubresourceRange{}
-		.setAspectMask(aspect)
-		.setBaseMipLevel(0)
-		.setLevelCount(1)
-		.setBaseArrayLayer(0)
-		.setLayerCount(1);
+auto create_texture_view(vk::Device &device, Texture2D &texture,
+                         const vk::ImageAspectFlags aspect)
+    -> vk::UniqueImageView {
+  const auto subresourceRange = vk::ImageSubresourceRange{}
+                                    .setAspectMask(aspect)
+                                    .setBaseMipLevel(0)
+                                    .setLevelCount(1)
+                                    .setBaseArrayLayer(0)
+                                    .setLayerCount(1);
 
-	const auto componentMapping = vk::ComponentMapping{}
-		.setR(vk::ComponentSwizzle::eIdentity)		
-		.setG(vk::ComponentSwizzle::eIdentity)
-		.setB(vk::ComponentSwizzle::eIdentity)
-		.setA(vk::ComponentSwizzle::eIdentity);
+  const auto componentMapping = vk::ComponentMapping{}
+                                    .setR(vk::ComponentSwizzle::eIdentity)
+                                    .setG(vk::ComponentSwizzle::eIdentity)
+                                    .setB(vk::ComponentSwizzle::eIdentity)
+                                    .setA(vk::ComponentSwizzle::eIdentity);
 
-	const auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
-		.setImage(texture.impl->image())
-		.setFormat(texture.impl->format)
-		.setSubresourceRange(subresourceRange)
-		.setViewType(vk::ImageViewType::e2D)
-		.setComponents(componentMapping);
+  const auto imageViewCreateInfo = vk::ImageViewCreateInfo{}
+                                       .setImage(texture.impl->image())
+                                       .setFormat(texture.impl->format)
+                                       .setSubresourceRange(subresourceRange)
+                                       .setViewType(vk::ImageViewType::e2D)
+                                       .setComponents(componentMapping);
 
-	return device.createImageViewUnique(imageViewCreateInfo);
+  return device.createImageViewUnique(imageViewCreateInfo);
 }
 
-void sort_renderable(Logger* logger,
-					 SortedRenderables* sorted,
-					 Renderable renderable)
-{
-	if (auto p = std::get_if<NormColorRenderable>(&renderable))
-		sorted->normcolors.push_back(*p);
-	else if (auto p = std::get_if<WireframeRenderable>(&renderable))
-		sorted->wireframes.push_back(*p);
-	else if (auto p = std::get_if<BaseTextureRenderable>(&renderable))
-		sorted->basetextures.push_back(*p);
-	else if (auto p = std::get_if<MaterialRenderable>(&renderable))
-		sorted->materialrenderables.push_back(*p);
-	else if (auto p = std::get_if<RenderableNodePtr>(&renderable))
-		sorted->renderablenodes.push_back(*p);
-	else {
-		logger->warn(std::source_location::current(),
-					 "Found unknown Renderable that can not be sorted and drawn");
-	}
+void sort_renderable(Logger *logger, SortedRenderables *sorted,
+                     Renderable renderable) {
+  if (auto p = std::get_if<NormColorRenderable>(&renderable))
+    sorted->normcolors.push_back(*p);
+  else if (auto p = std::get_if<WireframeRenderable>(&renderable))
+    sorted->wireframes.push_back(*p);
+  else if (auto p = std::get_if<BaseTextureRenderable>(&renderable))
+    sorted->basetextures.push_back(*p);
+  else if (auto p = std::get_if<MaterialRenderable>(&renderable))
+    sorted->materialrenderables.push_back(*p);
+  else if (auto p = std::get_if<RenderableNodePtr>(&renderable))
+    sorted->renderablenodes.push_back(*p);
+  else {
+    logger->warn(std::source_location::current(),
+                 "Found unknown Renderable that can not be sorted and drawn");
+  }
 }
 
-auto unwind_renderablenode(std::vector<MaterialRenderable>& renderables,
-						   TextureSamplerCache& texture_cache,
-						   RenderableNode* node) 
-	-> void
-{
-	if (!node) return;
+auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
+                           TextureSamplerCache &texture_cache,
+                           TexturedMeshCache &texturedmesh_cache,
+                           RenderableNode *node) -> void {
+  if (!node)
+    return;
 
-	for (auto& mesh: node->meshes) {
-		MaterialRenderable renderable;
-		renderable.model = node->model;
-		renderable.mesh = &mesh.mesh;
+  for (auto &mesh : node->meshes) {
+    MaterialRenderable renderable;
+    renderable.model = node->model;
+
+    if (mesh.mesh.has_value()) {
+		renderable.mesh = texturedmesh_cache.get(mesh.mesh.value());
 		renderable.has_shadow = true;
 		
 		if (mesh.ambient.has_value()) {
-			TextureSamplerCache::TextureInfo* info =
+			TextureSamplerCache::TextureInfo *info =
 				texture_cache.get_texture(mesh.ambient.value());
 			if (info) {
 				renderable.texture.ambient = &(info->texture);
-			}
-			else {
+			} else {
 				renderable.texture.ambient = nullptr;
 			}
 		}
-
+		
 		if (mesh.diffuse.has_value()) {
-			TextureSamplerCache::TextureInfo* info =
+			TextureSamplerCache::TextureInfo *info =
 				texture_cache.get_texture(mesh.diffuse.value());
 			if (info) {
 				renderable.texture.diffuse = &(info->texture);
-			}
-			else {
+			} else {
 				renderable.texture.diffuse = nullptr;
 			}
 		}
-	
+		
 		if (mesh.specular.has_value()) {
-			TextureSamplerCache::TextureInfo* info =
+			TextureSamplerCache::TextureInfo *info =
 				texture_cache.get_texture(mesh.specular.value());
 			if (info) {
 				renderable.texture.specular = &(info->texture);
-			}
-			else {
+			} else {
 				renderable.texture.specular = nullptr;
 			}
 		}
-
+		
 		renderable.texture.normal = nullptr;
 		renderables.push_back(renderable);
 	}
-	
-	for (auto& child: node->children) {
-		unwind_renderablenode(renderables, texture_cache, child.get());
-	}
+
+  }
+
+  for (auto &child : node->children) {
+    unwind_renderablenode(renderables, texture_cache, texturedmesh_cache,
+                          child.get());
+  }
 }
 
 auto unwind_renderablenode(TextureSamplerCache &texture_cache,
-                           RenderableNode* node)
-	-> std::vector<MaterialRenderable>
-{
-	std::vector<MaterialRenderable> renderables;
-	unwind_renderablenode(renderables, texture_cache, node);
-	return renderables;
+                           TexturedMeshCache &texturedmesh_cache,
+                           RenderableNode *node)
+    -> std::vector<MaterialRenderable> {
+  std::vector<MaterialRenderable> renderables;
+  unwind_renderablenode(renderables, texture_cache, texturedmesh_cache, node);
+  return renderables;
 }
 
+auto create_geometry_pass(Render::Context::Impl *context,
+                          vk::Extent2D render_extent,
+                          const uint32_t frames_in_flight,
+                          const bool debug_print) -> GeometryPass {
+  constexpr auto render_format = vk::Format::eR8G8B8A8Srgb;
+  constexpr auto depth_format = vk::Format::eD32Sfloat;
 
-auto create_geometry_pass(Render::Context::Impl* context,
-						  vk::Extent2D render_extent,
-						  const uint32_t frames_in_flight,
-						  const bool debug_print)
-	-> GeometryPass
-{
-	constexpr auto render_format = vk::Format::eR8G8B8A8Srgb;
-	constexpr auto depth_format = vk::Format::eD32Sfloat;
+  GeometryPass pass{};
+  pass.extent = render_extent;
 
-	GeometryPass pass{};
-	pass.extent = render_extent;
+  /* Setup the renderpass
+   */
+  const auto color_attachment =
+      vk::AttachmentDescription{}
+          .setFlags(vk::AttachmentDescriptionFlags())
+          .setFormat(render_format)
+          .setSamples(vk::SampleCountFlagBits::e1)
+          .setLoadOp(vk::AttachmentLoadOp::eClear)
+          .setStoreOp(vk::AttachmentStoreOp::eStore)
+          .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+          .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+          // NOTE these are important, as they determine the layout of the image
+          // before and after the renderpass
+          .setInitialLayout(vk::ImageLayout::eUndefined)
+          .setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
 
-	/* Setup the renderpass
-	 */
-    const auto color_attachment = vk::AttachmentDescription{}
-		.setFlags(vk::AttachmentDescriptionFlags())
-		.setFormat(render_format)
-		.setSamples(vk::SampleCountFlagBits::e1)
-		.setLoadOp(vk::AttachmentLoadOp::eClear)
-		.setStoreOp(vk::AttachmentStoreOp::eStore)
-		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-		// NOTE these are important, as they determine the layout of the image before and after
-		// the renderpass
-		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eTransferSrcOptimal);
+  const auto depth_attachment =
+      vk::AttachmentDescription{}
+          .setFlags(vk::AttachmentDescriptionFlags())
+          .setFormat(depth_format)
+          .setSamples(vk::SampleCountFlagBits::e1)
+          .setLoadOp(vk::AttachmentLoadOp::eClear)
+          .setStoreOp(vk::AttachmentStoreOp::eDontCare)
+          .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+          .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+          // NOTE these are important, as they determine the layout of the image
+          // before and after the renderpass
+          .setInitialLayout(vk::ImageLayout::eUndefined)
+          .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-    const auto depth_attachment = vk::AttachmentDescription{}
-		.setFlags(vk::AttachmentDescriptionFlags())
-		.setFormat(depth_format)
-		.setSamples(vk::SampleCountFlagBits::e1)
-		.setLoadOp(vk::AttachmentLoadOp::eClear)
-		.setStoreOp(vk::AttachmentStoreOp::eDontCare)
-		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-		// NOTE these are important, as they determine the layout of the image before and after
-		// the renderpass
-		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  const auto color_reference =
+      vk::AttachmentReference{}.setAttachment(0).setLayout(
+          vk::ImageLayout::eColorAttachmentOptimal);
 
-	const auto color_reference = vk::AttachmentReference{}
-		.setAttachment(0)
-		.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+  const auto depth_reference =
+      vk::AttachmentReference{}.setAttachment(1).setLayout(
+          vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-	const auto depth_reference = vk::AttachmentReference{}
-		.setAttachment(1)
-		.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-	
-    auto subpass = vk::SubpassDescription{}
-		.setFlags(vk::SubpassDescriptionFlags())
-		.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-		.setInputAttachments({})
-		.setResolveAttachments({})
-		.setColorAttachments(color_reference)
-		.setPDepthStencilAttachment(&depth_reference);
-	
-	// @note we could also specify color and depth dependencies seperately
-	//       and put them together in the renderpass as an array
-	auto color_depth_dependency = vk::SubpassDependency{}
-		.setSrcSubpass(vk::SubpassExternal)
-		.setDstSubpass(0)
-		.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput
-						 | vk::PipelineStageFlagBits::eEarlyFragmentTests)
-		.setSrcAccessMask(vk::AccessFlags())
-		.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput
-						 | vk::PipelineStageFlagBits::eEarlyFragmentTests)
-		.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite
-						  | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-	
-	std::array<vk::AttachmentDescription, 2> attachments {color_attachment, depth_attachment};
-	std::array<vk::SubpassDependency, 1> dependencies {color_depth_dependency};
-    auto renderPassCreateInfo = vk::RenderPassCreateInfo{}
-		.setFlags(vk::RenderPassCreateFlags())
-		.setAttachments(attachments)
-		.setDependencies(dependencies)
-		.setSubpasses(subpass);
+  auto subpass = vk::SubpassDescription{}
+                     .setFlags(vk::SubpassDescriptionFlags())
+                     .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+                     .setInputAttachments({})
+                     .setResolveAttachments({})
+                     .setColorAttachments(color_reference)
+                     .setPDepthStencilAttachment(&depth_reference);
 
-    pass.renderpass = context->device.get().createRenderPassUnique(renderPassCreateInfo);
-	context->logger.info(std::source_location::current(),
-						 "Created Render Pass!");
-	
-	U32Extent texture_extent {
-		render_extent.width,
-		render_extent.height
-	};
-	
-	for (size_t i = 0; i < frames_in_flight; i++) {
-		/* Setup the rendertarget for the render pass
-		 */
+  // @note we could also specify color and depth dependencies seperately
+  //       and put them together in the renderpass as an array
+  auto color_depth_dependency =
+      vk::SubpassDependency{}
+          .setSrcSubpass(vk::SubpassExternal)
+          .setDstSubpass(0)
+          .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                           vk::PipelineStageFlagBits::eEarlyFragmentTests)
+          .setSrcAccessMask(vk::AccessFlags())
+          .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                           vk::PipelineStageFlagBits::eEarlyFragmentTests)
+          .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite |
+                            vk::AccessFlagBits::eDepthStencilAttachmentWrite);
 
-		pass.colorbuffers.push_back(Texture2D::Impl(RenderTargetTexture,
-													context,
-													texture_extent,
-													vkformat_to_textureformat(render_format)));
-		
-		auto transition_to_transfer_src = [&] (vk::CommandBuffer& commandbuffer)
-		{
-			/* Setup the rendertarget
-			 */
-			pass.colorbuffers.back().layout =
-				transition_image_for_color_override(pass.colorbuffers.back().allocated.image.get(),
-													commandbuffer);
-		};
-		
-		with_buffer_submit(context->device.get(),
-						   context->commandpool.get(),
-						   context->graphics_queue(),
-						   transition_to_transfer_src);
-		
-		/* Setup the rendertarget view
-		 */
-		pass.colorbuffer_views
-			.push_back(pass.colorbuffers.back()
-					   .create_view(context,
-									vk::ImageAspectFlagBits::eColor));
+  std::array<vk::AttachmentDescription, 2> attachments{color_attachment,
+                                                       depth_attachment};
+  std::array<vk::SubpassDependency, 1> dependencies{color_depth_dependency};
+  auto renderPassCreateInfo = vk::RenderPassCreateInfo{}
+                                  .setFlags(vk::RenderPassCreateFlags())
+                                  .setAttachments(attachments)
+                                  .setDependencies(dependencies)
+                                  .setSubpasses(subpass);
 
-		/* Setup the Depthbuffers
-		 */
-		pass.depthbuffers.push_back(Texture2D::Impl(DepthBufferTexture,
-													context,
-													texture_extent));
-														 
-		/* Setup the depthbuffer view
-		 */
-		pass.depthbuffer_views
-			.push_back(pass.depthbuffers.back()
-					   .create_view(context,
-									vk::ImageAspectFlagBits::eDepth));
-		
-		/* Setup the FrameBuffers
-		 */
-		std::array<vk::ImageView, 2> attachments{
-			pass.colorbuffer_views.back().get(),
-			pass.depthbuffer_views.back().get(),
-		};
-		auto framebufferCreateInfo = vk::FramebufferCreateInfo{}
-			.setFlags(vk::FramebufferCreateFlags())
-			.setAttachments(attachments)
-			.setWidth(render_extent.width)
-			.setHeight(render_extent.height)
-			.setRenderPass(pass.renderpass.get())
-			.setLayers(1);
-		pass.framebuffers
-			.push_back(context->device.get()
-					   .createFramebufferUnique(framebufferCreateInfo));
-	}
+  pass.renderpass =
+      context->device.get().createRenderPassUnique(renderPassCreateInfo);
+  context->logger.info(std::source_location::current(), "Created Render Pass!");
 
-	context->logger.info(std::source_location::current(),
-						 "Created FramePasses!");
+  U32Extent texture_extent{render_extent.width, render_extent.height};
 
-	return pass;
+  for (size_t i = 0; i < frames_in_flight; i++) {
+    /* Setup the rendertarget for the render pass
+     */
+
+    pass.colorbuffers.push_back(
+        Texture2D::Impl(RenderTargetTexture, context, texture_extent,
+                        vkformat_to_textureformat(render_format)));
+
+    auto transition_to_transfer_src = [&](vk::CommandBuffer &commandbuffer) {
+      /* Setup the rendertarget
+       */
+      pass.colorbuffers.back().layout = transition_image_for_color_override(
+          pass.colorbuffers.back().allocated.image.get(), commandbuffer);
+    };
+
+    with_buffer_submit(context->device.get(), context->commandpool.get(),
+                       context->graphics_queue(), transition_to_transfer_src);
+
+    /* Setup the rendertarget view
+     */
+    pass.colorbuffer_views.push_back(pass.colorbuffers.back().create_view(
+        context, vk::ImageAspectFlagBits::eColor));
+
+    /* Setup the Depthbuffers
+     */
+    pass.depthbuffers.push_back(
+        Texture2D::Impl(DepthBufferTexture, context, texture_extent));
+
+    /* Setup the depthbuffer view
+     */
+    pass.depthbuffer_views.push_back(pass.depthbuffers.back().create_view(
+        context, vk::ImageAspectFlagBits::eDepth));
+
+    /* Setup the FrameBuffers
+     */
+    std::array<vk::ImageView, 2> attachments{
+        pass.colorbuffer_views.back().get(),
+        pass.depthbuffer_views.back().get(),
+    };
+    auto framebufferCreateInfo = vk::FramebufferCreateInfo{}
+                                     .setFlags(vk::FramebufferCreateFlags())
+                                     .setAttachments(attachments)
+                                     .setWidth(render_extent.width)
+                                     .setHeight(render_extent.height)
+                                     .setRenderPass(pass.renderpass.get())
+                                     .setLayers(1);
+    pass.framebuffers.push_back(
+        context->device.get().createFramebufferUnique(framebufferCreateInfo));
+  }
+
+  context->logger.info(std::source_location::current(), "Created FramePasses!");
+
+  return pass;
 }
 
-auto render_geometry_pass(GeometryPass& pass,
-						  Renderer::Impl::ShadowPasses& shadow_passes,
-						  // TODO: Pipelines are captured as a ptr because bind_front
-						  //       does not want to capture a reference for it...
-						  GeometryPipelines* pipelines,
-						  Logger* logger,
-						  TextureSamplerCache& texture_cache,
-						  const uint32_t current_frame_in_flight,
-						  const uint32_t max_frames_in_flight,
-						  const uint64_t total_frames,
-						  vk::Device& device,
-						  vk::DescriptorPool descriptor_pool,
-						  vk::CommandPool& command_pool,
-						  vk::Queue& queue,
-						  const WorldRenderInfo& world_info,
-						  std::vector<Renderable>& renderables,
-						  std::vector<Light>& lights,
-						  ShadowCasters& shadowcasters)
-	-> Texture2D::Impl*
-{
-	//TODO: Pull clearvalues out!
-	const float flash = std::abs(std::sin(total_frames / 120.f));
-	std::array<vk::ClearValue, 2> clearvalues{
-		vk::ClearValue{}.setColor({0.0f, 0.0f, flash, 1.0f}),
-		vk::ClearValue{}.setDepthStencil({1.0f, 0}),
-	};
-	
-	SortedRenderables sorted{};
-	std::ranges::for_each(renderables,
-						  std::bind_front(sort_renderable, logger, &sorted));
-	
-	//TODO: this is PROBABLY dirty to do, but we need to unwind the node tree into something
-	//      simple the render pipelines can understand...
-	for (auto& renderablenode: sorted.renderablenodes) {
-          std::vector<MaterialRenderable> renderables =
-              unwind_renderablenode(texture_cache,
-                                    renderablenode.get());
-		for (auto& renderable: renderables) {
-			sorted.materialrenderables.push_back(renderable);
-		}
-	}
+auto render_geometry_pass(
+    GeometryPass &pass, Renderer::Impl::ShadowPasses &shadow_passes,
+    // TODO: Pipelines are captured as a ptr because bind_front
+    //       does not want to capture a reference for it...
+    GeometryPipelines *pipelines, Logger *logger,
+    TextureSamplerCache &texture_cache, TexturedMeshCache &texturedmesh_cache,
+    const uint32_t current_frame_in_flight, const uint32_t max_frames_in_flight,
+    const uint64_t total_frames, vk::Device &device,
+    vk::DescriptorPool descriptor_pool, vk::CommandPool &command_pool,
+    vk::Queue &queue, const WorldRenderInfo &world_info,
+    std::vector<Renderable> &renderables, std::vector<Light> &lights,
+    ShadowCasters &shadowcasters) -> Texture2D::Impl * {
+  // TODO: Pull clearvalues out!
+  const float flash = std::abs(std::sin(total_frames / 120.f));
+  std::array<vk::ClearValue, 2> clearvalues{
+      vk::ClearValue{}.setColor({0.0f, 0.0f, flash, 1.0f}),
+      vk::ClearValue{}.setDepthStencil({1.0f, 0}),
+  };
 
-	auto generate_shadow_passes = [&] (vk::CommandBuffer& commandbuffer) 
-	{
-		std::optional<OrthographicShadowPass::CameraUniformData> ortho_caster_data;
-		if (shadowcasters.directional_caster.has_value()) {
-			ortho_caster_data.emplace();
-			DirectionalShadowCaster& dircaster = shadowcasters.directional_caster.value();
-			ortho_caster_data.value().view = dircaster.view();
-			ortho_caster_data.value().proj = dircaster.projection().get();
-		}
+  SortedRenderables sorted{};
+  std::ranges::for_each(renderables,
+                        std::bind_front(sort_renderable, logger, &sorted));
 
-		shadow_passes.orthographic.record(logger,
-										  device,
-										  CurrentFlightFrame{current_frame_in_flight},
-										  commandbuffer,
-										  ortho_caster_data,
-										  sorted.materialrenderables);
-		
-		
-		std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
-		if (shadowcasters.spot_caster.has_value()) {
-			pers_caster_data.emplace();
-			SpotShadowCaster& spotcaster = shadowcasters.spot_caster.value();
-			pers_caster_data.value().view = spotcaster.view();
-			pers_caster_data.value().proj = spotcaster.projection().get();
-		}
+  // TODO: this is PROBABLY dirty to do, but we need to unwind the node tree
+  // into something
+  //       simple the render pipelines can understand...
+  for (auto &renderablenode : sorted.renderablenodes) {
+    std::vector<MaterialRenderable> renderables = unwind_renderablenode(
+        texture_cache, texturedmesh_cache, renderablenode.get());
+    for (auto &renderable : renderables) {
+      sorted.materialrenderables.push_back(renderable);
+    }
+  }
 
-		//TODO: have multiple spot casters
-		shadow_passes.perspective.record(logger,
-										 device,
-										 CurrentFlightFrame{current_frame_in_flight},
-										 commandbuffer,
-										 pers_caster_data,
-										 sorted.materialrenderables);
-	};
+  auto generate_shadow_passes = [&](vk::CommandBuffer &commandbuffer) {
+    std::optional<OrthographicShadowPass::CameraUniformData> ortho_caster_data;
+    if (shadowcasters.directional_caster.has_value()) {
+      ortho_caster_data.emplace();
+      DirectionalShadowCaster &dircaster =
+          shadowcasters.directional_caster.value();
+      ortho_caster_data.value().view = dircaster.view();
+      ortho_caster_data.value().proj = dircaster.projection().get();
+    }
 
-	//TODO: shadow and geometry passes should be in same commandbuffer with proper image barrier
-	with_buffer_submit(device,
-					   command_pool,
-					   queue,
-					   generate_shadow_passes);
-	
-	auto generate_frame = [&] (vk::CommandBuffer& commandbuffer) 
-	{
-		const auto render_area = vk::Rect2D{}
-			.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
-			.setExtent(pass.extent);
-		
-		const auto renderPassInfo = vk::RenderPassBeginInfo{}
-			.setRenderPass(pass.renderpass.get())
-			.setFramebuffer(pass.framebuffers[current_frame_in_flight].get())
-			.setRenderArea(render_area)
-			.setClearValues(clearvalues);
+    shadow_passes.orthographic.record(
+        logger, device, CurrentFlightFrame{current_frame_in_flight},
+        commandbuffer, ortho_caster_data, sorted.materialrenderables);
 
-		commandbuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-		const std::vector<vk::Viewport> viewports{
-			vk::Viewport{}
-			.setX(0.0f)
-			.setY(0.0f)
-			.setWidth(pass.extent.width)
-			.setHeight(pass.extent.height)
-			.setMinDepth(0.0f)
-			.setMaxDepth(1.0f),
-		};
-		const uint32_t viewport_start = 0;
-		commandbuffer.setViewport(viewport_start, viewports);
+    std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
+    if (shadowcasters.spot_caster.has_value()) {
+      pers_caster_data.emplace();
+      SpotShadowCaster &spotcaster = shadowcasters.spot_caster.value();
+      pers_caster_data.value().view = spotcaster.view();
+      pers_caster_data.value().proj = spotcaster.projection().get();
+    }
 
-		const std::vector<vk::Rect2D> scissors{
-			vk::Rect2D{}
-			.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
-			.setExtent(pass.extent),
-		};
-		const uint32_t scissor_start = 0;
-		commandbuffer.setScissor(scissor_start, scissors);
-		
-		NormColorRenderInfo normcolor_info{};
-		normcolor_info.view = world_info.view;
-		normcolor_info.proj = world_info.projection;
+    // TODO: have multiple spot casters
+    shadow_passes.perspective.record(
+        logger, device, CurrentFlightFrame{current_frame_in_flight},
+        commandbuffer, pers_caster_data, sorted.materialrenderables);
+  };
 
-		draw_normcolors(device,
-						pipelines->normcolor,
-						commandbuffer,
-						current_frame_in_flight,
-						normcolor_info,
-						sorted.normcolors);
+  // TODO: shadow and geometry passes should be in same commandbuffer with
+  // proper image barrier
+  with_buffer_submit(device, command_pool, queue, generate_shadow_passes);
 
-		WireframeRenderInfo wireframe_info{};
-		wireframe_info.viewproj = world_info.projection * world_info.view;
+  auto generate_frame = [&](vk::CommandBuffer &commandbuffer) {
+    const auto render_area =
+        vk::Rect2D{}
+            .setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
+            .setExtent(pass.extent);
 
-		draw_wireframes(pipelines->wireframe,
-						commandbuffer,
-						wireframe_info,
-						sorted.wireframes);
-		
-		BaseTextureRenderInfo texture_info{};
-		texture_info.view = world_info.view;
-		texture_info.proj = world_info.projection;
-		draw_base_texture_renderables(pipelines->basetexture,
-									  *logger,
-									  device,
-									  descriptor_pool,
-									  commandbuffer,
-									  current_frame_in_flight,
-									  max_frames_in_flight,
-									  texture_info,
-									  sorted.basetextures);
-		
+    const auto renderPassInfo =
+        vk::RenderPassBeginInfo{}
+            .setRenderPass(pass.renderpass.get())
+            .setFramebuffer(pass.framebuffers[current_frame_in_flight].get())
+            .setRenderArea(render_area)
+            .setClearValues(clearvalues);
 
-		CurrentFlightFrame const current_flightframe{ current_frame_in_flight };
-		MaxFlightFrames const max_flightframes{ max_frames_in_flight };
-		
+    commandbuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+    const std::vector<vk::Viewport> viewports{
+        vk::Viewport{}
+            .setX(0.0f)
+            .setY(0.0f)
+            .setWidth(pass.extent.width)
+            .setHeight(pass.extent.height)
+            .setMinDepth(0.0f)
+            .setMaxDepth(1.0f),
+    };
+    const uint32_t viewport_start = 0;
+    commandbuffer.setViewport(viewport_start, viewports);
 
-		ShadowPassTexture& dirshadowtexture =
-			shadow_passes.orthographic.get_shadowtexture(current_flightframe);
-		
-		MaterialPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture 
-			directional_texture{
-			dirshadowtexture.descriptorset.get(),
-			shadowcasters.directional_caster};
+    const std::vector<vk::Rect2D> scissors{
+        vk::Rect2D{}
+            .setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
+            .setExtent(pass.extent),
+    };
+    const uint32_t scissor_start = 0;
+    commandbuffer.setScissor(scissor_start, scissors);
 
-		ShadowPassTexture& spotshadowtexture =
-			shadow_passes.perspective.get_shadowtexture(current_flightframe);
-		MaterialPipeline::MaterialShadowCasters::SpotShadowCasterTexture 
-			spot_texture{
-			spotshadowtexture.descriptorset.get(),
-			shadowcasters.spot_caster};
+    NormColorRenderInfo normcolor_info{};
+    normcolor_info.view = world_info.view;
+    normcolor_info.proj = world_info.projection;
 
-		MaterialPipeline::MaterialShadowCasters material_shadowcasters{
-			directional_texture,
-			spot_texture};
-		
-		MaterialPipeline::FrameInfo material_frame_info{};
-		material_frame_info.view = world_info.view;
-		material_frame_info.proj = world_info.projection;
-		material_frame_info.camera_position = world_info.camera_position;
-		pipelines->material.render(material_frame_info,
-								   *logger,
-								   device,
-								   descriptor_pool,
-								   commandbuffer,
-								   current_flightframe,
-								   max_flightframes,
-								   sorted.materialrenderables,
-								   lights,
-								   material_shadowcasters);
+    draw_normcolors(device, pipelines->normcolor, commandbuffer,
+                    current_frame_in_flight, normcolor_info, sorted.normcolors);
 
-		commandbuffer.endRenderPass();
-	};
+    WireframeRenderInfo wireframe_info{};
+    wireframe_info.viewproj = world_info.projection * world_info.view;
 
-	with_buffer_submit(device,
-					   command_pool,
-					   queue,
-					   generate_frame);
+    draw_wireframes(pipelines->wireframe, commandbuffer, wireframe_info,
+                    sorted.wireframes);
 
-	return &pass.colorbuffers[current_frame_in_flight];
+    BaseTextureRenderInfo texture_info{};
+    texture_info.view = world_info.view;
+    texture_info.proj = world_info.projection;
+    draw_base_texture_renderables(pipelines->basetexture, *logger, device,
+                                  descriptor_pool, commandbuffer,
+                                  current_frame_in_flight, max_frames_in_flight,
+                                  texture_info, sorted.basetextures);
+
+    CurrentFlightFrame const current_flightframe{current_frame_in_flight};
+    MaxFlightFrames const max_flightframes{max_frames_in_flight};
+
+    ShadowPassTexture &dirshadowtexture =
+        shadow_passes.orthographic.get_shadowtexture(current_flightframe);
+
+    MaterialPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture
+        directional_texture{dirshadowtexture.descriptorset.get(),
+                            shadowcasters.directional_caster};
+
+    ShadowPassTexture &spotshadowtexture =
+        shadow_passes.perspective.get_shadowtexture(current_flightframe);
+    MaterialPipeline::MaterialShadowCasters::SpotShadowCasterTexture
+        spot_texture{spotshadowtexture.descriptorset.get(),
+                     shadowcasters.spot_caster};
+
+    MaterialPipeline::MaterialShadowCasters material_shadowcasters{
+        directional_texture, spot_texture};
+
+    MaterialPipeline::FrameInfo material_frame_info{};
+    material_frame_info.view = world_info.view;
+    material_frame_info.proj = world_info.projection;
+    material_frame_info.camera_position = world_info.camera_position;
+    pipelines->material.render(
+        material_frame_info, *logger, device, descriptor_pool, commandbuffer,
+        current_flightframe, max_flightframes, sorted.materialrenderables,
+        lights, material_shadowcasters);
+
+    commandbuffer.endRenderPass();
+  };
+
+  with_buffer_submit(device, command_pool, queue, generate_frame);
+
+  return &pass.colorbuffers[current_frame_in_flight];
 }
 
-Renderer::Impl::Impl(Render::Context::Impl* context,
-					 Presenter::Impl* presenter,
-					 Logger logger,
-					 DescriptorPool::Impl* descriptor_pool,
-					 std::filesystem::path shaders_root)
-	: shaders_root(shaders_root)
-	, context(context)
-	, presenter(presenter)
-	, logger(logger)
-	, descriptor_pool(descriptor_pool)
-{
-	
+Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
+                     Logger logger, DescriptorPool::Impl *descriptor_pool,
+                     std::filesystem::path shaders_root)
+    : shaders_root(shaders_root), context(context), presenter(presenter),
+      logger(logger), descriptor_pool(descriptor_pool) {
 
-	U32Extent constexpr shadow_extent{1024, 1024};
-	//U32Extent constexpr shadow_extent{256, 256};
+  U32Extent constexpr shadow_extent{1024, 1024};
+  // U32Extent constexpr shadow_extent{256, 256};
 
-	//TODO: Allow extent to be set externally
-	//TODO: Allow debug print to be set externally
-	vk::Extent2D const render_extent = context->get_window_extent();
-	bool const debug_print = true;
-	shadow_passes.orthographic = OrthographicShadowPass(logger,
-														context,
-														presenter,
-														descriptor_pool,
-														shadow_extent,
-														shaders_root,
-														debug_print);
+  // TODO: Allow extent to be set externally
+  // TODO: Allow debug print to be set externally
+  vk::Extent2D const render_extent = context->get_window_extent();
+  bool const debug_print = true;
+  shadow_passes.orthographic =
+      OrthographicShadowPass(logger, context, presenter, descriptor_pool,
+                             shadow_extent, shaders_root, debug_print);
 
-	shadow_passes.perspective = PerspectiveShadowPass(logger,
-													  context,
-													  presenter,
-													  descriptor_pool,
-													  shadow_extent,
-													  shaders_root,
-													  debug_print);
+  shadow_passes.perspective =
+      PerspectiveShadowPass(logger, context, presenter, descriptor_pool,
+                            shadow_extent, shaders_root, debug_print);
 
-	geometry_pass = create_geometry_pass(context,
-										 render_extent,
-										 presenter->max_frames_in_flight,
-										 debug_print);
-	
-	geometry_pipelines.material = MaterialPipeline(logger,
-												   context,
-												   presenter,
-												   descriptor_pool,
-												   geometry_pass.renderpass.get(),
-												   shaders_root);
-	context->logger.info(std::source_location::current(),
-						 "Created Material Pipeline");
-	
-	geometry_pipelines.basetexture = create_base_texture_pipeline(context->logger,
-																  context,
-																  presenter,
-																  descriptor_pool,
-																  geometry_pass.renderpass.get(),
-																  presenter->max_frames_in_flight,
-																  render_extent,
-																  shaders_root,
-																  debug_print);
-	context->logger.info(std::source_location::current(),
-						 "Created BaseTexture Pipeline");
+  geometry_pass = create_geometry_pass(
+      context, render_extent, presenter->max_frames_in_flight, debug_print);
 
-	geometry_pipelines.normcolor = create_norm_render_pipeline(context->logger,
-															   context->physical_device,
-															   context->device.get(),
-															   geometry_pass.renderpass.get(),
-															   presenter->max_frames_in_flight,
-															   render_extent,
-															   shaders_root,
-															   debug_print);
-	context->logger.info(std::source_location::current(),
-						 "Created NormColor Pipeline");
+  geometry_pipelines.material =
+      MaterialPipeline(logger, context, presenter, descriptor_pool,
+                       geometry_pass.renderpass.get(), shaders_root);
+  context->logger.info(std::source_location::current(),
+                       "Created Material Pipeline");
 
-	geometry_pipelines.wireframe = create_wireframe_render_pipeline(context->logger,
-																	context->device.get(),
-																	geometry_pass.renderpass.get(),
-																	render_extent,
-																	shaders_root,
-																	debug_print);
-	context->logger.info(std::source_location::current(),
-						 "Created Wireframe Pipeline");
+  geometry_pipelines.basetexture = create_base_texture_pipeline(
+      context->logger, context, presenter, descriptor_pool,
+      geometry_pass.renderpass.get(), presenter->max_frames_in_flight,
+      render_extent, shaders_root, debug_print);
+  context->logger.info(std::source_location::current(),
+                       "Created BaseTexture Pipeline");
+
+  geometry_pipelines.normcolor = create_norm_render_pipeline(
+      context->logger, context->physical_device, context->device.get(),
+      geometry_pass.renderpass.get(), presenter->max_frames_in_flight,
+      render_extent, shaders_root, debug_print);
+  context->logger.info(std::source_location::current(),
+                       "Created NormColor Pipeline");
+
+  geometry_pipelines.wireframe = create_wireframe_render_pipeline(
+      context->logger, context->device.get(), geometry_pass.renderpass.get(),
+      render_extent, shaders_root, debug_print);
+  context->logger.info(std::source_location::current(),
+                       "Created Wireframe Pipeline");
 }
 
-Renderer::Impl::~Impl()
-{
-}
+Renderer::Impl::~Impl() {}
 
-auto Renderer::Impl::render(TextureSamplerCache& texture_cache,
-							const uint32_t current_frame_in_flight,
-							const uint64_t total_frames,
-							const WorldRenderInfo& world_info,
-							std::vector<Renderable>& renderables,
-							std::vector<Light>& lights,
-							ShadowCasters& shadowcasters)
-		-> Texture2D::Impl*
-{
-	return render_geometry_pass(geometry_pass,
-								shadow_passes,
-								&geometry_pipelines,
-								&logger,
-								texture_cache,
-								current_frame_in_flight,
-								presenter->max_frames_in_flight,
-								total_frames,
-								context->device.get(),
-								descriptor_pool->descriptor_pool.get(),
-								presenter->command_pool(),
-								context->graphics_queue(),
-								world_info,
-								renderables,
-								lights,
-								shadowcasters);
+auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
+                            TexturedMeshCache &texturedmesh_cache,
+                            const uint32_t current_frame_in_flight,
+                            const uint64_t total_frames,
+                            const WorldRenderInfo &world_info,
+                            std::vector<Renderable> &renderables,
+                            std::vector<Light> &lights,
+                            ShadowCasters &shadowcasters) -> Texture2D::Impl * {
+  return render_geometry_pass(
+      geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
+      texturedmesh_cache, current_frame_in_flight,
+      presenter->max_frames_in_flight, total_frames, context->device.get(),
+      descriptor_pool->descriptor_pool.get(), presenter->command_pool(),
+      context->graphics_queue(), world_info, renderables, lights,
+      shadowcasters);
 }
 
 auto Renderer::render(TextureSamplerCache &texture_cache,
+                      TexturedMeshCache &texturedmesh_cache,
                       const uint32_t current_frame_in_flight,
-					  const uint64_t total_frames,
-					  const WorldRenderInfo& world_info,
-					  std::vector<Renderable>& renderables,
-					  std::vector<Light>& lights,
-					  ShadowCasters& shadowcasters)
-		-> Texture2D::Impl*
-{
-  return impl->render(texture_cache,
-                      current_frame_in_flight,
-						total_frames,
-						world_info,
-						renderables,
-						lights,
-						shadowcasters);
+                      const uint64_t total_frames,
+                      const WorldRenderInfo &world_info,
+                      std::vector<Renderable> &renderables,
+                      std::vector<Light> &lights, ShadowCasters &shadowcasters)
+    -> Texture2D::Impl * {
+  return impl->render(texture_cache, texturedmesh_cache,
+                      current_frame_in_flight, total_frames, world_info,
+                      renderables, lights, shadowcasters);
 }
 
-Renderer::Renderer(Render::Context& context,
-				   Presenter& presenter,
-				   Logger logger,
-				   DescriptorPool& descriptor_pool,
-				   const std::filesystem::path shaders_root)
-	: impl(std::make_unique<Impl>(context.impl.get(),
-								  presenter.impl.get(),
-								  logger,
-								  descriptor_pool.impl.get(),
-								  shaders_root))
-{
-}
+Renderer::Renderer(Render::Context &context, Presenter &presenter,
+                   Logger logger, DescriptorPool &descriptor_pool,
+                   const std::filesystem::path shaders_root)
+    : impl(std::make_unique<Impl>(context.impl.get(), presenter.impl.get(),
+                                  logger, descriptor_pool.impl.get(),
+                                  shaders_root)) {}
 
-Renderer::~Renderer()
-{
-}
+Renderer::~Renderer() {}

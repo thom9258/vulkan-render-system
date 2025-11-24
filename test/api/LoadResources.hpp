@@ -70,6 +70,7 @@ struct Resources {
   struct {
     TextureSamplerReadOnly lulu;
     TextureSamplerReadOnly statue;
+	TextureSamplerReadOnly pixelart;
   } textures;
 };
 
@@ -372,4 +373,10 @@ Resources::Resources(Render::Context &context,
                   BitmapPixelFormat::RGBA, VerticalFlipOnLoad::No) |
       throw_on_bitmap_error() | get_bitmap() | move_bitmap_to_gpu(&context) |
       make_shader_readonly(&context, InterpolationType::Linear);
+  
+  textures.pixelart = load_bitmap(textures_root / "cat_pixelart.png",
+								  BitmapPixelFormat::RGBA, VerticalFlipOnLoad::No) |
+	  throw_on_bitmap_error() | get_bitmap() |
+	  move_bitmap_to_gpu(&context) |
+	  make_shader_readonly(&context, InterpolationType::Point);
 }

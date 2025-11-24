@@ -2,6 +2,7 @@
 
 #include "glm.hpp"
 #include "TextureSamplerCache.hpp"
+#include "TexturedMeshCache.hpp"
 #include "Mesh.hpp"
 
 #include <variant>
@@ -50,7 +51,7 @@ struct RenderableNode
 {
 	struct MaterialMesh
 	{
-		TexturedMesh mesh;
+		std::optional<TexturedMeshRef> mesh;
 		std::optional<TextureSamplerRef> ambient;
 		std::optional<TextureSamplerRef> diffuse;
 		std::optional<TextureSamplerRef> specular;
