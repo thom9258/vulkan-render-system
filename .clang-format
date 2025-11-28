@@ -1,0 +1,9 @@
+---
+Language: Cpp
+BasedOnStyle:  Mozilla
+IndentWidth: 4
+TableGenBreakInsideDAGArg: DontBreak
+TabWidth: 4
+UseTab: ForIdentation
+PointerAlignment: Left
+ReferenceAlignment: Left

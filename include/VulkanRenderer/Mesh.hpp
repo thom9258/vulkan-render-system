@@ -6,7 +6,6 @@
 
 struct Mesh
 {
-	//VertexBuffer<VertexPosNormColor> vertexbuffer;
 	VertexBuffer vertexbuffer;
 };
 
