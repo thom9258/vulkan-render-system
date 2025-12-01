@@ -37,6 +37,15 @@ public:
 					 Texture2D&& texture)
 		-> TextureSamplerRef;
 
+	auto load_from_path(Render::Context *context,
+						std::string_view name,
+						InterpolationType interpolation,
+						VerticalFlipOnLoad flip,
+						BitmapPixelFormat format,
+						std::filesystem::path path)
+		-> TextureSamplerRef;
+
+
 	TextureInfo* get_texture(TextureSamplerRef ref);
 	std::optional<TextureSamplerRef> get_ref_from_path(std::filesystem::path path);
 

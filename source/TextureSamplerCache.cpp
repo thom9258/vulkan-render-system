@@ -44,6 +44,22 @@ auto TextureSamplerCache::add_texture(Render::Context* context,
 	return ref;
 }
 
+auto TextureSamplerCache::load_from_path(Render::Context *context,
+                                         std::string_view name,
+                                         InterpolationType interpolation,
+										 VerticalFlipOnLoad flip,
+										 BitmapPixelFormat format,
+                                         std::filesystem::path path)
+    -> TextureSamplerRef {
+	Texture2D texture = load_bitmap(path, format, flip) |
+		throw_on_bitmap_error() | get_bitmap() | move_bitmap_to_gpu(context);
+
+	return add_texture(context, interpolation, name, path, std::move(texture));
+}    
+
+
+
+
 auto TextureSamplerCache::get_texture(TextureSamplerRef ref) 
 	-> TextureSamplerCache::TextureInfo*
 {

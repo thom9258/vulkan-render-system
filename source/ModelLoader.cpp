@@ -94,13 +94,14 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 
   RenderableNode::MaterialMesh drawable_mesh;
   drawable_mesh.mesh = texturedmesh_cache.add(
-      context, TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(
-                   context, unindexed)});
+      context, TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(context,
+																	   unindexed)});
 
   drawable_mesh.ambient = std::nullopt;
   drawable_mesh.diffuse = std::nullopt;
   drawable_mesh.specular = std::nullopt;
   drawable_mesh.normal = std::nullopt;
+  drawable_mesh.has_shadow = true;
 
   if (mesh->mMaterialIndex >= 0) {
     auto get_texture_path =

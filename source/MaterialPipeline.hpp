@@ -84,6 +84,8 @@ struct MaterialPipeline
 				Logger& logger,
 				vk::Device& device,
 				vk::DescriptorPool descriptor_pool,
+				TexturedMeshCache& texturedmesh_cache,
+				TextureSamplerCache& texturesampler_cache,
 				vk::CommandBuffer& commandbuffer,
 				CurrentFlightFrame const current_flightframe,
 				MaxFlightFrames const max_frames_in_flight,

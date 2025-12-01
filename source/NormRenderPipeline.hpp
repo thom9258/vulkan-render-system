@@ -355,6 +355,7 @@ create_norm_render_pipeline(Logger& logger,
 
 void draw_normcolors(vk::Device& device,
 					 NormRenderPipeline& pipeline,
+					 TexturedMeshCache& texturedmesh_cache,
 					 vk::CommandBuffer& commandbuffer,
 					 const uint32_t frame_in_flight,
 					 const NormColorRenderInfo& info,
@@ -393,6 +394,12 @@ void draw_normcolors(vk::Device& device,
 	
 
 	for (auto renderable: renderables) {
+		if (!renderable.mesh.has_value())
+			continue;
+		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
+		if (!mesh)
+			continue;
+		
 		NormRenderPipeline::PushConstants push{};
 		push.model = renderable.model;
 		const uint32_t push_offset = 0;
@@ -402,26 +409,23 @@ void draw_normcolors(vk::Device& device,
 									sizeof(push),
 									&push);
 		
-		
 		const uint32_t firstBinding = 0;
 		const uint32_t bindingCount = 1;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
 		std::array<vk::Buffer, bindingCount> buffers {
-			renderable.mesh->vertexbuffer.impl->buffer.get(),
+			mesh->vertexbuffer.impl->buffer.get(),
 		};
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
 										buffers.data(),
 										offsets.data());
 		
-		
 		const uint32_t instanceCount = 1;
 		const uint32_t firstVertex = 0;
 		const uint32_t firstInstance = 0;
-		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+		commandbuffer.draw(mesh->vertexbuffer.impl->length,
 						   instanceCount,
 						   firstVertex,
 						   firstInstance);
-		
 	}
 }

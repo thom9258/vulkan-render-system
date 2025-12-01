@@ -612,6 +612,8 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							  Logger& logger,
 							  vk::Device& device,
 							  vk::DescriptorPool descriptor_pool,
+							  TexturedMeshCache& texturedmesh_cache,
+							  TextureSamplerCache& texturesampler_cache,
 							  vk::CommandBuffer& commandbuffer,
 							  CurrentFlightFrame const current_flightframe,
 							  MaxFlightFrames const max_frames_in_flight,
@@ -777,14 +779,25 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 	int i = 0;
 	for (MaterialRenderable& renderable: renderables) {
 		
-		TextureSamplerReadOnly* ambient_texture = renderable.texture.ambient 
-			? renderable.texture.ambient 
-			: &m_ambient.default_texture;
-		
+		auto try_get_texture_from_cache =
+			[] (TextureSamplerCache& texturesampler_cache, std::optional<TextureSamplerRef> ref)
+			-> TextureSamplerReadOnly* 
+			{
+			if (ref.has_value()) {
+				TextureSamplerCache::TextureInfo *info =
+					texturesampler_cache.get_texture(ref.value());
+				if (info) {
+					return &(info->texture);
+				}
+			}
 
-		if (ambient_texture == nullptr) {
+			return nullptr;
+		};
+		
+		TextureSamplerReadOnly* ambient_texture = try_get_texture_from_cache(texturesampler_cache,
+																			 renderable.ambient);
+		if (!ambient_texture) 
 			ambient_texture = &m_ambient.default_texture;
-		}
 
 		if (ambient_texture != last_ambient_texture) {
 			if (!m_ambient.sets.contains(ambient_texture)) {
@@ -812,9 +825,9 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			last_ambient_texture = ambient_texture;
 		}
 
-		TextureSamplerReadOnly* diffuse_texture = renderable.texture.diffuse 
-			? renderable.texture.diffuse 
-			: &m_diffuse.default_texture;
+		TextureSamplerReadOnly* diffuse_texture = try_get_texture_from_cache(texturesampler_cache, renderable.diffuse);
+		if (!diffuse_texture) 
+			diffuse_texture = &m_diffuse.default_texture;
 		
 		if (diffuse_texture == nullptr) {
 			diffuse_texture = &m_diffuse.default_texture;
@@ -845,11 +858,11 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			last_diffuse_texture = diffuse_texture;
 		}
 	
-
-		TextureSamplerReadOnly* specular_texture = renderable.texture.specular 
-			? renderable.texture.specular 
-			: &m_specular.default_texture;
-		
+		TextureSamplerReadOnly* specular_texture = try_get_texture_from_cache(texturesampler_cache,
+																			  renderable.specular);
+		if (!specular_texture) 
+			specular_texture = &m_specular.default_texture;
+	
 		if (specular_texture == nullptr) {
 			specular_texture = &m_specular.default_texture;
 		}
@@ -879,9 +892,10 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 			last_specular_texture = specular_texture;
 		}
 		
-		TextureSamplerReadOnly* normal_texture = renderable.texture.normal 
-			? renderable.texture.normal 
-			: &m_normal.default_texture;
+		TextureSamplerReadOnly* normal_texture = try_get_texture_from_cache(texturesampler_cache,
+																			renderable.normal);
+		if (!normal_texture) 
+			normal_texture = &m_normal.default_texture;
 		
 		if (normal_texture != last_normal_texture) {
 			if (!m_normal.sets.contains(normal_texture)) {
@@ -935,7 +949,10 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 											 nullptr);
 			}
 		}
-	
+		
+		if (!renderable.mesh.has_value())
+			continue;
+
 		PushConstants push{};
 		push.model = renderable.model;
 		const uint32_t push_offset = 0;
@@ -948,8 +965,10 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		const uint32_t firstBinding = 0;
 		const uint32_t bindingCount = 1;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
+		
+		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
 		std::array<vk::Buffer, bindingCount> buffers {
-			renderable.mesh->vertexbuffer.impl->buffer.get(),
+			mesh->vertexbuffer.impl->buffer.get(),
 		};
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
@@ -959,7 +978,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		const uint32_t instanceCount = 1;
 		const uint32_t firstVertex = 0;
 		const uint32_t firstInstance = 0;
-		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+		commandbuffer.draw(mesh->vertexbuffer.impl->length,
 						   instanceCount,
 						   firstVertex,
 						   firstInstance);

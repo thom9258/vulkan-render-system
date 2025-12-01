@@ -10,7 +10,6 @@
 #include "ShadowPass.hpp"
 #include "NormRenderPipeline.hpp"
 #include "WireframePipeline.hpp"
-#include "BaseTexturePipeline.hpp"
 #include "MaterialPipeline.hpp"
 
 struct GeometryPass
@@ -26,7 +25,6 @@ struct GeometryPass
 
 struct GeometryPipelines
 {
-	BaseTexturePipeline basetexture;
 	NormRenderPipeline normcolor;
 	WireframePipeline wireframe;
 	MaterialPipeline material;
@@ -34,7 +32,6 @@ struct GeometryPipelines
 
 struct SortedRenderables
 {
-	std::vector<BaseTextureRenderable> basetextures;
 	std::vector<NormColorRenderable> normcolors;
 	std::vector<WireframeRenderable> wireframes;
 	std::vector<MaterialRenderable> materialrenderables;
