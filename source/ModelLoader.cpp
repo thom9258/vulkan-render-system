@@ -42,6 +42,7 @@ void print_mesh_material_info(std::string_view prefix,
     std::filesystem::path path =
         base_directory / std::filesystem::path(pathstring.C_Str());
 
+#if 0
     if (!std::filesystem::exists(path) ||
         !std::filesystem::is_regular_file(path)) {
       std::cout << std::format(
@@ -52,6 +53,8 @@ void print_mesh_material_info(std::string_view prefix,
                                path.string())
                 << std::endl;
     }
+#endif
+
   }
 };
 
@@ -144,15 +147,8 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
           texture_cache.get_ref_from_path(diffuse_path.value());
 
       if (cached.has_value()) {
-        std::cout << std::format("Model has cached Diffuse name: {} path: {}",
-                                 diffuse_name, diffuse_path.value().string())
-                  << std::endl;
         drawable_mesh.diffuse = cached.value();
       } else {
-        std::cout << std::format("Model has Diffuse name: {} path: {}",
-                                 diffuse_name, diffuse_path.value().string())
-                  << std::endl;
-
         Texture2D texture =
             load_bitmap(diffuse_path.value(), BitmapPixelFormat::RGBA,
                         VerticalFlipOnLoad::No) |
@@ -165,10 +161,6 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 
         drawable_mesh.diffuse = ref;
       }
-    } else {
-      std::cout << std::format("Model has invalid Diffuse name: {}",
-                               diffuse_name)
-                << std::endl;
     }
 
     // ------------------------------------------
@@ -182,15 +174,8 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
           texture_cache.get_ref_from_path(specular_path.value());
 
       if (cached.has_value()) {
-        std::cout << std::format("Model has cached Specular name: {} path: {}",
-                                 specular_name, specular_path.value().string())
-                  << std::endl;
         drawable_mesh.specular = cached.value();
       } else {
-        std::cout << std::format("Model has Specular name: {} path: {}",
-                                 specular_name, specular_path.value().string())
-                  << std::endl;
-
         Texture2D texture =
             load_bitmap(specular_path.value(), BitmapPixelFormat::RGBA,
                         VerticalFlipOnLoad::No) |
@@ -203,10 +188,6 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 
         drawable_mesh.specular = ref;
       }
-    } else {
-      std::cout << std::format("Model has invalid Specular name: {}",
-                               specular_name)
-                << std::endl;
     }
 
     // ------------------------------------------
@@ -220,14 +201,8 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
           texture_cache.get_ref_from_path(ambient_path.value());
 
       if (cached.has_value()) {
-        std::cout << std::format("Model has cached Ambient name: {} path: {}",
-                                 ambient_name, ambient_path.value().string())
-                  << std::endl;
         drawable_mesh.ambient = cached.value();
       } else {
-        std::cout << std::format("Model has Ambient name: {} path: {}",
-                                 ambient_name, ambient_path.value().string())
-                  << std::endl;
 
         Texture2D texture =
             load_bitmap(ambient_path.value(), BitmapPixelFormat::RGBA,
@@ -241,10 +216,6 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 
         drawable_mesh.ambient = ref;
       }
-    } else {
-      std::cout << std::format("Model has invalid Ambient name: {}",
-                               ambient_name)
-                << std::endl;
     }
   }
 

@@ -41,14 +41,6 @@
 			"scale": [40, 40, 40]
 		},
 		{
-			"name": "asset-monster", 
-			"draw-mode": "material",
-			"has-shadow": "yes",
-			"position": [0, 0, 0],
-			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
-			"scale": [0.1, 0.1, 0.1]
-		},
-		{
 			"name": "chest", 
 			"draw-mode": "material",
 			"has-shadow": "yes",

@@ -26,7 +26,7 @@ struct Resources {
   } monkey;
 
   struct {
-    std::optional<TexturedMeshRef> mesh;
+    //std::optional<TexturedMeshRef> mesh;
     std::optional<TexturedMeshRef> textured_mesh;
   } cube;
 
@@ -39,7 +39,7 @@ struct Resources {
   } gizmo_sphere;
 
   struct {
-    std::optional<TexturedMeshRef> mesh;
+    //std::optional<TexturedMeshRef> mesh;
     std::optional<TexturedMeshRef> textured_mesh;
     std::optional<TextureSamplerRef> diffuse;
   } chest;

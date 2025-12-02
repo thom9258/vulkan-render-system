@@ -67,10 +67,10 @@ constexpr bool slowframes = false;
 constexpr bool printframerate = false;
 constexpr size_t printframerateinterval = 100;
 
-std::vector<VertexPosNormColor> triangle_vertices = {
-    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+std::vector<VertexPosNormColorUV> triangle_vertices = {
+    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0, 0}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0, 0}},
+    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0, 0}},
 };
 
 struct Scene {
@@ -173,7 +173,12 @@ auto load_scene_from_path(std::filesystem::path const path,
         scene.renderables.push_back(chest);
       } else if (prefab["draw-mode"] == "normcolor") {
         NormColorRenderable chest{};
-        chest.mesh = resources.chest.mesh;
+        chest.mesh = resources.chest.textured_mesh;
+        chest.model = transform.as_matrix();
+        scene.renderables.push_back(chest);
+      } else if (prefab["draw-mode"] == "wireframe") {
+        WireframeRenderable chest{};
+        chest.mesh = resources.chest.textured_mesh;
         chest.model = transform.as_matrix();
         scene.renderables.push_back(chest);
       } else {
@@ -206,7 +211,12 @@ auto load_scene_from_path(std::filesystem::path const path,
         scene.renderables.push_back(box);
       } else if (prefab["draw-mode"] == "normcolor") {
         NormColorRenderable box{};
-        box.mesh = resources.cube.mesh;
+        box.mesh = resources.cube.textured_mesh;
+        box.model = transform.as_matrix();
+        scene.renderables.push_back(box);
+      } else if (prefab["draw-mode"] == "wireframe") {
+        WireframeRenderable box{};
+        box.mesh = resources.cube.textured_mesh;
         box.model = transform.as_matrix();
         scene.renderables.push_back(box);
       } else {
@@ -239,6 +249,11 @@ auto load_scene_from_path(std::filesystem::path const path,
         floor.diffuse = resources.brickwall.diffuse;
         floor.specular = resources.brickwall.specular;
         floor.normal = resources.brickwall.normal;
+        floor.model = transform.as_matrix();
+        scene.renderables.push_back(floor);
+      } else if (prefab["draw-mode"] == "wireframe") {
+        WireframeRenderable floor{};
+        floor.mesh = resources.cube.textured_mesh;
         floor.model = transform.as_matrix();
         scene.renderables.push_back(floor);
       } else {

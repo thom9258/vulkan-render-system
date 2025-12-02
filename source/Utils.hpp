@@ -103,44 +103,6 @@ get_swapchain_surface_format(const std::vector<vk::SurfaceFormatKHR>& availables
 std::optional<std::vector<uint32_t>>
 read_binary_file(const std::string& filename);
 
-#if 0
-[[nodiscard]]
-std::optional<uint32_t>
-find_memory_type(const vk::PhysicalDeviceMemoryProperties& memoryProperties,
-				 uint32_t typeBits,
-				 const vk::MemoryPropertyFlags requirementsMask)
-{
-	uint32_t typeIndex = uint32_t( ~0 );
-	for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
-		const bool has_requirements =
-			((memoryProperties.memoryTypes[i].propertyFlags & requirementsMask) == requirementsMask);
-
-		if ((typeBits & 1) && has_requirements) {
-			typeIndex = i;
-			break;
-		}
-		typeBits >>= 1;
-	}
-
-	if (typeIndex == uint32_t( ~0 ) )
-		return {};
-	return typeIndex;
-}
-
-uint32_t findMemoryType(vk::BufferUsageFlags usage,
-						vk::MemoryPropertyFlags properties,
-						vk::PhysicalDeviceMemoryProperties memProperties)
-{
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-
-    throw std::runtime_error("failed to find suitable memory type!");
-}
-#endif
-
 uint32_t 
 findMemoryType(vk::PhysicalDeviceMemoryProperties const & memoryProperties,
 			   uint32_t typeBits,

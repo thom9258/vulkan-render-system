@@ -97,8 +97,8 @@ create_wireframe_render_pipeline(Logger& logger,
 		.setFlags(vk::PipelineDynamicStateCreateFlags())
 		.setDynamicStates(dynamicStates);
 	
-	const auto bindingDescriptions = binding_descriptions(VertexPosNormColor{});
-	const auto attributeDescriptions = attribute_descriptions(VertexPosNormColor{});
+	const auto bindingDescriptions = binding_descriptions(VertexPosNormColorUV{});
+	const auto attributeDescriptions = attribute_descriptions(VertexPosNormColorUV{});
 	
 	auto pipelineVertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{}
 		.setFlags(vk::PipelineVertexInputStateCreateFlags())
