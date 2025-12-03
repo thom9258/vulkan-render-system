@@ -97,8 +97,8 @@ create_wireframe_render_pipeline(Logger& logger,
 		.setFlags(vk::PipelineDynamicStateCreateFlags())
 		.setDynamicStates(dynamicStates);
 	
-	const auto bindingDescriptions = binding_descriptions(VertexPosNormColor{});
-	const auto attributeDescriptions = attribute_descriptions(VertexPosNormColor{});
+	const auto bindingDescriptions = binding_descriptions(VertexPosNormColorUV{});
+	const auto attributeDescriptions = attribute_descriptions(VertexPosNormColorUV{});
 	
 	auto pipelineVertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{}
 		.setFlags(vk::PipelineVertexInputStateCreateFlags())
@@ -235,6 +235,7 @@ create_wireframe_render_pipeline(Logger& logger,
 }
 
 void draw_wireframes(WireframePipeline& pipeline,
+					 TexturedMeshCache& texturedmesh_cache,
 					 vk::CommandBuffer& commandbuffer,
 					 const WireframeRenderInfo& info,
 					 std::vector<WireframeRenderable> renderables)
@@ -247,6 +248,12 @@ void draw_wireframes(WireframePipeline& pipeline,
 							   pipeline.pipeline.get());
 
 	for (auto renderable: renderables) {
+		if (!renderable.mesh.has_value())
+			continue;
+		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
+		if (!mesh)
+			continue;
+
 		WireframePipeline::PushConstants push{};
 		push.color = renderable.basecolor;	
 		push.modelviewproj = info.viewproj * renderable.model;
@@ -261,7 +268,7 @@ void draw_wireframes(WireframePipeline& pipeline,
 		const uint32_t bindingCount = 1;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
 		std::array<vk::Buffer, bindingCount> buffers {
-			renderable.mesh->vertexbuffer.impl->buffer.get(),
+			mesh->vertexbuffer.impl->buffer.get(),
 		};
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
@@ -271,7 +278,7 @@ void draw_wireframes(WireframePipeline& pipeline,
 		const uint32_t instanceCount = 1;
 		const uint32_t firstVertex = 0;
 		const uint32_t firstInstance = 0;
-		commandbuffer.draw(renderable.mesh->vertexbuffer.impl->length,
+		commandbuffer.draw(mesh->vertexbuffer.impl->length,
 						   instanceCount,
 						   firstVertex,
 						   firstInstance);

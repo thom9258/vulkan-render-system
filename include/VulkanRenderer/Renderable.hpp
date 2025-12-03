@@ -12,40 +12,27 @@
 
 struct NormColorRenderable
 {
-	Mesh* mesh;
+	std::optional<TexturedMeshRef> mesh;
 	glm::mat4 model;
 };
 
 struct WireframeRenderable
 {
-	Mesh* mesh;
+	std::optional<TexturedMeshRef> mesh;
 	glm::mat4 model;
 	glm::vec4 basecolor;
 };
 
-struct BaseTextureRenderable
-{
-	TexturedMesh* mesh;
-	TextureSamplerReadOnly* texture;
-	glm::mat4 model;
-};
-
-struct TextureMaterialPtrs
-{
-	TextureSamplerReadOnly* ambient{nullptr};
-	TextureSamplerReadOnly* diffuse{nullptr};
-	TextureSamplerReadOnly* specular{nullptr};
-	TextureSamplerReadOnly* normal{nullptr};
-};
-
 struct MaterialRenderable
 {
-	TexturedMesh* mesh;
-	TextureMaterialPtrs texture;
+	std::optional<TexturedMeshRef> mesh;
+	std::optional<TextureSamplerRef> ambient;
+	std::optional<TextureSamplerRef> diffuse;
+	std::optional<TextureSamplerRef> specular;
+	std::optional<TextureSamplerRef> normal;
 	glm::mat4 model;
 	bool has_shadow;
 };
-
 
 struct RenderableNode
 {
@@ -56,6 +43,7 @@ struct RenderableNode
 		std::optional<TextureSamplerRef> diffuse;
 		std::optional<TextureSamplerRef> specular;
 		std::optional<TextureSamplerRef> normal;
+		bool has_shadow;
 	};
 
 	std::optional<std::string> name;
@@ -70,30 +58,5 @@ using RenderableNodePtr = RenderableNode::NodePtr;
 
 using Renderable = std::variant<NormColorRenderable,
 								WireframeRenderable,
-								BaseTextureRenderable,
 								MaterialRenderable,
 								RenderableNodePtr>;
-
-
-
-struct NoRenderable {};
-struct MaterialRenderable2
-{
-		//TexturedMeshRef vertices;
-		//std::optional<IndicesRef> indices;
-		std::optional<TextureSamplerRef> ambient;
-		std::optional<TextureSamplerRef> diffuse;
-		std::optional<TextureSamplerRef> specular;
-		std::optional<TextureSamplerRef> normal;
-};
-
-using Renderable2 = std::variant < NoRenderable,
-								   MaterialRenderable2>;
-
-struct RenderableNode2
-{
-	glm::mat4 model_matrix;
-	std::optional<std::string> name;
-	Renderable2 renderable;
-	std::vector<RenderableNode2> children;
-};      

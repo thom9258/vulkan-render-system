@@ -34,8 +34,6 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
     sorted->normcolors.push_back(*p);
   else if (auto p = std::get_if<WireframeRenderable>(&renderable))
     sorted->wireframes.push_back(*p);
-  else if (auto p = std::get_if<BaseTextureRenderable>(&renderable))
-    sorted->basetextures.push_back(*p);
   else if (auto p = std::get_if<MaterialRenderable>(&renderable))
     sorted->materialrenderables.push_back(*p);
   else if (auto p = std::get_if<RenderableNodePtr>(&renderable))
@@ -47,68 +45,35 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
 }
 
 auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
-                           TextureSamplerCache &texture_cache,
-                           TexturedMeshCache &texturedmesh_cache,
+						   glm::mat4 parent_model_matrix,
                            RenderableNode *node) -> void {
   if (!node)
     return;
+  
+  glm::mat4 model_matrix = node->model * parent_model_matrix;
 
   for (auto &mesh : node->meshes) {
     MaterialRenderable renderable;
-    renderable.model = node->model;
-
-    if (mesh.mesh.has_value()) {
-		renderable.mesh = texturedmesh_cache.get(mesh.mesh.value());
-		renderable.has_shadow = true;
-		
-		if (mesh.ambient.has_value()) {
-			TextureSamplerCache::TextureInfo *info =
-				texture_cache.get_texture(mesh.ambient.value());
-			if (info) {
-				renderable.texture.ambient = &(info->texture);
-			} else {
-				renderable.texture.ambient = nullptr;
-			}
-		}
-		
-		if (mesh.diffuse.has_value()) {
-			TextureSamplerCache::TextureInfo *info =
-				texture_cache.get_texture(mesh.diffuse.value());
-			if (info) {
-				renderable.texture.diffuse = &(info->texture);
-			} else {
-				renderable.texture.diffuse = nullptr;
-			}
-		}
-		
-		if (mesh.specular.has_value()) {
-			TextureSamplerCache::TextureInfo *info =
-				texture_cache.get_texture(mesh.specular.value());
-			if (info) {
-				renderable.texture.specular = &(info->texture);
-			} else {
-				renderable.texture.specular = nullptr;
-			}
-		}
-		
-		renderable.texture.normal = nullptr;
-		renderables.push_back(renderable);
-	}
-
+    renderable.model = model_matrix;
+    renderable.mesh = mesh.mesh;
+    renderable.ambient = mesh.ambient;
+    renderable.diffuse = mesh.diffuse;
+    renderable.specular = mesh.specular;
+    renderable.normal = mesh.normal;
+    renderable.has_shadow = mesh.has_shadow;
+	renderables.push_back(renderable);
   }
 
   for (auto &child : node->children) {
-    unwind_renderablenode(renderables, texture_cache, texturedmesh_cache,
-                          child.get());
+    unwind_renderablenode(renderables, model_matrix, child.get());
   }
 }
 
-auto unwind_renderablenode(TextureSamplerCache &texture_cache,
-                           TexturedMeshCache &texturedmesh_cache,
-                           RenderableNode *node)
+auto unwind_renderablenode(RenderableNode *node)
     -> std::vector<MaterialRenderable> {
   std::vector<MaterialRenderable> renderables;
-  unwind_renderablenode(renderables, texture_cache, texturedmesh_cache, node);
+  glm::mat4 parent_model_matrix(1.0f);
+  unwind_renderablenode(renderables, parent_model_matrix, node);
   return renderables;
 }
 
@@ -280,7 +245,7 @@ auto render_geometry_pass(
   //       simple the render pipelines can understand...
   for (auto &renderablenode : sorted.renderablenodes) {
     std::vector<MaterialRenderable> renderables = unwind_renderablenode(
-        texture_cache, texturedmesh_cache, renderablenode.get());
+        renderablenode.get());
     for (auto &renderable : renderables) {
       sorted.materialrenderables.push_back(renderable);
     }
@@ -297,7 +262,7 @@ auto render_geometry_pass(
     }
 
     shadow_passes.orthographic.record(
-        logger, device, CurrentFlightFrame{current_frame_in_flight},
+        logger, device, texturedmesh_cache, CurrentFlightFrame{current_frame_in_flight},
         commandbuffer, ortho_caster_data, sorted.materialrenderables);
 
     std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
@@ -310,7 +275,7 @@ auto render_geometry_pass(
 
     // TODO: have multiple spot casters
     shadow_passes.perspective.record(
-        logger, device, CurrentFlightFrame{current_frame_in_flight},
+        logger, device, texturedmesh_cache, CurrentFlightFrame{current_frame_in_flight},
         commandbuffer, pers_caster_data, sorted.materialrenderables);
   };
 
@@ -356,22 +321,14 @@ auto render_geometry_pass(
     normcolor_info.view = world_info.view;
     normcolor_info.proj = world_info.projection;
 
-    draw_normcolors(device, pipelines->normcolor, commandbuffer,
+    draw_normcolors(device, pipelines->normcolor, texturedmesh_cache, commandbuffer,
                     current_frame_in_flight, normcolor_info, sorted.normcolors);
 
     WireframeRenderInfo wireframe_info{};
     wireframe_info.viewproj = world_info.projection * world_info.view;
 
-    draw_wireframes(pipelines->wireframe, commandbuffer, wireframe_info,
+    draw_wireframes(pipelines->wireframe, texturedmesh_cache, commandbuffer, wireframe_info,
                     sorted.wireframes);
-
-    BaseTextureRenderInfo texture_info{};
-    texture_info.view = world_info.view;
-    texture_info.proj = world_info.projection;
-    draw_base_texture_renderables(pipelines->basetexture, *logger, device,
-                                  descriptor_pool, commandbuffer,
-                                  current_frame_in_flight, max_frames_in_flight,
-                                  texture_info, sorted.basetextures);
 
     CurrentFlightFrame const current_flightframe{current_frame_in_flight};
     MaxFlightFrames const max_flightframes{max_frames_in_flight};
@@ -397,7 +354,7 @@ auto render_geometry_pass(
     material_frame_info.proj = world_info.projection;
     material_frame_info.camera_position = world_info.camera_position;
     pipelines->material.render(
-        material_frame_info, *logger, device, descriptor_pool, commandbuffer,
+        material_frame_info, *logger, device, descriptor_pool, texturedmesh_cache, texture_cache, commandbuffer,
         current_flightframe, max_flightframes, sorted.materialrenderables,
         lights, material_shadowcasters);
 
@@ -438,13 +395,6 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
                        geometry_pass.renderpass.get(), shaders_root);
   context->logger.info(std::source_location::current(),
                        "Created Material Pipeline");
-
-  geometry_pipelines.basetexture = create_base_texture_pipeline(
-      context->logger, context, presenter, descriptor_pool,
-      geometry_pass.renderpass.get(), presenter->max_frames_in_flight,
-      render_extent, shaders_root, debug_print);
-  context->logger.info(std::source_location::current(),
-                       "Created BaseTexture Pipeline");
 
   geometry_pipelines.normcolor = create_norm_render_pipeline(
       context->logger, context->physical_device, context->device.get(),

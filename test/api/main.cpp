@@ -67,10 +67,10 @@ constexpr bool slowframes = false;
 constexpr bool printframerate = false;
 constexpr size_t printframerateinterval = 100;
 
-std::vector<VertexPosNormColor> triangle_vertices = {
-    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+std::vector<VertexPosNormColorUV> triangle_vertices = {
+    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0, 0}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0, 0}},
+    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0, 0}},
 };
 
 struct Scene {
@@ -138,21 +138,21 @@ auto load_scene_from_path(std::filesystem::path const path,
     if (name == "smg") {
       if (prefab["draw-mode"] == "material") {
         MaterialRenderable smg{};
-        smg.mesh = &resources.smg.textured_mesh;
+        smg.mesh = resources.smg.textured_mesh;
         if (prefab["has-shadow"] == "yes") {
           smg.has_shadow = true;
         }
 
         // smg.texture.ambient = &resources.smg.diffuse;
-        smg.texture.ambient = nullptr;
-        smg.texture.diffuse = &resources.smg.diffuse;
-        smg.texture.specular = &resources.smg.specular;
-        smg.texture.normal = &resources.smg.normal;
+        smg.ambient = std::nullopt;
+        smg.diffuse = resources.smg.diffuse;
+        smg.specular = resources.smg.specular;
+        smg.normal = resources.smg.normal;
         smg.model = transform.as_matrix();
         scene.renderables.push_back(smg);
       } else if (prefab["draw-mode"] == "normcolor") {
         NormColorRenderable smg{};
-        smg.mesh = &resources.smg.mesh;
+        smg.mesh = resources.smg.textured_mesh;
         smg.model = transform.as_matrix();
         scene.renderables.push_back(smg);
       } else {
@@ -161,19 +161,25 @@ auto load_scene_from_path(std::filesystem::path const path,
     } else if (name == "chest") {
       if (prefab["draw-mode"] == "material") {
         MaterialRenderable chest{};
-        chest.mesh = &resources.chest.textured_mesh;
+        chest.mesh = resources.chest.textured_mesh;
         if (prefab["has-shadow"] == "yes") {
           chest.has_shadow = true;
         }
 
-        chest.texture.ambient = &resources.chest.diffuse;
-        chest.texture.diffuse = &resources.chest.diffuse;
-        chest.texture.specular = &resources.chest.diffuse;
+        chest.ambient = resources.chest.diffuse;
+        chest.diffuse = resources.chest.diffuse;
+        chest.specular = resources.chest.diffuse;
         chest.model = transform.as_matrix();
         scene.renderables.push_back(chest);
       } else if (prefab["draw-mode"] == "normcolor") {
         NormColorRenderable chest{};
-        chest.mesh = &resources.chest.mesh;
+        chest.mesh = resources.chest.textured_mesh;
+        chest.model = transform.as_matrix();
+        scene.renderables.push_back(chest);
+      } else if (prefab["draw-mode"] == "wireframe") {
+        WireframeRenderable chest{};
+        chest.mesh = resources.chest.textured_mesh;
+		chest.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
         chest.model = transform.as_matrix();
         scene.renderables.push_back(chest);
       } else {
@@ -181,32 +187,37 @@ auto load_scene_from_path(std::filesystem::path const path,
       }
     } else if (name == "transformship") {
       MaterialRenderable ship{};
-      ship.mesh = &resources.transformship.mesh;
+      ship.mesh = resources.transformship.mesh;
       if (prefab["has-shadow"] == "yes") {
         ship.has_shadow = true;
       }
-      ship.texture.ambient = nullptr;
-      ship.texture.diffuse = &resources.transformship.diffuse;
-      ship.texture.specular = nullptr;
-      ship.texture.normal = nullptr;
+      ship.ambient = std::nullopt;
+      ship.diffuse = resources.transformship.diffuse;
+      ship.specular = std::nullopt;
+      ship.normal = std::nullopt;
       ship.model = transform.as_matrix();
       scene.renderables.push_back(ship);
     } else if (name == "box") {
       if (prefab["draw-mode"] == "material") {
         MaterialRenderable box{};
-        box.mesh = &resources.cube.textured_mesh;
+        box.mesh = resources.cube.textured_mesh;
         if (prefab["has-shadow"] == "yes") {
           box.has_shadow = true;
         }
 
-        box.texture.ambient = &resources.box.diffuse;
-        box.texture.diffuse = &resources.box.diffuse;
-        box.texture.specular = &resources.box.specular;
+        box.ambient = resources.box.diffuse;
+        box.diffuse = resources.box.diffuse;
+        box.specular = resources.box.specular;
         box.model = transform.as_matrix();
         scene.renderables.push_back(box);
       } else if (prefab["draw-mode"] == "normcolor") {
         NormColorRenderable box{};
-        box.mesh = &resources.cube.mesh;
+        box.mesh = resources.cube.textured_mesh;
+        box.model = transform.as_matrix();
+        scene.renderables.push_back(box);
+      } else if (prefab["draw-mode"] == "wireframe") {
+        WireframeRenderable box{};
+        box.mesh = resources.cube.textured_mesh;
         box.model = transform.as_matrix();
         scene.renderables.push_back(box);
       } else {
@@ -215,14 +226,14 @@ auto load_scene_from_path(std::filesystem::path const path,
     } else if (name == "pixelart") {
       if (prefab["draw-mode"] == "material") {
         MaterialRenderable pixelart{};
-        pixelart.mesh = &resources.cube.textured_mesh;
+        pixelart.mesh = resources.cube.textured_mesh;
         if (prefab["has-shadow"] == "yes") {
           pixelart.has_shadow = true;
         }
 
-        pixelart.texture.diffuse = &resources.textures.pixelart;
-        pixelart.texture.specular = nullptr;
-        pixelart.texture.normal = nullptr;
+        pixelart.diffuse = resources.textures.pixelart;
+        pixelart.specular = std::nullopt;
+        pixelart.normal = std::nullopt;
         pixelart.model = transform.as_matrix();
         scene.renderables.push_back(pixelart);
       } else {
@@ -231,14 +242,19 @@ auto load_scene_from_path(std::filesystem::path const path,
     } else if (name == "floor") {
       if (prefab["draw-mode"] == "material") {
         MaterialRenderable floor{};
-        floor.mesh = &resources.cube.textured_mesh;
+        floor.mesh = resources.cube.textured_mesh;
         if (prefab["has-shadow"] == "yes") {
           floor.has_shadow = true;
         }
 
-        floor.texture.diffuse = &resources.brickwall.diffuse;
-        floor.texture.specular = &resources.brickwall.specular;
-        floor.texture.normal = &resources.brickwall.normal;
+        floor.diffuse = resources.brickwall.diffuse;
+        floor.specular = resources.brickwall.specular;
+        floor.normal = resources.brickwall.normal;
+        floor.model = transform.as_matrix();
+        scene.renderables.push_back(floor);
+      } else if (prefab["draw-mode"] == "wireframe") {
+        WireframeRenderable floor{};
+        floor.mesh = resources.cube.textured_mesh;
         floor.model = transform.as_matrix();
         scene.renderables.push_back(floor);
       } else {
@@ -284,12 +300,12 @@ auto load_scene_from_path(std::filesystem::path const path,
 
       if (obj["draw-gizmo"] == "yes") {
         MaterialRenderable ship{};
-        ship.mesh = &resources.transformship.mesh;
+        ship.mesh = resources.transformship.mesh;
         ship.has_shadow = false;
-        ship.texture.ambient = nullptr;
-        ship.texture.diffuse = &resources.transformship.diffuse;
-        ship.texture.specular = nullptr;
-        ship.texture.normal = nullptr;
+        ship.ambient = std::nullopt;
+        ship.diffuse = resources.transformship.diffuse;
+        ship.specular = std::nullopt;
+        ship.normal = std::nullopt;
         ship.model = caster.model();
         scene.renderables.push_back(ship);
       }
@@ -324,12 +340,12 @@ auto load_scene_from_path(std::filesystem::path const path,
 
       if (obj["draw-gizmo"] == "yes") {
         MaterialRenderable ship{};
-        ship.mesh = &resources.transformship.mesh;
+        ship.mesh = resources.transformship.mesh;
         ship.has_shadow = false;
-        ship.texture.ambient = nullptr;
-        ship.texture.diffuse = &resources.transformship.diffuse;
-        ship.texture.specular = nullptr;
-        ship.texture.normal = nullptr;
+        ship.ambient = std::nullopt;
+        ship.diffuse = resources.transformship.diffuse;
+        ship.specular = std::nullopt;
+        ship.normal = std::nullopt;
         ship.model = caster.model();
         scene.renderables.push_back(ship);
       }
@@ -347,7 +363,7 @@ auto load_scene_from_path(std::filesystem::path const path,
       if (obj["draw-gizmo"] == "yes") {
         WireframeRenderable gizmo{};
         gizmo.basecolor = glm::vec4(glm::normalize(p.diffuse), 1.0f);
-        gizmo.mesh = &resources.gizmo_sphere.mesh;
+        gizmo.mesh = resources.gizmo_sphere.mesh;
         float const scale = p.attenuation.approximate_distance(0.03f);
         gizmo.model = glm::translate(glm::mat4(1.0f), p.position) *
                       glm::scale(glm::mat4(1.0f), glm::vec3(scale));
@@ -466,7 +482,7 @@ int main(int argc, char **argv) {
   TextureSamplerCache texture_cache;
   TexturedMeshCache texturedmesh_cache;
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
-  Resources resources{context, texture_cache, assets_root};
+  Resources resources{context, texturedmesh_cache, texture_cache, assets_root};
 
   std::cout << "STARTING DRAW LOOP" << std::endl;
   /** ************************************************************************

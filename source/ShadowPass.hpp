@@ -72,6 +72,7 @@ public:
 	
 	void record(Logger* logger,
 				vk::Device& device,
+				TexturedMeshCache& texturedmesh_cache,
 				CurrentFlightFrame current_flightframe,
 				vk::CommandBuffer& commandbuffer,
 				std::optional<CameraUniformData> camera_data,
@@ -135,6 +136,7 @@ public:
 	
 	void record(Logger* logger,
 				vk::Device& device,
+				TexturedMeshCache& texturedmesh_cache,
 				CurrentFlightFrame current_flightframe,
 				vk::CommandBuffer& commandbuffer,
 				std::optional<CameraUniformData> camera_data,
@@ -162,6 +164,7 @@ public:
 
 	void record(Logger* logger,
 				vk::Device& device,
+				TexturedMeshCache& texturedmesh_cache,
 				CurrentFlightFrame current_flightframe,
 				vk::CommandBuffer& commandbuffer,
 				std::optional<CameraUniformData> camera_data,
