@@ -44,85 +44,17 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
   }
 }
 
-#if 0
 auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
-                           TextureSamplerCache &texture_cache,
-                           TexturedMeshCache &texturedmesh_cache,
+						   glm::mat4 parent_model_matrix,
                            RenderableNode *node) -> void {
   if (!node)
     return;
+  
+  glm::mat4 model_matrix = node->model * parent_model_matrix;
 
   for (auto &mesh : node->meshes) {
     MaterialRenderable renderable;
-    renderable.model = node->model;
-
-    if (mesh.mesh.has_value()) {
-		renderable.mesh = texturedmesh_cache.get(mesh.mesh.value());
-		renderable.has_shadow = true;
-		
-		if (mesh.ambient.has_value()) {
-			TextureSamplerCache::TextureInfo *info =
-				texture_cache.get_texture(mesh.ambient.value());
-			if (info) {
-				renderable.texture.ambient = &(info->texture);
-			} else {
-				renderable.texture.ambient = nullptr;
-			}
-		}
-		
-		if (mesh.diffuse.has_value()) {
-			TextureSamplerCache::TextureInfo *info =
-				texture_cache.get_texture(mesh.diffuse.value());
-			if (info) {
-				renderable.texture.diffuse = &(info->texture);
-			} else {
-				renderable.texture.diffuse = nullptr;
-			}
-		}
-		
-		if (mesh.specular.has_value()) {
-			TextureSamplerCache::TextureInfo *info =
-				texture_cache.get_texture(mesh.specular.value());
-			if (info) {
-				renderable.texture.specular = &(info->texture);
-			} else {
-				renderable.texture.specular = nullptr;
-			}
-		}
-		
-		renderable.texture.normal = nullptr;
-		renderables.push_back(renderable);
-	}
-
-  }
-
-  for (auto &child : node->children) {
-    unwind_renderablenode(renderables, texture_cache, texturedmesh_cache,
-                          child.get());
-  }
-}
-
-
-auto unwind_renderablenode(TextureSamplerCache &texture_cache,
-                           TexturedMeshCache &texturedmesh_cache,
-                           RenderableNode *node)
-    -> std::vector<MaterialRenderable> {
-  std::vector<MaterialRenderable> renderables;
-  unwind_renderablenode(renderables, texture_cache, texturedmesh_cache, node);
-  return renderables;
-}
-
-
-#else
-
-auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
-                           RenderableNode *node) -> void {
-  if (!node)
-    return;
-
-  for (auto &mesh : node->meshes) {
-    MaterialRenderable renderable;
-    renderable.model = node->model;
+    renderable.model = model_matrix;
     renderable.mesh = mesh.mesh;
     renderable.ambient = mesh.ambient;
     renderable.diffuse = mesh.diffuse;
@@ -133,17 +65,17 @@ auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
   }
 
   for (auto &child : node->children) {
-    unwind_renderablenode(renderables, child.get());
+    unwind_renderablenode(renderables, model_matrix, child.get());
   }
 }
 
 auto unwind_renderablenode(RenderableNode *node)
     -> std::vector<MaterialRenderable> {
   std::vector<MaterialRenderable> renderables;
-  unwind_renderablenode(renderables, node);
+  glm::mat4 parent_model_matrix(1.0f);
+  unwind_renderablenode(renderables, parent_model_matrix, node);
   return renderables;
 }
-#endif
 
 auto create_geometry_pass(Render::Context::Impl *context,
                           vk::Extent2D render_extent,

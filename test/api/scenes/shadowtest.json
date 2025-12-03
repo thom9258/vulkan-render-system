@@ -14,6 +14,14 @@
 			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf"
 		},
 		{
+			"name": "fox", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf"
+		},
+		{
+			"name": "helmet", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf"
+		},
+		{
 			"name": "asset-backpack", 
 			"path": "../../../assets/models/backpack/backpack.obj"
 		},
@@ -47,6 +55,22 @@
 			"position": [-3, 0, 4],
 			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
 			"scale": [0.03, 0.03, 0.03]
+		},
+		{
+			"name": "asset-monster", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [-1, 1, 2],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.03, 0.03, 0.03]
+		},
+		{
+			"name": "helmet", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [0.5, 2.5, -0.75],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.4, 0.4, 0.4]
 		},
 		{
 			"name": "box", 
