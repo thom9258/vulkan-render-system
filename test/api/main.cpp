@@ -179,6 +179,7 @@ auto load_scene_from_path(std::filesystem::path const path,
       } else if (prefab["draw-mode"] == "wireframe") {
         WireframeRenderable chest{};
         chest.mesh = resources.chest.textured_mesh;
+		chest.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
         chest.model = transform.as_matrix();
         scene.renderables.push_back(chest);
       } else {

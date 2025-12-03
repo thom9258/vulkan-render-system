@@ -42,7 +42,7 @@
 		},
 		{
 			"name": "chest", 
-			"draw-mode": "material",
+			"draw-mode": "wireframe",
 			"has-shadow": "yes",
 			"position": [-3, 0, 4],
 			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
