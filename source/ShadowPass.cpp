@@ -721,24 +721,12 @@ void GenericShadowPass::record(Logger* logger,
 		const uint32_t bindingCount = 1;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
 
-		uint32_t vertex_length = 0;
-		std::array<vk::Buffer, bindingCount> buffers;
-		
-		if (auto* p = std::get_if<SimpleMeshRef>(&renderable.mesh.value())) {
-			TexturedMesh* mesh = mesh_cache.get(*p);
-			buffers[0] = mesh->vertexbuffer.impl->buffer.get();
-			vertex_length = mesh->vertexbuffer.impl->length;
-		}
-		else if (auto* p = std::get_if<AnimatedMeshRef>(&renderable.mesh.value())) {
-			AnimatedMesh* mesh = mesh_cache.get(*p);
-			buffers[0] = mesh->vertexbuffer.impl->buffer.get();
-			vertex_length = mesh->vertexbuffer.impl->length;
-		}
-		else {
-			logger->warn(std::source_location::current(), "Unknown mesh reference type");
-			continue;
-		}
-		
+		TexturedMesh* mesh = mesh_cache.get(renderable.mesh.value());
+		uint32_t vertex_length = mesh->vertexbuffer.impl->length;
+		std::array<vk::Buffer, bindingCount> buffers {
+			mesh->vertexbuffer.impl->buffer.get()                 
+		};
+
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
 										buffers.data(),

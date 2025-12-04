@@ -50,9 +50,9 @@ auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
   if (!node)
     return;
   
-  glm::mat4 model_matrix = node->model * parent_model_matrix;
+  glm::mat4 model_matrix = node->model_matrix * parent_model_matrix;
 
-  for (auto &mesh : node->meshes) {
+  for (auto &mesh : node->models) {
     MaterialRenderable renderable;
     renderable.model = model_matrix;
     renderable.mesh = mesh.mesh;

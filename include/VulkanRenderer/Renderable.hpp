@@ -23,11 +23,20 @@ struct WireframeRenderable
 	glm::vec4 basecolor;
 };
 
-using MeshRef = std::variant<SimpleMeshRef, AnimatedMeshRef>;
-
 struct MaterialRenderable
 {
-	std::optional<MeshRef> mesh;
+	std::optional<SimpleMeshRef> mesh;
+	std::optional<TextureSamplerRef> ambient;
+	std::optional<TextureSamplerRef> diffuse;
+	std::optional<TextureSamplerRef> specular;
+	std::optional<TextureSamplerRef> normal;
+	glm::mat4 model;
+	bool has_shadow;
+};
+
+struct AnimatedRenderable
+{
+	std::optional<AnimatedMeshRef> mesh;
 	std::optional<TextureSamplerRef> ambient;
 	std::optional<TextureSamplerRef> diffuse;
 	std::optional<TextureSamplerRef> specular;
@@ -38,9 +47,19 @@ struct MaterialRenderable
 
 struct RenderableNode
 {
-	struct MaterialMesh
+	struct SimpleModel
 	{
-		std::optional<MeshRef> mesh;
+		std::optional<SimpleMeshRef> mesh;
+		std::optional<TextureSamplerRef> ambient;
+		std::optional<TextureSamplerRef> diffuse;
+		std::optional<TextureSamplerRef> specular;
+		std::optional<TextureSamplerRef> normal;
+		bool has_shadow;
+	};
+	
+	struct AnimatedModel
+	{
+		std::optional<AnimatedMeshRef> mesh;
 		std::optional<TextureSamplerRef> ambient;
 		std::optional<TextureSamplerRef> diffuse;
 		std::optional<TextureSamplerRef> specular;
@@ -48,9 +67,11 @@ struct RenderableNode
 		bool has_shadow;
 	};
 
+	using Model = std::variant<SimpleModel, AnimatedModel>;
+
 	std::optional<std::string> name;
-	glm::mat4 model;
-	std::vector<MaterialMesh> meshes;
+	glm::mat4 model_matrix;
+	std::vector<Model> models;
 	
 	using NodePtr = std::shared_ptr<RenderableNode>;
 	std::vector<NodePtr> children;

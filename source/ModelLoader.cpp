@@ -61,7 +61,7 @@ void print_mesh_material_info(std::string_view prefix,
 auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 				  MeshCache& mesh_cache,
                   std::filesystem::path const &base_directory, aiMesh *mesh,
-                  const aiScene *scene) -> RenderableNode::MaterialMesh {
+                  const aiScene *scene) -> RenderableNode::SimpleModel {
   std::vector<VertexPosNormColorUV> vertices{};
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
     VertexPosNormColorUV vertex;
@@ -95,7 +95,7 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
   std::vector<VertexPosNormColorUV> unindexed =
       unindex_vertices(vertices, indices);
 
-  RenderableNode::MaterialMesh drawable_mesh;
+  RenderableNode::SimpleModel drawable_mesh;
   drawable_mesh.mesh = mesh_cache.add(
       context, TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(context,
 																	   unindexed)});
@@ -239,13 +239,13 @@ auto process_node(Render::Context &context, TextureSamplerCache &texture_cache,
     return nullptr;
   auto drawable_node = std::make_shared<RenderableNodePtr::element_type>();
   drawable_node->name = node->mName.C_Str();
-  drawable_node->model = glm_matrix(node->mTransformation);
+  drawable_node->model_matrix = glm_matrix(node->mTransformation);
 
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
     aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
     if (!mesh)
       continue;
-    drawable_node->meshes.push_back(
+    drawable_node->models.push_back(
         process_mesh(context, texture_cache, mesh_cache, base_directory, mesh, scene));
   }
 
