@@ -93,7 +93,7 @@ auto parse_transform(json j) -> Render::Transform {
 auto load_scene_from_path(std::filesystem::path const path,
 						  Render::Context &context,
 						  TextureSamplerCache &texture_cache,
-						  TexturedMeshCache &texturedmesh_cache,
+						  MeshCache &mesh_cache,
                           Resources &resources) -> Scene {
   std::ifstream fs(path.string());
   std::string content;
@@ -114,7 +114,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 	  std::string path = asset["path"];
 	  
 	  RenderableNodePtr loaded_model = load_model(context,
-												  texturedmesh_cache,
+												  mesh_cache,
 												  texture_cache,
 												  path);
 	  
@@ -480,9 +480,9 @@ int main(int argc, char **argv) {
   DescriptorPool descriptor_pool(descriptor_pool_info, context);
 
   TextureSamplerCache texture_cache;
-  TexturedMeshCache texturedmesh_cache;
+  MeshCache mesh_cache;
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
-  Resources resources{context, texturedmesh_cache, texture_cache, assets_root};
+  Resources resources{context, mesh_cache, texture_cache, assets_root};
 
   std::cout << "STARTING DRAW LOOP" << std::endl;
   /** ************************************************************************
@@ -490,7 +490,7 @@ int main(int argc, char **argv) {
    */
   SDL_Event event{};
   bool reload_scene = false;
-  Scene scene = load_scene_from_path(scene_path, context, texture_cache, texturedmesh_cache, resources);
+  Scene scene = load_scene_from_path(scene_path, context, texture_cache, mesh_cache, resources);
   bool exit = false;
   uint64_t framecount = 0;
   // std::size_t scene_index = 0;
@@ -589,13 +589,13 @@ int main(int argc, char **argv) {
         [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
 		
 		if (reload_scene) {
-			scene = load_scene_from_path(scene_path, context, texture_cache, texturedmesh_cache, resources);
+			scene = load_scene_from_path(scene_path, context, texture_cache, mesh_cache, resources);
 			reload_scene = false;
 		}
 
 
       auto *textureptr =
-          renderer.render(texture_cache, texturedmesh_cache, frameInfo.current_flight_frame_index,
+          renderer.render(texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
                           frameInfo.total_frame_count, world_info,
                           scene.renderables, scene.lights, scene.shadowcasters);
 

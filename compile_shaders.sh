@@ -13,6 +13,7 @@ function compile_vert_frag ()
   echo "compiled ${SHADER_SOURCE_DIR}/""$1"".frag to ${RESOURCES_DIR}/""$1"".frag.spv"
 }
 
+compile_vert_frag "AnimatedMaterial"
 compile_vert_frag "NormColor"
 compile_vert_frag "Wireframe"
 compile_vert_frag "Diffuse"

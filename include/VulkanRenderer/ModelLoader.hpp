@@ -6,6 +6,6 @@
 
 
 RenderableNodePtr load_model(Render::Context& context,
-							 TexturedMeshCache& texturedmesh_cache,
+							 MeshCache& mesh_cache,
 							 TextureSamplerCache& texture_cache,
 							 std::filesystem::path path);

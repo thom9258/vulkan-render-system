@@ -84,7 +84,7 @@ struct MaterialPipeline
 				Logger& logger,
 				vk::Device& device,
 				vk::DescriptorPool descriptor_pool,
-				TexturedMeshCache& texturedmesh_cache,
+				MeshCache& mesh_cache,
 				TextureSamplerCache& texturesampler_cache,
 				vk::CommandBuffer& commandbuffer,
 				CurrentFlightFrame const current_flightframe,

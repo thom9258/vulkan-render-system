@@ -612,7 +612,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							  Logger& logger,
 							  vk::Device& device,
 							  vk::DescriptorPool descriptor_pool,
-							  TexturedMeshCache& texturedmesh_cache,
+							  MeshCache& mesh_cache,
 							  TextureSamplerCache& texturesampler_cache,
 							  vk::CommandBuffer& commandbuffer,
 							  CurrentFlightFrame const current_flightframe,
@@ -964,12 +964,25 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 
 		const uint32_t firstBinding = 0;
 		const uint32_t bindingCount = 1;
+		uint32_t vertices_length = 0;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
-		
-		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
-		std::array<vk::Buffer, bindingCount> buffers {
-			mesh->vertexbuffer.impl->buffer.get(),
-		};
+		std::array<vk::Buffer, bindingCount> buffers{};
+
+		if (auto* p = std::get_if<SimpleMeshRef>(&renderable.mesh.value())) {
+			TexturedMesh* mesh = mesh_cache.get(*p);
+			buffers[0] = mesh->vertexbuffer.impl->buffer.get();
+			vertices_length = mesh->vertexbuffer.impl->length;
+		}
+		else if (auto* p = std::get_if<AnimatedMeshRef>(&renderable.mesh.value())) {
+			AnimatedMesh* mesh = mesh_cache.get(*p);
+			buffers[0] = mesh->vertexbuffer.impl->buffer.get();
+			vertices_length = mesh->vertexbuffer.impl->length;
+		}
+		else {
+				logger.warn(std::source_location::current(),
+							"MaterialPipeline found unknown Mesh Ref");
+		}
+
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
 										buffers.data(),
@@ -978,7 +991,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		const uint32_t instanceCount = 1;
 		const uint32_t firstVertex = 0;
 		const uint32_t firstInstance = 0;
-		commandbuffer.draw(mesh->vertexbuffer.impl->length,
+		commandbuffer.draw(vertices_length,
 						   instanceCount,
 						   firstVertex,
 						   firstInstance);

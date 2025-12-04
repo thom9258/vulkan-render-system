@@ -222,7 +222,7 @@ auto render_geometry_pass(
     // TODO: Pipelines are captured as a ptr because bind_front
     //       does not want to capture a reference for it...
     GeometryPipelines *pipelines, Logger *logger,
-    TextureSamplerCache &texture_cache, TexturedMeshCache &texturedmesh_cache,
+    TextureSamplerCache &texture_cache, MeshCache &mesh_cache,
     const uint32_t current_frame_in_flight, const uint32_t max_frames_in_flight,
     const uint64_t total_frames, vk::Device &device,
     vk::DescriptorPool descriptor_pool, vk::CommandPool &command_pool,
@@ -262,7 +262,7 @@ auto render_geometry_pass(
     }
 
     shadow_passes.orthographic.record(
-        logger, device, texturedmesh_cache, CurrentFlightFrame{current_frame_in_flight},
+        logger, device, mesh_cache, CurrentFlightFrame{current_frame_in_flight},
         commandbuffer, ortho_caster_data, sorted.materialrenderables);
 
     std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
@@ -275,7 +275,7 @@ auto render_geometry_pass(
 
     // TODO: have multiple spot casters
     shadow_passes.perspective.record(
-        logger, device, texturedmesh_cache, CurrentFlightFrame{current_frame_in_flight},
+        logger, device, mesh_cache, CurrentFlightFrame{current_frame_in_flight},
         commandbuffer, pers_caster_data, sorted.materialrenderables);
   };
 
@@ -321,13 +321,13 @@ auto render_geometry_pass(
     normcolor_info.view = world_info.view;
     normcolor_info.proj = world_info.projection;
 
-    draw_normcolors(device, pipelines->normcolor, texturedmesh_cache, commandbuffer,
+    draw_normcolors(device, pipelines->normcolor, mesh_cache, commandbuffer,
                     current_frame_in_flight, normcolor_info, sorted.normcolors);
 
     WireframeRenderInfo wireframe_info{};
     wireframe_info.viewproj = world_info.projection * world_info.view;
 
-    draw_wireframes(pipelines->wireframe, texturedmesh_cache, commandbuffer, wireframe_info,
+    draw_wireframes(pipelines->wireframe, mesh_cache, commandbuffer, wireframe_info,
                     sorted.wireframes);
 
     CurrentFlightFrame const current_flightframe{current_frame_in_flight};
@@ -354,7 +354,7 @@ auto render_geometry_pass(
     material_frame_info.proj = world_info.projection;
     material_frame_info.camera_position = world_info.camera_position;
     pipelines->material.render(
-        material_frame_info, *logger, device, descriptor_pool, texturedmesh_cache, texture_cache, commandbuffer,
+        material_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
         current_flightframe, max_flightframes, sorted.materialrenderables,
         lights, material_shadowcasters);
 
@@ -413,7 +413,7 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
 Renderer::Impl::~Impl() {}
 
 auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
-                            TexturedMeshCache &texturedmesh_cache,
+                            MeshCache &mesh_cache,
                             const uint32_t current_frame_in_flight,
                             const uint64_t total_frames,
                             const WorldRenderInfo &world_info,
@@ -422,7 +422,7 @@ auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
                             ShadowCasters &shadowcasters) -> Texture2D::Impl * {
   return render_geometry_pass(
       geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
-      texturedmesh_cache, current_frame_in_flight,
+      mesh_cache, current_frame_in_flight,
       presenter->max_frames_in_flight, total_frames, context->device.get(),
       descriptor_pool->descriptor_pool.get(), presenter->command_pool(),
       context->graphics_queue(), world_info, renderables, lights,
@@ -430,14 +430,14 @@ auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
 }
 
 auto Renderer::render(TextureSamplerCache &texture_cache,
-                      TexturedMeshCache &texturedmesh_cache,
+                      MeshCache &mesh_cache,
                       const uint32_t current_frame_in_flight,
                       const uint64_t total_frames,
                       const WorldRenderInfo &world_info,
                       std::vector<Renderable> &renderables,
                       std::vector<Light> &lights, ShadowCasters &shadowcasters)
     -> Texture2D::Impl * {
-  return impl->render(texture_cache, texturedmesh_cache,
+  return impl->render(texture_cache, mesh_cache,
                       current_frame_in_flight, total_frames, world_info,
                       renderables, lights, shadowcasters);
 }

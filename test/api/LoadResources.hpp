@@ -3,7 +3,7 @@
 #include <VulkanRenderer/Bitmap.hpp>
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/TextureSamplerCache.hpp>
-#include <VulkanRenderer/TexturedMeshCache.hpp>
+#include <VulkanRenderer/MeshCache.hpp>
 #include <VulkanRenderer/Vertex.hpp>
 
 #define SIMPLE_GEOMETRY_IMPLEMENTATION
@@ -17,40 +17,40 @@ struct Resources {
   Resources &operator=(Resources &&) = delete;
   Resources &operator=(const Resources &) = delete;
 
-  Resources(Render::Context &context, TexturedMeshCache &mesh_cache,
+  Resources(Render::Context &context, MeshCache &mesh_cache,
             TextureSamplerCache &texture_cache,
             std::filesystem::path assets_root);
 
   struct {
-    std::optional<TexturedMeshRef> mesh;
+    std::optional<SimpleMeshRef> mesh;
   } monkey;
 
   struct {
-    //std::optional<TexturedMeshRef> mesh;
-    std::optional<TexturedMeshRef> textured_mesh;
+    //std::optional<SimpleMeshRef> mesh;
+    std::optional<SimpleMeshRef> textured_mesh;
   } cube;
 
   struct {
-    std::optional<TexturedMeshRef> mesh;
+    std::optional<SimpleMeshRef> mesh;
   } gizmo_cone;
 
   struct {
-    std::optional<TexturedMeshRef> mesh;
+    std::optional<SimpleMeshRef> mesh;
   } gizmo_sphere;
 
   struct {
-    //std::optional<TexturedMeshRef> mesh;
-    std::optional<TexturedMeshRef> textured_mesh;
+    //std::optional<SimpleMeshRef> mesh;
+    std::optional<SimpleMeshRef> textured_mesh;
     std::optional<TextureSamplerRef> diffuse;
   } chest;
 
   struct {
-    std::optional<TexturedMeshRef> mesh;
+    std::optional<SimpleMeshRef> mesh;
     std::optional<TextureSamplerRef> diffuse;
   } transformship;
 
   struct {
-    std::optional<TexturedMeshRef> textured_mesh;
+    std::optional<SimpleMeshRef> textured_mesh;
     std::optional<TextureSamplerRef> diffuse;
     std::optional<TextureSamplerRef> specular;
     std::optional<TextureSamplerRef> normal;
@@ -160,7 +160,7 @@ auto get_gizmo_sphere_vertices() -> std::vector<VertexPosNormColorUV> {
   return vertices;
 }
 
-Resources::Resources(Render::Context &context, TexturedMeshCache &mesh_cache,
+Resources::Resources(Render::Context &context, MeshCache &mesh_cache,
                      TextureSamplerCache &texture_cache,
                      std::filesystem::path assets_root) {
   std::filesystem::path models_root = assets_root / "models/";

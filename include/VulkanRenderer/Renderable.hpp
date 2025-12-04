@@ -2,7 +2,7 @@
 
 #include "glm.hpp"
 #include "TextureSamplerCache.hpp"
-#include "TexturedMeshCache.hpp"
+#include "MeshCache.hpp"
 #include "Mesh.hpp"
 
 #include <variant>
@@ -12,20 +12,22 @@
 
 struct NormColorRenderable
 {
-	std::optional<TexturedMeshRef> mesh;
+	std::optional<SimpleMeshRef> mesh;
 	glm::mat4 model;
 };
 
 struct WireframeRenderable
 {
-	std::optional<TexturedMeshRef> mesh;
+	std::optional<SimpleMeshRef> mesh;
 	glm::mat4 model;
 	glm::vec4 basecolor;
 };
 
+using MeshRef = std::variant<SimpleMeshRef, AnimatedMeshRef>;
+
 struct MaterialRenderable
 {
-	std::optional<TexturedMeshRef> mesh;
+	std::optional<MeshRef> mesh;
 	std::optional<TextureSamplerRef> ambient;
 	std::optional<TextureSamplerRef> diffuse;
 	std::optional<TextureSamplerRef> specular;
@@ -38,7 +40,7 @@ struct RenderableNode
 {
 	struct MaterialMesh
 	{
-		std::optional<TexturedMeshRef> mesh;
+		std::optional<MeshRef> mesh;
 		std::optional<TextureSamplerRef> ambient;
 		std::optional<TextureSamplerRef> diffuse;
 		std::optional<TextureSamplerRef> specular;

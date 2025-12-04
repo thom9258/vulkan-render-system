@@ -1,7 +1,7 @@
 #include <VulkanRenderer/ModelLoader.hpp>
 
 #include "ShaderTexture.hpp"
-#include "TexturedMeshCache.hpp"
+#include "MeshCache.hpp"
 #include "Vertex.hpp"
 
 #include <assimp/Importer.hpp>
@@ -59,7 +59,7 @@ void print_mesh_material_info(std::string_view prefix,
 };
 
 auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
-                  TexturedMeshCache &texturedmesh_cache,
+				  MeshCache& mesh_cache,
                   std::filesystem::path const &base_directory, aiMesh *mesh,
                   const aiScene *scene) -> RenderableNode::MaterialMesh {
   std::vector<VertexPosNormColorUV> vertices{};
@@ -96,7 +96,7 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
       unindex_vertices(vertices, indices);
 
   RenderableNode::MaterialMesh drawable_mesh;
-  drawable_mesh.mesh = texturedmesh_cache.add(
+  drawable_mesh.mesh = mesh_cache.add(
       context, TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(context,
 																	   unindexed)});
 
@@ -232,7 +232,7 @@ glm::mat4 glm_matrix(aiMatrix4x4 other) {
 
 [[nodiscard]]
 auto process_node(Render::Context &context, TextureSamplerCache &texture_cache,
-                  TexturedMeshCache &texturedmesh_cache,
+                  MeshCache &mesh_cache,
                   std::filesystem::path const &base_directory, aiNode *node,
                   const aiScene *scene) -> RenderableNodePtr {
   if (!node || !scene)
@@ -246,12 +246,12 @@ auto process_node(Render::Context &context, TextureSamplerCache &texture_cache,
     if (!mesh)
       continue;
     drawable_node->meshes.push_back(
-        process_mesh(context, texture_cache, texturedmesh_cache, base_directory, mesh, scene));
+        process_mesh(context, texture_cache, mesh_cache, base_directory, mesh, scene));
   }
 
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
     RenderableNodePtr child = process_node(
-        context, texture_cache, texturedmesh_cache, base_directory, node->mChildren[i], scene);
+        context, texture_cache, mesh_cache, base_directory, node->mChildren[i], scene);
 
     if (child != nullptr)
       drawable_node->children.push_back(std::move(child));
@@ -261,7 +261,7 @@ auto process_node(Render::Context &context, TextureSamplerCache &texture_cache,
 }
 
 RenderableNodePtr load_model(Render::Context &context,
-                             TexturedMeshCache &texturedmesh_cache,
+							 MeshCache &mesh_cache,
                              TextureSamplerCache &texture_cache,
                              std::filesystem::path path) {
   if (!std::filesystem::exists(path) &&
@@ -283,7 +283,7 @@ RenderableNodePtr load_model(Render::Context &context,
   }
 
   std::filesystem::path base_directory = path.parent_path();
-  RenderableNodePtr root = process_node(context, texture_cache, texturedmesh_cache, base_directory,
+  RenderableNodePtr root = process_node(context, texture_cache, mesh_cache, base_directory,
                                         scene->mRootNode, scene);
   return root;
 }
