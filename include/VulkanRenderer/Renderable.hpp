@@ -82,4 +82,5 @@ using RenderableNodePtr = RenderableNode::NodePtr;
 using Renderable = std::variant<NormColorRenderable,
 								WireframeRenderable,
 								MaterialRenderable,
+								AnimatedRenderable,
 								RenderableNodePtr>;

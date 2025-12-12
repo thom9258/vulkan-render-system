@@ -35,6 +35,7 @@ struct SortedRenderables
 	std::vector<NormColorRenderable> normcolors;
 	std::vector<WireframeRenderable> wireframes;
 	std::vector<MaterialRenderable> materialrenderables;
+	std::vector<AnimatedRenderable> animated_renderables;
 	std::vector<RenderableNodePtr> renderablenodes;
 };
 

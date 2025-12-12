@@ -36,6 +36,8 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
     sorted->wireframes.push_back(*p);
   else if (auto p = std::get_if<MaterialRenderable>(&renderable))
     sorted->materialrenderables.push_back(*p);
+  else if (auto p = std::get_if<AnimatedRenderable>(&renderable))
+    sorted->animated_renderables.push_back(*p);
   else if (auto p = std::get_if<RenderableNodePtr>(&renderable))
     sorted->renderablenodes.push_back(*p);
   else {
@@ -44,7 +46,8 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
   }
 }
 
-auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
+auto unwind_renderablenode(std::vector<MaterialRenderable> &simple,
+						   std::vector<AnimatedRenderable> &animated,
 						   glm::mat4 parent_model_matrix,
                            RenderableNode *node) -> void {
   if (!node)
@@ -53,28 +56,41 @@ auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
   glm::mat4 model_matrix = node->model_matrix * parent_model_matrix;
 
   for (auto &mesh : node->models) {
-    MaterialRenderable renderable;
-    renderable.model = model_matrix;
-    renderable.mesh = mesh.mesh;
-    renderable.ambient = mesh.ambient;
-    renderable.diffuse = mesh.diffuse;
-    renderable.specular = mesh.specular;
-    renderable.normal = mesh.normal;
-    renderable.has_shadow = mesh.has_shadow;
-	renderables.push_back(renderable);
+	  if (auto* p = std::get_if<RenderableNode::SimpleModel>(&mesh)) {
+		  MaterialRenderable renderable;
+		  renderable.model = model_matrix;
+		  renderable.mesh = p->mesh;
+		  renderable.ambient = p->ambient;
+		  renderable.diffuse = p->diffuse;
+		  renderable.specular = p->specular;
+		  renderable.normal = p->normal;
+		  renderable.has_shadow = p->has_shadow;
+		  simple.push_back(renderable);
+	  }
+	  else if (auto* p = std::get_if<RenderableNode::AnimatedModel>(&mesh)) {
+		  AnimatedRenderable renderable;
+		  renderable.model = model_matrix;
+		  renderable.mesh = p->mesh;
+		  renderable.ambient = p->ambient;
+		  renderable.diffuse = p->diffuse;
+		  renderable.specular = p->specular;
+		  renderable.normal = p->normal;
+		  renderable.has_shadow = p->has_shadow;
+		  animated.push_back(renderable);
+	  }
   }
 
   for (auto &child : node->children) {
-    unwind_renderablenode(renderables, model_matrix, child.get());
+    unwind_renderablenode(simple, animated, model_matrix, child.get());
   }
 }
 
-auto unwind_renderablenode(RenderableNode *node)
-    -> std::vector<MaterialRenderable> {
-  std::vector<MaterialRenderable> renderables;
+void unwind_renderablenode(std::vector<MaterialRenderable>& simple,
+						   std::vector<AnimatedRenderable>& animated,
+						   RenderableNode *node)
+{
   glm::mat4 parent_model_matrix(1.0f);
-  unwind_renderablenode(renderables, parent_model_matrix, node);
-  return renderables;
+  unwind_renderablenode(simple, animated, parent_model_matrix, node);
 }
 
 auto create_geometry_pass(Render::Context::Impl *context,
@@ -241,13 +257,20 @@ auto render_geometry_pass(
                         std::bind_front(sort_renderable, logger, &sorted));
 
   // TODO: this is PROBABLY dirty to do, but we need to unwind the node tree
-  // into something
+  // into something...
   //       simple the render pipelines can understand...
   for (auto &renderablenode : sorted.renderablenodes) {
-    std::vector<MaterialRenderable> renderables = unwind_renderablenode(
-        renderablenode.get());
-    for (auto &renderable : renderables) {
-      sorted.materialrenderables.push_back(renderable);
+	  std::vector<MaterialRenderable> simple;
+	  std::vector<AnimatedRenderable> animated;
+	  unwind_renderablenode(simple,
+							animated,
+							renderablenode.get());
+
+    for (auto &s : simple) {
+      sorted.materialrenderables.push_back(s);
+    }
+    for (auto &a : animated) {
+      sorted.animated_renderables.push_back(a);
     }
   }
 
