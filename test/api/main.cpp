@@ -268,7 +268,7 @@ auto load_scene_from_path(std::filesystem::path const path,
 		}
 
 		RenderableNodePtr renderable = found->second;
-        renderable->model = transform.as_matrix();
+        renderable->model_matrix = transform.as_matrix();
         scene.renderables.push_back(renderable);
     }
   }
@@ -284,12 +284,14 @@ auto load_scene_from_path(std::filesystem::path const path,
       p.specular = parse_vec3(obj["specular"]);
       p.diffuse = parse_vec3(obj["diffuse"]);
 
-      const float near_plane = 0.1f, far_plane = 30.0f;
+	  const float ortho_size = 50.0f;
+      const float near_plane = 0.1f;
+      const float far_plane = ortho_size * 2;
       const glm::vec3 position = parse_vec3(obj["position"]);
 
       DirectionalShadowCaster caster{
           OrthographicProjection{
-              glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane)},
+              glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, near_plane, far_plane)},
           p, PositionVector{position}, UpVector{world_up}};
 
       if (obj["casts-shadow"] == "yes") {
