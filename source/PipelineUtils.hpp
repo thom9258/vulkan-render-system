@@ -12,6 +12,7 @@
 
 using BindingIndex = StrongType<uint32_t, struct BindingIndexTag>;
 using TotalDescriptorCount = StrongType<uint32_t, struct TotalDescriptorCountTag>;
+using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
 using FragmentPath = StrongType<std::filesystem::path, struct FragmentPathTag>;
 using VertexPath = StrongType<std::filesystem::path, struct VertexPathTag>;
 

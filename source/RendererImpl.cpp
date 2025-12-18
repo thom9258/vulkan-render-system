@@ -381,6 +381,26 @@ auto render_geometry_pass(
         current_flightframe, max_flightframes, sorted.materialrenderables,
         lights, material_shadowcasters);
 
+    AnimatedPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture
+        adirectional_texture{dirshadowtexture.descriptorset.get(),
+                            shadowcasters.directional_caster};
+
+    AnimatedPipeline::MaterialShadowCasters::SpotShadowCasterTexture
+        aspot_texture{spotshadowtexture.descriptorset.get(),
+                     shadowcasters.spot_caster};
+
+    AnimatedPipeline::MaterialShadowCasters animated_shadowcasters{
+        adirectional_texture, aspot_texture};
+
+    AnimatedPipeline::FrameInfo animated_frame_info{};
+    animated_frame_info.view = world_info.view;
+    animated_frame_info.proj = world_info.projection;
+    animated_frame_info.camera_position = world_info.camera_position;
+    pipelines->animated.render(
+        animated_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
+        current_flightframe, max_flightframes, sorted.animated_renderables,
+        lights, animated_shadowcasters);
+
     commandbuffer.endRenderPass();
   };
 
@@ -418,6 +438,12 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
                        geometry_pass.renderpass.get(), shaders_root);
   context->logger.info(std::source_location::current(),
                        "Created Material Pipeline");
+
+  geometry_pipelines.animated =
+      AnimatedPipeline(logger, context, presenter, descriptor_pool,
+                       geometry_pass.renderpass.get(), shaders_root);
+  context->logger.info(std::source_location::current(),
+                       "Created Animated Material Pipeline");
 
   geometry_pipelines.normcolor = create_norm_render_pipeline(
       context->logger, context->physical_device, context->device.get(),

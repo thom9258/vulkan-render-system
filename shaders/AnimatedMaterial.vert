@@ -24,9 +24,6 @@ uniform GlobalBindings
 	vec4 camera_position;
 } global;
 
-#define MAX_BONES 100
-#define MAX_BONE_INFLUENCES 4
-
 layout (set = 0, binding = 5)
 uniform DirectionalShadowCasterUniform 
 {
@@ -43,7 +40,9 @@ uniform SpotShadowCasterUniform
 	bool exists;
 } spot_shadowcaster;
 
-layout (set = 0, binding = 7)
+#define MAX_BONES 100
+#define MAX_BONE_INFLUENCES 4
+layout(set = 7, binding = 0)
 uniform ModelInfo
 {
 	mat4 model;

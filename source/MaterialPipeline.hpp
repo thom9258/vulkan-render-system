@@ -23,23 +23,6 @@
 #include <algorithm>
 #include <map>
 
-// TODO: We dont want a combined image sampler, we want them seperated to be able to swap them
-// https://docs.vulkan.org/samples/latest/samples/api/separate_image_sampler/README.html
-
-using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
-
-struct SortedLights
-{
-	std::vector<DirectionalLight> directionals;
-	std::vector<PointLight> points;
-	std::vector<SpotLight> spots;
-};
-
-void sort_light(Logger* logger,
-				SortedLights* sorted,
-				Light light);
-
-
 struct MaterialPipeline
 {
 	MaterialPipeline() = default;

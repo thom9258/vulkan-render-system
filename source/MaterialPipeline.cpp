@@ -3,22 +3,6 @@
 
 #include <format>
 
-void sort_light(Logger* logger,
-				SortedLights* sorted,
-				Light light)
-{
-	if (auto p = std::get_if<DirectionalLight>(&light))
-		sorted->directionals.push_back(*p);
-	else if (auto p = std::get_if<PointLight>(&light))
-		sorted->points.push_back(*p);
-	else if (auto p = std::get_if<SpotLight>(&light))
-		sorted->spots.push_back(*p);
-	else {
-		logger->warn(std::source_location::current(),
-					 "Found unknown Light that can not be sorted and used for drawing");
-	}
-}
-
 MaterialPipeline::MaterialPipeline(Logger& logger,
 								   Render::Context::Impl* context,
 								   Presenter::Impl* presenter,
@@ -595,7 +579,6 @@ MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_global_set_layout, rhs.m_global_set_layout);
-	std::swap(m_global_set_layout, rhs.m_global_set_layout);
 	std::swap(m_global_set_uniforms, rhs.m_global_set_uniforms);
 	std::swap(m_ambient, rhs.m_ambient);
 	std::swap(m_diffuse, rhs.m_diffuse);
@@ -920,10 +903,6 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 											 nullptr);
 			last_normal_texture = normal_texture;
 			}
-
-
-			logger.info(std::source_location::current(),
-						"passed textures binding, starting to bind shadowcasters");
 		}
 		
 		PushConstants push{};

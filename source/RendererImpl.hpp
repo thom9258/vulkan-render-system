@@ -11,6 +11,7 @@
 #include "NormRenderPipeline.hpp"
 #include "WireframePipeline.hpp"
 #include "MaterialPipeline.hpp"
+#include "AnimatedPipeline.hpp"
 
 struct GeometryPass
 {
@@ -28,6 +29,7 @@ struct GeometryPipelines
 	NormRenderPipeline normcolor;
 	WireframePipeline wireframe;
 	MaterialPipeline material;
+	AnimatedPipeline animated;
 };
 
 struct SortedRenderables

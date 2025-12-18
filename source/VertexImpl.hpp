@@ -10,3 +10,9 @@ auto binding_descriptions(const VertexPosNormColorUV&)
 auto attribute_descriptions(const VertexPosNormColorUV&)
 	-> std::array<vk::VertexInputAttributeDescription, 4>;
 
+auto binding_descriptions(const VertexAnimatedPosNormColorUV&)
+	-> std::array<vk::VertexInputBindingDescription, 1>;
+
+auto attribute_descriptions(const VertexAnimatedPosNormColorUV&)
+	-> std::array<vk::VertexInputAttributeDescription, 6>;
+
