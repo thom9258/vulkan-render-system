@@ -91,10 +91,10 @@ auto parse_transform(json j) -> Render::Transform {
 }
 
 auto load_scene_from_path(std::filesystem::path const path,
-						  Render::Context &context,
-						  TextureSamplerCache &texture_cache,
-						  MeshCache &mesh_cache,
-                          Resources &resources) -> Scene {
+                          Render::Context &context,
+                          TextureSamplerCache &texture_cache,
+                          MeshCache &mesh_cache, Resources &resources)
+    -> Scene {
   std::ifstream fs(path.string());
   std::string content;
   fs.seekg(0, std::ios::end);
@@ -105,28 +105,26 @@ auto load_scene_from_path(std::filesystem::path const path,
                  std::istreambuf_iterator<char>());
 
   json j = json::parse(content);
-  
+
   std::map<std::string, RenderableNodePtr> loaded_assets;
 
   json assets = j["assets"];
   for (auto &asset : assets) {
-	  std::string name = asset["name"];
-	  std::string path = asset["path"];
-	  
-	  RenderableNodePtr loaded_model = load_model(context,
-												  mesh_cache,
-												  texture_cache,
-												  path);
-	  
-	  if (loaded_model) {
-		  loaded_assets[name] = loaded_model;
-		  std::cout << std::format("Loaded asset {} from path: {}", name, path) << std::endl;
-	  } else {
-		  std::cout << std::format("Could NOT Load asset {} from path: {}", name, path) << std::endl;
-	  }
+    std::string name = asset["name"];
+    std::string path = asset["path"];
 
+    RenderableNodePtr loaded_model =
+        load_model(context, mesh_cache, texture_cache, path);
 
-
+    if (loaded_model) {
+      loaded_assets[name] = loaded_model;
+      std::cout << std::format("Loaded asset {} from path: {}", name, path)
+                << std::endl;
+    } else {
+      std::cout << std::format("Could NOT Load asset {} from path: {}", name,
+                               path)
+                << std::endl;
+    }
   }
 
   Scene scene;
@@ -179,7 +177,7 @@ auto load_scene_from_path(std::filesystem::path const path,
       } else if (prefab["draw-mode"] == "wireframe") {
         WireframeRenderable chest{};
         chest.mesh = resources.chest.textured_mesh;
-		chest.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+        chest.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
         chest.model = transform.as_matrix();
         scene.renderables.push_back(chest);
       } else {
@@ -261,15 +259,15 @@ auto load_scene_from_path(std::filesystem::path const path,
         std::cout << "Unknown draw mode for " << name << std::endl;
       }
     } else {
-		auto found = loaded_assets.find(name);
-		if (found == loaded_assets.end()) {
-			std::cout << "Unknown renderable " << name << std::endl;
-			continue;
-		}
+      auto found = loaded_assets.find(name);
+      if (found == loaded_assets.end()) {
+        std::cout << "Unknown renderable " << name << std::endl;
+        continue;
+      }
 
-		RenderableNodePtr renderable = found->second;
-        renderable->model_matrix = transform.as_matrix();
-        scene.renderables.push_back(renderable);
+      RenderableNodePtr renderable = found->second;
+      renderable->model_matrix = transform.as_matrix();
+      scene.renderables.push_back(renderable);
     }
   }
 
@@ -284,15 +282,16 @@ auto load_scene_from_path(std::filesystem::path const path,
       p.specular = parse_vec3(obj["specular"]);
       p.diffuse = parse_vec3(obj["diffuse"]);
 
-	  const float ortho_size = 50.0f;
+      const float ortho_size = 50.0f;
       const float near_plane = 0.1f;
       const float far_plane = ortho_size * 2;
       const glm::vec3 position = parse_vec3(obj["position"]);
 
-      DirectionalShadowCaster caster{
-          OrthographicProjection{
-              glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, near_plane, far_plane)},
-          p, PositionVector{position}, UpVector{world_up}};
+      DirectionalShadowCaster caster{OrthographicProjection{glm::ortho(
+                                         -ortho_size, ortho_size, -ortho_size,
+                                         ortho_size, near_plane, far_plane)},
+                                     p, PositionVector{position},
+                                     UpVector{world_up}};
 
       if (obj["casts-shadow"] == "yes") {
         scene.shadowcasters.directional_caster = caster;
@@ -492,11 +491,24 @@ int main(int argc, char **argv) {
    */
   SDL_Event event{};
   bool reload_scene = false;
-  Scene scene = load_scene_from_path(scene_path, context, texture_cache, mesh_cache, resources);
+  Scene scene = load_scene_from_path(scene_path, context, texture_cache,
+                                     mesh_cache, resources);
   bool exit = false;
   uint64_t framecount = 0;
-  // std::size_t scene_index = 0;
 
+#if 0
+  std::expected<LoadedAnimatedModel, std::string> animated =
+      load_animated_model(context, mesh_cache, texture_cache,
+                          models_root /
+                              "glTF-Sample-Models/2.0/AnimatedMorphCube/glTF/"
+                              "AnimatedMorphCube.gltf");
+
+  if (!animated.has_value()) {
+	  throw std::runtime_error(animated.error());
+  }
+
+#endif 
+  
   while (!exit) {
     /** ************************************************************************
      * Handle Inputs
@@ -589,17 +601,16 @@ int main(int argc, char **argv) {
      */
     FrameProducer frameGenerator =
         [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
-		
-		if (reload_scene) {
-			scene = load_scene_from_path(scene_path, context, texture_cache, mesh_cache, resources);
-			reload_scene = false;
-		}
+      if (reload_scene) {
+        scene = load_scene_from_path(scene_path, context, texture_cache,
+                                     mesh_cache, resources);
+        reload_scene = false;
+      }
 
-
-      auto *textureptr =
-          renderer.render(texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
-                          frameInfo.total_frame_count, world_info,
-                          scene.renderables, scene.lights, scene.shadowcasters);
+      auto *textureptr = renderer.render(
+          texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
+          frameInfo.total_frame_count, world_info, scene.renderables,
+          scene.lights, scene.shadowcasters);
 
       if (textureptr == nullptr)
         return std::nullopt;

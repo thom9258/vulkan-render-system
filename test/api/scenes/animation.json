@@ -1,0 +1,52 @@
+{
+    "prefabs" : 
+	[
+		{
+			"name": "smg", 
+			"draw-mode": "normcolor",
+			"position": [2, 1, 0],
+			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.2, 0.2, 0.2]
+		},
+		{
+			"name": "chest", 
+			"draw-mode": "normcolor",
+			"position": [-2, 1, 0],
+			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.03, 0.03, 0.03]
+		},
+		{
+			"name": "box",
+			"draw-mode": "normcolor",
+			"position": [0, -0.2, 0],
+			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [1, 1, 1]
+		}
+	],
+	
+    "lights" : 
+	[
+		{
+			"type": "directional", 
+			"casts-shadow": "no",
+			"draw-gizmo": "no",
+			"position": [0, 0, 0],
+
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0, 0, 0],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.01, 0.01, 0.01]
+		},
+		{
+			"type": "directional", 
+			"casts-shadow": "yes",
+			"draw-gizmo": "yes",
+			"position": [0, 8, 0],
+
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0.5, 0.5, 0.5],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.0, 0.0, 0.0]
+		}
+	]
+}

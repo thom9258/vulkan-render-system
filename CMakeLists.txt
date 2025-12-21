@@ -19,7 +19,7 @@ find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(assimp REQUIRED)
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE "")
 
 target_include_directories(${PROJECT_NAME} 
@@ -50,6 +50,7 @@ set(PUBLIC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/glm.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Mesh.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ModelLoader.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Animation.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Renderable.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Light.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ShadowCaster.hpp
@@ -87,6 +88,7 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ModelLoader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Animation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Utils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/TextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexImpl.cpp
