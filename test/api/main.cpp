@@ -496,7 +496,6 @@ int main(int argc, char **argv) {
   bool exit = false;
   uint64_t framecount = 0;
 
-#if 0
   std::expected<LoadedAnimatedModel, std::string> animated =
       load_animated_model(context, mesh_cache, texture_cache,
                           models_root /
@@ -506,8 +505,6 @@ int main(int argc, char **argv) {
   if (!animated.has_value()) {
 	  throw std::runtime_error(animated.error());
   }
-
-#endif 
   
   while (!exit) {
     /** ************************************************************************

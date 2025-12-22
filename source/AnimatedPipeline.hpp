@@ -77,13 +77,7 @@ struct AnimatedPipeline
 	
 	
 private:
-	static constexpr std::size_t max_bone_matrices = 100;
 
-	struct ModelInfoUniformData {
-		glm::mat4 model_matrix;
-		glm::mat4 bone_matrices[max_bone_matrices];
-	};
-	
 	vk::UniquePipelineLayout m_layout;
     vk::UniquePipeline m_pipeline;
 	
@@ -126,11 +120,16 @@ private:
 		UniformMemoryDirectWrite<LightArrayLengthsUniformData> lightarray_lengths; 
 		UniformMemoryDirectWrite<DirectionalShadowCasterUniformData> directional_shadowcaster; 
 		UniformMemoryDirectWrite<SpotShadowCasterUniformData> spot_shadowcaster; 
-		UniformMemoryDirectWrite<ModelInfoUniformData> model_info; 
 	};
 	
 	vk::UniqueDescriptorSetLayout m_global_set_layout;
 	FlightFramesArray<GlobalSetUniform> m_global_set_uniforms;
+	
+	static constexpr std::size_t max_bone_matrices = 100;
+	struct ModelInfoUniformData {
+		glm::mat4 model_matrix;
+		glm::mat4 bone_matrices[max_bone_matrices];
+	};
 
 	struct ModelInfoUniform
 	{

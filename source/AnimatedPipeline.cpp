@@ -510,7 +510,7 @@ AnimatedPipeline::AnimatedPipeline(
   //       as the uniforms are direct write uniforms, thus simply writing to the
   //       memory is considered updating them
   for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
-    std::array<vk::WriteDescriptorSet, 8> writes{
+    std::array<vk::WriteDescriptorSet, 7> writes{
         vk::WriteDescriptorSet{}
             .setDstSet(m_global_set_uniforms[i].set.get())
             .setDstBinding(0)
@@ -570,14 +570,6 @@ AnimatedPipeline::AnimatedPipeline(
             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
             .setBufferInfo(
                 m_global_set_uniforms[i].spot_shadowcaster.buffer_info()),
-
-        vk::WriteDescriptorSet{}
-            .setDstSet(m_global_set_uniforms[i].set.get())
-            .setDstBinding(7)
-            .setDstArrayElement(0)
-            .setDescriptorCount(1)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setBufferInfo(m_global_set_uniforms[i].model_info.buffer_info()),
     };
 
     context->device.get().updateDescriptorSets(writes.size(), writes.data(), 0,
@@ -942,12 +934,6 @@ void AnimatedPipeline::render(
                   "passed textures binding, starting to bind shadowcasters");
     }
 
-    // TODO: We need to structure this so we have ready-to-use descriptorsets
-    //       we can swap in when they are required... This means we need some
-    //       sort of system like textures where for each model_info we create
-    //       and record a descriptor set that can be later bound...
-    //       so what we need here is a giant pool we can go through, and bind
-    //       our ModelInfoUniformData to, THEN bind them.......
     ModelInfoUniformData model_info;
     model_info.model_matrix = renderable.model;
     // TODO: Acquire actual bone model matrices from an animator class
