@@ -69,6 +69,7 @@ set(PUBLIC_HEADERS
 )
 
 set(PRIVATE_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Renderable.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Camera.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/FlightFrames.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ContextImpl.cpp

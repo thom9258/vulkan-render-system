@@ -1,29 +1,46 @@
 {
-    "prefabs" : 
+	"assets" : 
 	[
 		{
-			"name": "smg", 
-			"draw-mode": "normcolor",
-			"position": [2, 1, 0],
-			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
-			"scale": [0.2, 0.2, 0.2]
+			"name": "asset-smg", 
+			"path": "../../../assets/models/smg/smg.obj"
 		},
 		{
-			"name": "chest", 
-			"draw-mode": "normcolor",
-			"position": [-2, 1, 0],
-			"rotation-wxyz": [0.0, 0.0, 1.0, 0.0],
-			"scale": [0.03, 0.03, 0.03]
+			"name": "asset-chest", 
+			"path": "../../../assets/models/ChestWowStyle/Chest.obj"
 		},
 		{
-			"name": "box",
-			"draw-mode": "normcolor",
-			"position": [0, -0.2, 0],
-			"rotation-wxyz": [1.0, 0.0, 0.0, 0.0],
-			"scale": [1, 1, 1]
+			"name": "corset", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf"
+		},
+		{
+			"name": "fox", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf"
+		},
+		{
+			"name": "helmet", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf"
+		},
+		{
+			"name": "asset-backpack", 
+			"path": "../../../assets/models/backpack/backpack.obj"
+		},
+		{
+			"name": "asset-monster", 
+			"path": "../../../assets/models/glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb"
 		}
 	],
-	
+    "level" : 
+	[
+		{
+			"name": "fox", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [2, 0, 0],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [0.05, 0.05, 0.05]
+		}
+	],
     "lights" : 
 	[
 		{
@@ -31,22 +48,10 @@
 			"casts-shadow": "no",
 			"draw-gizmo": "no",
 			"position": [0, 0, 0],
-
-			"direction": [-0.3, -1.0, -0.2],
+			"direction": [0.0, -1.0, 0.0],
 			"diffuse": [0, 0, 0],
 			"specular": [0.0, 0.0, 0.0],
-			"ambient": [0.01, 0.01, 0.01]
-		},
-		{
-			"type": "directional", 
-			"casts-shadow": "yes",
-			"draw-gizmo": "yes",
-			"position": [0, 8, 0],
-
-			"direction": [-0.3, -1.0, -0.2],
-			"diffuse": [0.5, 0.5, 0.5],
-			"specular": [0.0, 0.0, 0.0],
-			"ambient": [0.0, 0.0, 0.0]
+			"ambient": [0.4, 0.4, 0.4]
 		}
 	]
 }

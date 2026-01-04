@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <print>
 #include <ranges>
 #include <sstream>
 #include <streambuf>
@@ -485,6 +486,36 @@ int main(int argc, char **argv) {
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
   Resources resources{context, mesh_cache, texture_cache, assets_root};
 
+  std::expected<LoadedAnimatedModel, std::string> animated =
+      load_animated_model(context, mesh_cache, texture_cache,
+                          models_root /
+                              "glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf");
+
+  if (!animated.has_value()) {
+    throw std::runtime_error(animated.error());
+  }
+
+  std::println("has meshes: {}", animated.value().renderable != nullptr);
+  std::println("bone infos count: {}",
+               animated.value().bone_infos.get().size());
+  std::println("animations count: {}", animated.value().animations.size());
+
+  Animator animator;
+  animator.PlayAnimation(&animated.value().animations[0]);
+  foreach_node(
+      [&](RenderableNodePtr &renderable) {
+        renderable->model_matrix = glm::mat4(1.0f); /*glm::translate(
+            glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.2f)),
+            glm::vec3(0.0f, 0.0f, 0.0f));*/
+
+        for (RenderableNode::Model &model : renderable->models) {
+          if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+			  p->animator = &animator;
+          }
+        }
+      },
+      animated.value().renderable);
+
   std::cout << "STARTING DRAW LOOP" << std::endl;
   /** ************************************************************************
    * Frame Loop
@@ -493,145 +524,150 @@ int main(int argc, char **argv) {
   bool reload_scene = false;
   Scene scene = load_scene_from_path(scene_path, context, texture_cache,
                                      mesh_cache, resources);
+
+  scene.renderables.push_back(animated.value().renderable);
   bool exit = false;
   uint64_t framecount = 0;
+  double delta_time = 0;
+  double total_time = 0;
 
-  std::expected<LoadedAnimatedModel, std::string> animated =
-      load_animated_model(context, mesh_cache, texture_cache,
-                          models_root /
-                              "glTF-Sample-Models/2.0/AnimatedMorphCube/glTF/"
-                              "AnimatedMorphCube.gltf");
-
-  if (!animated.has_value()) {
-	  throw std::runtime_error(animated.error());
-  }
-  
   while (!exit) {
-    /** ************************************************************************
-     * Handle Inputs
-     */
-    glm::vec3 const camera_right = camera.rotation[0];
-    glm::vec3 const camera_up = camera.rotation[1];
-    glm::vec3 const camera_forward = camera.rotation[2];
-    float constexpr move_speed = 0.5f;
-    float constexpr rotate_speed = 3.0f;
+    animator.UpdateAnimation(delta_time);
+    auto duration_delta_time = with_time_measurement([&]() {
+      /** ************************************************************************
+       * Handle Inputs
+       */
+      glm::vec3 const camera_right = camera.rotation[0];
+      glm::vec3 const camera_up = camera.rotation[1];
+      glm::vec3 const camera_forward = camera.rotation[2];
+      float constexpr move_speed = 0.5f;
+      float constexpr rotate_speed = 3.0f;
 
-    while (SDL_PollEvent(&event)) {
-      switch (event.type) {
-      case SDL_QUIT:
-        exit = true;
-        break;
-
-      case SDL_KEYDOWN:
-        switch (event.key.keysym.sym) {
-        case SDLK_ESCAPE:
+      while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_QUIT:
           exit = true;
           break;
 
-          //			case SDLK_n:
-          //				scene_index++;
-          //				break;
-        case SDLK_w:
-          camera.position += camera_forward * move_speed;
+        case SDL_KEYDOWN:
+          switch (event.key.keysym.sym) {
+          case SDLK_ESCAPE:
+            exit = true;
+            break;
+
+            //			case SDLK_n:
+            //				scene_index++;
+            //				break;
+          case SDLK_w:
+            camera.position += camera_forward * move_speed;
+            break;
+          case SDLK_s:
+            camera.position += camera_forward * -move_speed;
+            break;
+          case SDLK_d:
+            camera.position += camera_right * -move_speed;
+            break;
+          case SDLK_a:
+            camera.position += camera_right * move_speed;
+            break;
+          case SDLK_e:
+            camera.position += camera_up * -move_speed;
+            break;
+          case SDLK_q:
+            camera.position += camera_up * move_speed;
+            break;
+          case SDLK_r:
+            reload_scene = true;
+            break;
+          case SDLK_LEFT:
+            camera.rotation =
+                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                      glm::radians(rotate_speed), world_up));
+            break;
+          case SDLK_RIGHT:
+            camera.rotation =
+                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                      glm::radians(-rotate_speed), world_up));
+            break;
+          case SDLK_UP:
+            camera.rotation =
+                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                      glm::radians(rotate_speed), world_right));
+            break;
+          case SDLK_DOWN:
+            camera.rotation = glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                                    glm::radians(-rotate_speed),
+                                                    world_right));
+            break;
+          }
           break;
-        case SDLK_s:
-          camera.position += camera_forward * -move_speed;
-          break;
-        case SDLK_d:
-          camera.position += camera_right * -move_speed;
-          break;
-        case SDLK_a:
-          camera.position += camera_right * move_speed;
-          break;
-        case SDLK_e:
-          camera.position += camera_up * -move_speed;
-          break;
-        case SDLK_q:
-          camera.position += camera_up * move_speed;
-          break;
-        case SDLK_r:
-          reload_scene = true;
-          break;
-        case SDLK_LEFT:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(rotate_speed), world_up));
-          break;
-        case SDLK_RIGHT:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(-rotate_speed), world_up));
-          break;
-        case SDLK_UP:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(rotate_speed), world_right));
-          break;
-        case SDLK_DOWN:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(-rotate_speed), world_right));
-          break;
+
+        case SDL_WINDOWEVENT: {
+          switch (event.window.event) {
+          case SDL_WINDOWEVENT_RESIZED:
+          case SDL_WINDOWEVENT_SIZE_CHANGED:
+            context.window_resize_event_triggered();
+            // TODO: DO RESIZE
+            break;
+          case SDL_WINDOWEVENT_CLOSE:
+            exit = true;
+            break;
+          }
+        } break;
         }
-        break;
+      }
 
-      case SDL_WINDOWEVENT: {
-        switch (event.window.event) {
-        case SDL_WINDOWEVENT_RESIZED:
-        case SDL_WINDOWEVENT_SIZE_CHANGED:
-          context.window_resize_event_triggered();
-          // TODO: DO RESIZE
-          break;
-        case SDL_WINDOWEVENT_CLOSE:
-          exit = true;
-          break;
+      world_info.camera_position = camera.position;
+      world_info.view = camera.view();
+
+      /** ************************************************************************
+       * Render Loop
+       */
+      FrameProducer frameGenerator =
+          [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
+        if (reload_scene) {
+          scene = load_scene_from_path(scene_path, context, texture_cache,
+                                       mesh_cache, resources);
+          scene.renderables.push_back(animated.value().renderable);
+          reload_scene = false;
         }
-      } break;
+
+        auto *textureptr = renderer.render(
+            texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
+            frameInfo.total_frame_count, world_info, scene.renderables,
+            scene.lights, scene.shadowcasters);
+
+        if (textureptr == nullptr)
+          return std::nullopt;
+        return textureptr;
+      };
+
+      auto render_time = with_time_measurement(
+          [&]() { presenter.with_presentation(frameGenerator); });
+
+      if (slowframes) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       }
-    }
+      if (printframerate) {
+        if (framecount % printframerateinterval == 0) {
+          const auto frame_time_ms =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  render_time);
 
-    world_info.camera_position = camera.position;
-    world_info.view = camera.view();
-
-    /** ************************************************************************
-     * Render Loop
-     */
-    FrameProducer frameGenerator =
-        [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
-      if (reload_scene) {
-        scene = load_scene_from_path(scene_path, context, texture_cache,
-                                     mesh_cache, resources);
-        reload_scene = false;
+          std::cout << "Frame Time [ms]: " << frame_time_ms.count() << "\n"
+                    << "Frame Count:     " << framecount << "\n"
+                    << "=====================================" << std::endl;
+        }
       }
 
-      auto *textureptr = renderer.render(
-          texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
-          frameInfo.total_frame_count, world_info, scene.renderables,
-          scene.lights, scene.shadowcasters);
+      framecount++;
+    });
 
-      if (textureptr == nullptr)
-        return std::nullopt;
-      return textureptr;
-    };
+    delta_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(duration_delta_time)
+            .count();
 
-    auto render_time = with_time_measurement(
-        [&]() { presenter.with_presentation(frameGenerator); });
-
-    if (slowframes) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    }
-    if (printframerate) {
-      if (framecount % printframerateinterval == 0) {
-        const auto frame_time_ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(render_time);
-
-        std::cout << "Frame Time [ms]: " << frame_time_ms.count() << "\n"
-                  << "Frame Count:     " << framecount << "\n"
-                  << "=====================================" << std::endl;
-      }
-    }
-
-    framecount++;
+	total_time += delta_time;
   }
 
   context.wait_until_idle();

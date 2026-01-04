@@ -2,8 +2,17 @@
 #include "VertexBufferImpl.hpp"
 
 #include <format>
+#include <print>
+#include <ranges>
 
 void initialize_mat4(glm::mat4 &m) { m = glm::mat4(1.0f); }
+
+void initialize_bone_matrices(glm::mat4 *bone_matrices,
+                              size_t bone_matrices_count) {
+  for (size_t i = 0; i < bone_matrices_count; i++) {
+    bone_matrices[i] = glm::mat4(1.0f);
+  }
+}
 
 AnimatedPipeline::AnimatedPipeline(
     Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
@@ -298,9 +307,7 @@ AnimatedPipeline::AnimatedPipeline(
       m_global_set_layout.get(),     m_ambient.layout.get(),
       m_diffuse.layout.get(),        m_specular.layout.get(),
       m_normal.layout.get(),         m_directional_shadowmap_layout.get(),
-      m_spot_shadowmap_layout.get(),
-	  m_model_info_layout.get()
-  };
+      m_spot_shadowmap_layout.get(), m_model_info_layout.get()};
 
   auto pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo{}
                                       .setFlags(vk::PipelineLayoutCreateFlags())
@@ -427,34 +434,23 @@ AnimatedPipeline::AnimatedPipeline(
   for (auto &uniform : m_global_set_uniforms) {
     uniform.camera = UniformMemoryDirectWrite<CameraUniformData>(
         context->physical_device, context->device.get(), camera_uniform_count);
-    uniform.camera.write(context->device.get(), &camera_init_data, 1);
-
-    logger.info(std::source_location::current(),
-                "created frame uniform camera descriptor memories");
+    uniform.camera.write(context->device.get(), &camera_init_data);
 
     uniform.pointlight = UniformMemoryDirectWrite<PointLightUniformData>(
         context->physical_device, context->device.get(), max_pointlights);
 
-    uniform.pointlight.write(context->device.get(), &pointlight_init_data, 1);
-
-    logger.info(std::source_location::current(),
-                "created frame uniform pointlight descriptor memories");
+    uniform.pointlight.write(context->device.get(), &pointlight_init_data);
 
     uniform.spotlight = UniformMemoryDirectWrite<SpotLightUniformData>(
         context->physical_device, context->device.get(), max_spotlights);
-    uniform.spotlight.write(context->device.get(), &spotlight_init_data, 1);
-    logger.info(std::source_location::current(),
-                "created frame uniform spotlight descriptor memories");
+    uniform.spotlight.write(context->device.get(), &spotlight_init_data);
 
     uniform.directionallight =
         UniformMemoryDirectWrite<DirectionalLightUniformData>(
             context->physical_device, context->device.get(),
             max_directionallights);
 
-    uniform.directionallight.write(context->device.get(), &dirlight_init_data,
-                                   1);
-    logger.info(std::source_location::current(),
-                "created frame uniform directional light descriptor memories");
+    uniform.directionallight.write(context->device.get(), &dirlight_init_data);
 
     uniform.lightarray_lengths =
         UniformMemoryDirectWrite<LightArrayLengthsUniformData>(
@@ -463,10 +459,6 @@ AnimatedPipeline::AnimatedPipeline(
     uniform.lightarray_lengths.write(context->device.get(),
                                      &lightarray_lengths_init_data,
                                      lightarray_lengths_count);
-
-    logger.info(
-        std::source_location::current(),
-        "created frame uniform light array lengths descriptor memories");
 
     uniform.directional_shadowcaster =
         UniformMemoryDirectWrite<DirectionalShadowCasterUniformData>(
@@ -477,10 +469,6 @@ AnimatedPipeline::AnimatedPipeline(
                                            &directional_shadowcaster_init_data,
                                            directional_shadowcasters_count);
 
-    logger.info(
-        std::source_location::current(),
-        "created frame uniform directional shadowcaster descriptor memories");
-
     uniform.spot_shadowcaster =
         UniformMemoryDirectWrite<SpotShadowCasterUniformData>(
             context->physical_device, context->device.get(),
@@ -489,9 +477,6 @@ AnimatedPipeline::AnimatedPipeline(
     uniform.spot_shadowcaster.write(context->device.get(),
                                     &spot_shadowcaster_init_data,
                                     spot_shadowcasters_count);
-
-    logger.info(std::source_location::current(),
-                "created frame uniform spot shadowcaster descriptor memories");
   }
 
   for (size_t i = 0; i < m_global_set_uniforms.size(); i++) {
@@ -500,8 +485,6 @@ AnimatedPipeline::AnimatedPipeline(
             frame_uniform_allocate_info);
 
     m_global_set_uniforms[i].set = std::move(sets[0]);
-    logger.info(std::source_location::current(),
-                "created frame uniform descriptor set");
   }
 
   // NOTE: Here we technically update the descriptor sets, but this is done to
@@ -577,10 +560,6 @@ AnimatedPipeline::AnimatedPipeline(
     logger.info(std::source_location::current(), "added another set of writes");
   }
 
-  ModelInfoUniformData model_info_init_data;
-  model_info_init_data.model_matrix = glm::mat4(1.0f);
-  std::ranges::for_each(model_info_init_data.bone_matrices, initialize_mat4);
-
   uint32_t constexpr model_info_layouts_size = 1;
   const auto model_info_uniform_allocate_info =
       vk::DescriptorSetAllocateInfo{}
@@ -588,6 +567,8 @@ AnimatedPipeline::AnimatedPipeline(
           .setDescriptorSetCount(layouts_size)
           .setSetLayouts(m_model_info_layout.get());
 
+  size_t pool_index = 0;
+  size_t model_info_index = 0;
   for (ModelInfoUniformPool &pool : m_model_info_uniform_pools) {
     for (ModelInfoUniform &model_info : pool) {
 
@@ -603,11 +584,19 @@ AnimatedPipeline::AnimatedPipeline(
           context->physical_device, context->device.get(),
           spot_shadowcasters_count);
 
+      ModelInfoUniformData model_info_init_data;
+      glm::vec3 pos(pool_index, model_info_index, 7.5f);
+      model_info_init_data.model_matrix = glm::translate(glm::mat4(1.0f), pos);
+      initialize_bone_matrices(model_info_init_data.bone_matrices,
+                               max_bone_matrices);
+
       model_info.uniform.write(context->device.get(), &model_info_init_data,
                                model_infos_count);
 
       logger.info(std::source_location::current(),
-                  "created model info uniform model info descriptor memories");
+                  std::format("created model info uniform model info "
+                              "descriptor memories with pos {}",
+                              glm::to_string(pos)));
 
       std::array<vk::WriteDescriptorSet, 1> write{
           vk::WriteDescriptorSet{}
@@ -624,7 +613,11 @@ AnimatedPipeline::AnimatedPipeline(
 
       logger.info(std::source_location::current(),
                   "wrote model_info uniform in update");
+
+      model_info_index++;
     }
+
+    pool_index++;
   }
 }
 
@@ -772,8 +765,9 @@ void AnimatedPipeline::render(
   ModelInfoUniformData model_info_init_data;
   model_info_init_data.model_matrix = glm::mat4(1.0f);
   std::ranges::for_each(model_info_init_data.bone_matrices, initialize_mat4);
+
   m_model_info_uniform_pools[*current_flightframe][0].uniform.write(
-      device, &model_info_init_data, model_info_uniform_count);
+      device, &model_info_init_data);
 
   commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
                              m_pipeline.get());
@@ -795,15 +789,56 @@ void AnimatedPipeline::render(
                                    m_layout.get(), first_set, init_sets.size(),
                                    init_sets.data(), 0, nullptr);
 
+  // TODO: overhaul the texture updating system so we use handles instead of the
+  // texture ptrs and make the thing more reusable so it isint duplicated in
+  // every pipeline.
   TextureSamplerReadOnly *last_ambient_texture = &m_ambient.default_texture;
   TextureSamplerReadOnly *last_diffuse_texture = &m_diffuse.default_texture;
   TextureSamplerReadOnly *last_specular_texture = &m_specular.default_texture;
   TextureSamplerReadOnly *last_normal_texture = &m_normal.default_texture;
 
-  // TODO: i needed?
-  int i = 0;
-  int current_model_info = 1;
-  for (AnimatedRenderable &renderable : renderables) {
+  // TODO: Ideally we just create a filter of valid renderables by:
+  // todraw = renderables
+  //   | views::filter(valid)
+  //   | views::take(max_animated_renderables);
+  //
+  // the last step ensures we dont run out of descriptor sets...
+
+  // NOTE: apparently we cant really write to our descriptor sets inside the
+  // draw commandbuffer recording loop. This problem was not seen with textures,
+  // so maybe there is a difference in how direct writing to an existing
+  // descriptor setworks compared to the texture descriptor set creation?
+  // TODO: ANYWAY, i should probably figure out why this actually is!
+  for (auto [index, renderable] : std::views::enumerate(renderables)) {
+
+    // TODO: Ideally we just use views::filter to do this! so we dont need to do
+    // it twice.
+    if (!renderable.mesh.has_value()) {
+      logger.error(std::source_location::current(),
+                   "Got Renderable that has no Mesh!");
+      continue;
+    }
+    // https://docs.vulkan.org/tutorial/latest/16_Multiple_Objects.html
+    ModelInfoUniformData model_info;
+    model_info.model_matrix = renderable.model;
+
+    if (renderable.animator == nullptr) {
+		initialize_bone_matrices(model_info.bone_matrices, max_bone_matrices);
+    } else {
+      std::vector<glm::mat4> bone_matrices =
+          renderable.animator->GetFinalBoneMatrices();
+      for (size_t i = 0; i < std::min(bone_matrices.size(), size_t(100)); i++) {
+        model_info.bone_matrices[i] = bone_matrices[i];
+      }
+    }
+
+    m_model_info_uniform_pools[*current_flightframe][index].uniform.write(
+        device, &model_info);
+  }
+
+  // TODO: do something when we reach more animated renderables than we have
+  // descriptor sets for!
+  for (auto [index, renderable] : std::views::enumerate(renderables)) {
 
     if (!renderable.mesh.has_value()) {
       logger.error(std::source_location::current(),
@@ -934,23 +969,6 @@ void AnimatedPipeline::render(
                   "passed textures binding, starting to bind shadowcasters");
     }
 
-    ModelInfoUniformData model_info;
-    model_info.model_matrix = renderable.model;
-    // TODO: Acquire actual bone model matrices from an animator class
-    // somewhere instead of identity initializing them...
-    std::ranges::for_each(model_info.bone_matrices, initialize_mat4);
-    m_model_info_uniform_pools[*current_flightframe][current_model_info]
-        .uniform.write(device, &model_info, model_info_uniform_count);
-    current_model_info++;
-
-    std::array<vk::DescriptorSet, 1> model_info_sets {
-		m_model_info_uniform_pools[*current_flightframe][current_model_info].set.get()
-    };
-
-	commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-									 m_layout.get(), 0, model_info_sets.size(),
-									 model_info_sets.data(), 0, nullptr);
-
     const uint32_t firstBinding = 0;
     const uint32_t bindingCount = 1;
     std::array<vk::DeviceSize, bindingCount> offsets = {0};
@@ -967,6 +985,16 @@ void AnimatedPipeline::render(
 
     commandbuffer.bindVertexBuffers(firstBinding, bindingCount, buffers.data(),
                                     offsets.data());
+
+    uint32_t constexpr model_info_set_index = 7;
+    std::array<vk::DescriptorSet, 1> model_info_sets{
+        m_model_info_uniform_pools.at(*current_flightframe)
+            .at(index)
+            .set.get()};
+
+    commandbuffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics, m_layout.get(), model_info_set_index,
+        model_info_sets.size(), model_info_sets.data(), 0, nullptr);
 
     const uint32_t instanceCount = 1;
     const uint32_t firstVertex = 0;

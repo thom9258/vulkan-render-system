@@ -1,6 +1,7 @@
 #include <VulkanRenderer/Animation.hpp>
 
 #include <algorithm>
+#include <print>
 
 auto BoneInfos::get() -> std::map<std::string, BoneInfo> & {
   return m_BoneInfoMap;
@@ -9,7 +10,7 @@ auto BoneInfos::get() -> std::map<std::string, BoneInfo> & {
 auto BoneInfos::counter() -> int & { return m_BoneCounter; }
 
 auto BoneInfos::has_bone(std::string_view name) -> bool {
-  return get().find(std::string(name)) == get().end();
+  return get().find(std::string(name)) != get().end();
 }
 
 auto BoneInfos::insert_bone(std::string_view name, glm::mat4 offset) -> int {
@@ -190,7 +191,6 @@ void Animator::CalculateBoneTransform(const AssimpNodeData *node,
   }
 
   glm::mat4 globalTransformation = parentTransform * nodeTransform;
-
   auto boneInfoMap = m_CurrentAnimation->GetBoneIDMap();
   if (boneInfoMap.find(nodeName) != boneInfoMap.end()) {
     int index = boneInfoMap[nodeName].id;

@@ -70,8 +70,8 @@ void main()
 		vec3 localNormal =
 			 mat3(model_info.bone_matrices[vertex_bone_ids[i]]) * vertex_normal;
     }
-
      gl_Position = global.proj * global.view * model_info.model * animationModel;
+
 	 out_texcoord = vertex_texcoord;
 
 	 // world space vertex normal from model space vertex normal

@@ -83,7 +83,7 @@ auto attribute_descriptions(const VertexAnimatedPosNormColorUV&)
 		vk::VertexInputAttributeDescription{}
 		.setBinding(0)
 		.setLocation(4)
-		.setFormat(vk::Format::eR32G32B32Sint)
+		.setFormat(vk::Format::eR32G32B32A32Sint)
 		.setOffset(offsetof(VertexAnimatedPosNormColorUV, bone_ids)),
 
 		vk::VertexInputAttributeDescription{}

@@ -76,6 +76,7 @@ auto unwind_renderablenode(std::vector<MaterialRenderable> &simple,
 		  renderable.specular = p->specular;
 		  renderable.normal = p->normal;
 		  renderable.has_shadow = p->has_shadow;
+		  renderable.animator = p->animator;
 		  animated.push_back(renderable);
 	  }
   }

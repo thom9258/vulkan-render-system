@@ -92,13 +92,19 @@ struct UniformMemoryDirectWrite
 	
 	void write(vk::Device device, Data* data, size_t length)
 	{
-		if (length == 0) return;
+		if (length == 0) throw std::runtime_error("UniformMemoryDirectWrite: zero length write");
+		if (data == nullptr) throw std::runtime_error("UniformMemoryDirectWrite: nullptr write");
 		if (length > m_count) length = m_count;
 		copy_to_allocated_memory(device,
 								 m_memory,
 								 reinterpret_cast<void*>(data),
 								 sizeof(Data) * length);
 	}
+
+
+        void write(vk::Device device, Data *data) {
+			write(device, data, 1);
+        }
 	
 	vk::DescriptorBufferInfo& buffer_info() const
 	{
@@ -111,7 +117,7 @@ struct UniformMemoryDirectWrite
 	
 };
 
-
+#if 0
 template<typename Data>
 struct UniformBuffer
 {
@@ -196,6 +202,8 @@ struct Uniform {
 	FlightFramesArray<BufferType> buffers;
 };
 
+#endif
+
 template <DescriptorSetIndex t_set_index>
 struct TextureDescriptor
 {
@@ -204,8 +212,6 @@ struct TextureDescriptor
 	vk::UniqueDescriptorSetLayout layout;
 	std::map<TextureSamplerReadOnly*, FlightFramesArray<vk::UniqueDescriptorSet>> sets;
 };
-
-
 
 //TODO: This was an attempt at making it nice to automatically get textures
 //      for a material, but it was abandoned..
