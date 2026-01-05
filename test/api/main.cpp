@@ -490,6 +490,7 @@ int main(int argc, char **argv) {
       load_animated_model(context, mesh_cache, texture_cache,
                           models_root /
                               "glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf");
+                              //"gltf-wolf/Wolf-Blender-2.82a.gltf");
 
   if (!animated.has_value()) {
     throw std::runtime_error(animated.error());
@@ -501,12 +502,18 @@ int main(int argc, char **argv) {
   std::println("animations count: {}", animated.value().animations.size());
 
   Animator animator;
-  animator.PlayAnimation(&animated.value().animations[0]);
+  animator.PlayAnimation(&animated.value().animations[1]);
+ //https://github.khronos.org/glTF-Sample-Viewer-Release/?model=https://raw.GithubUserContent.com/KhronosGroup/glTF-Sample-Assets/main/./Models/Fox/glTF-Binary/Fox.glb
+
   foreach_node(
       [&](RenderableNodePtr &renderable) {
-        renderable->model_matrix = glm::mat4(1.0f); /*glm::translate(
+#if 0
+        renderable->model_matrix = glm::mat4(1.0f); 
+#else
+		renderable->model_matrix = glm::translate(
             glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.2f)),
-            glm::vec3(0.0f, 0.0f, 0.0f));*/
+            glm::vec3(0.0f, 0.0f, 0.0f));
+#endif
 
         for (RenderableNode::Model &model : renderable->models) {
           if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
@@ -532,7 +539,7 @@ int main(int argc, char **argv) {
   double total_time = 0;
 
   while (!exit) {
-    animator.UpdateAnimation(delta_time);
+    animator.UpdateAnimation(delta_time / 1000);
     auto duration_delta_time = with_time_measurement([&]() {
       /** ************************************************************************
        * Handle Inputs

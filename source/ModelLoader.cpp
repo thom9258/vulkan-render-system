@@ -237,12 +237,26 @@ auto process_mesh(Render::Context &context, TextureSamplerCache &texture_cache,
 
 namespace assimp_to_glm {
 
-glm::mat4 matrix(aiMatrix4x4 other) {
-  glm::mat4 matrix;
-  for (size_t r = 0; r < 4; r++)
-    for (size_t c = 0; c < 4; c++)
-      matrix[r][c] = other[r][c];
-  return matrix;
+glm::mat4 matrix(aiMatrix4x4 from) {
+  glm::mat4 to;
+  // the a,b,c,d in assimp is the row ; the 1,2,3,4 is the column
+  to[0][0] = from.a1;
+  to[1][0] = from.a2;
+  to[2][0] = from.a3;
+  to[3][0] = from.a4;
+  to[0][1] = from.b1;
+  to[1][1] = from.b2;
+  to[2][1] = from.b3;
+  to[3][1] = from.b4;
+  to[0][2] = from.c1;
+  to[1][2] = from.c2;
+  to[2][2] = from.c3;
+  to[3][2] = from.c4;
+  to[0][3] = from.d1;
+  to[1][3] = from.d2;
+  to[2][3] = from.d3;
+  to[3][3] = from.d4;
+  return to;
 }
 
 glm::vec3 vec3(aiVector3f other) {
@@ -326,33 +340,33 @@ RenderableNodePtr load_model(Render::Context &context, MeshCache &mesh_cache,
 Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
   Bone bone(name, ID);
 
-  bone.m_NumPositions = channel->mNumPositionKeys;
-
-  for (int positionIndex = 0; positionIndex < bone.m_NumPositions;
-       ++positionIndex) {
-    aiVector3D aiPosition = channel->mPositionKeys[positionIndex].mValue;
-    float timeStamp = channel->mPositionKeys[positionIndex].mTime;
+  // bone.m_NumPositions = channel->mNumPositionKeys;
+  // for (int i = 0; i < bone.m_NumPositions; ++i) {
+  for (int i = 0; i < channel->mNumPositionKeys; ++i) {
+    aiVector3D aiPosition = channel->mPositionKeys[i].mValue;
+    float timeStamp = channel->mPositionKeys[i].mTime;
     KeyPosition data;
     data.position = assimp_to_glm::vec3(aiPosition);
     data.timeStamp = timeStamp;
     bone.m_Positions.push_back(data);
   }
 
-  bone.m_NumRotations = channel->mNumRotationKeys;
-  for (int rotationIndex = 0; rotationIndex < bone.m_NumRotations;
-       ++rotationIndex) {
-    aiQuaternion aiOrientation = channel->mRotationKeys[rotationIndex].mValue;
-    float timeStamp = channel->mRotationKeys[rotationIndex].mTime;
+  // bone.m_NumRotations = channel->mNumRotationKeys;
+  // for (int rotationIndex = 0; rotationIndex < bone.m_NumRotations;
+  for (int i = 0; i < channel->mNumRotationKeys; ++i) {
+    aiQuaternion aiOrientation = channel->mRotationKeys[i].mValue;
+    float timeStamp = channel->mRotationKeys[i].mTime;
     KeyRotation data;
     data.orientation = assimp_to_glm::quat(aiOrientation);
     data.timeStamp = timeStamp;
     bone.m_Rotations.push_back(data);
   }
 
-  bone.m_NumScalings = channel->mNumScalingKeys;
-  for (int keyIndex = 0; keyIndex < bone.m_NumScalings; ++keyIndex) {
-    aiVector3D scale = channel->mScalingKeys[keyIndex].mValue;
-    float timeStamp = channel->mScalingKeys[keyIndex].mTime;
+  // bone.m_NumScalings = channel->mNumScalingKeys;
+  // for (int keyIndex = 0; keyIndex < bone.m_NumScalings; ++keyIndex) {
+  for (int i = 0; i < channel->mNumScalingKeys; ++i) {
+    aiVector3D scale = channel->mScalingKeys[i].mValue;
+    float timeStamp = channel->mScalingKeys[i].mTime;
     KeyScale data;
     data.scale = assimp_to_glm::vec3(scale);
     data.timeStamp = timeStamp;
@@ -387,16 +401,33 @@ void ReadMissingBones(Animation &animation, BoneInfos &bone_infos,
 void ReadHeirarchyData(Animation &animation, AssimpNodeData &dest,
                        const aiNode *src) {
   assert(src);
-
   dest.name = src->mName.data;
   dest.transformation = assimp_to_glm::matrix(src->mTransformation);
-  dest.childrenCount = src->mNumChildren;
 
   for (int i = 0; i < src->mNumChildren; i++) {
     AssimpNodeData newData;
     ReadHeirarchyData(animation, newData, src->mChildren[i]);
     dest.children.push_back(newData);
   }
+}
+
+void print_heirarchy_data(std::ostream &os, AssimpNodeData &node, int indent) {
+  const std::string indentstring(indent * 2, ' ');
+  std::println(os, "{}{}:", indentstring, node.name);
+  std::println(os, "{}{}", indentstring, glm::to_string(node.transformation));
+
+  for (AssimpNodeData &child : node.children) {
+    print_heirarchy_data(os, child, indent + 1);
+  }
+}
+
+void print_animation(std::ostream &os, Animation &animation,
+                     std::string_view name) {
+  std::println(os, "Animation {}:", name);
+  std::println(os, "  Duration: {}", animation.m_Duration);
+  std::println(os, "  Ticks Per Second: {}", animation.m_TicksPerSecond);
+  std::println(os, "  Node Heirarchy:");
+  print_heirarchy_data(std::cout, animation.m_RootNode, 1);
 }
 
 auto create_animations(const aiScene *scene, BoneInfos &bone_infos)
@@ -414,6 +445,7 @@ auto create_animations(const aiScene *scene, BoneInfos &bone_infos)
     animation.m_TicksPerSecond = ai_animation->mTicksPerSecond;
     ReadHeirarchyData(animation, animation.m_RootNode, scene->mRootNode);
     ReadMissingBones(animation, bone_infos, ai_animation);
+    print_animation(std::cout, animation, std::format("{}", i));
     animations.push_back(animation);
   }
 
@@ -438,6 +470,7 @@ auto process_animated_mesh(Render::Context &context,
     vertex.norm[2] = mesh->mNormals[i].z;
     vertex.color = glm::vec3(1.0f);
     vertex.bone_ids = glm::ivec4(-1.0f);
+    vertex.weights = glm::vec4(0.0f);
 
     if (mesh->mTextureCoords[0]) {
       // texcoords have multiple dimensions we only care about the first
@@ -450,6 +483,7 @@ auto process_animated_mesh(Render::Context &context,
     vertices.push_back(vertex);
   }
 
+  // NOTE: we extract all the bone ids and weights afterwards for each vertex
   for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
     std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
     std::optional<int> boneID;
@@ -459,6 +493,10 @@ auto process_animated_mesh(Render::Context &context,
       boneID = bone_infos.insert_bone(
           boneName,
           assimp_to_glm::matrix(mesh->mBones[boneIndex]->mOffsetMatrix));
+
+      std::println(">> and matrix {}",
+                   glm::to_string(assimp_to_glm::matrix(
+                       mesh->mBones[boneIndex]->mOffsetMatrix)));
     } else {
       std::println("Found existing BoneInfo by name {}", boneName);
       boneID = bone_infos.find_bone_id(boneName);
@@ -473,8 +511,10 @@ auto process_animated_mesh(Render::Context &context,
       float weight = weights[weightIndex].mWeight;
       assert(vertexId <= vertices.size());
 
-      vertices[vertexId].bone_ids[boneIndex] = boneID.value();
-      vertices[vertexId].weights[boneIndex] = weight;
+      if (vertices[vertexId].bone_ids[boneIndex] < 0) {
+        vertices[vertexId].bone_ids[boneIndex] = boneID.value();
+        vertices[vertexId].weights[boneIndex] = weight;
+      }
     }
   }
 

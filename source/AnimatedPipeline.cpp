@@ -577,9 +577,6 @@ AnimatedPipeline::AnimatedPipeline(
               model_info_uniform_allocate_info);
 
       model_info.set = std::move(sets[0]);
-      logger.info(std::source_location::current(),
-                  "created model info uniform descriptor set");
-
       model_info.uniform = UniformMemoryDirectWrite<ModelInfoUniformData>(
           context->physical_device, context->device.get(),
           spot_shadowcasters_count);
@@ -593,11 +590,6 @@ AnimatedPipeline::AnimatedPipeline(
       model_info.uniform.write(context->device.get(), &model_info_init_data,
                                model_infos_count);
 
-      logger.info(std::source_location::current(),
-                  std::format("created model info uniform model info "
-                              "descriptor memories with pos {}",
-                              glm::to_string(pos)));
-
       std::array<vk::WriteDescriptorSet, 1> write{
           vk::WriteDescriptorSet{}
               .setDstSet(model_info.set.get())
@@ -610,10 +602,6 @@ AnimatedPipeline::AnimatedPipeline(
 
       context->device.get().updateDescriptorSets(write.size(), write.data(), 0,
                                                  nullptr);
-
-      logger.info(std::source_location::current(),
-                  "wrote model_info uniform in update");
-
       model_info_index++;
     }
 
@@ -789,14 +777,6 @@ void AnimatedPipeline::render(
                                    m_layout.get(), first_set, init_sets.size(),
                                    init_sets.data(), 0, nullptr);
 
-  // TODO: overhaul the texture updating system so we use handles instead of the
-  // texture ptrs and make the thing more reusable so it isint duplicated in
-  // every pipeline.
-  TextureSamplerReadOnly *last_ambient_texture = &m_ambient.default_texture;
-  TextureSamplerReadOnly *last_diffuse_texture = &m_diffuse.default_texture;
-  TextureSamplerReadOnly *last_specular_texture = &m_specular.default_texture;
-  TextureSamplerReadOnly *last_normal_texture = &m_normal.default_texture;
-
   // TODO: Ideally we just create a filter of valid renderables by:
   // todraw = renderables
   //   | views::filter(valid)
@@ -827,7 +807,7 @@ void AnimatedPipeline::render(
     } else {
       std::vector<glm::mat4> bone_matrices =
           renderable.animator->GetFinalBoneMatrices();
-      for (size_t i = 0; i < std::min(bone_matrices.size(), size_t(100)); i++) {
+      for (size_t i = 0; i < std::min(bone_matrices.size(), max_bone_matrices); i++) {
         model_info.bone_matrices[i] = bone_matrices[i];
       }
     }
@@ -835,6 +815,14 @@ void AnimatedPipeline::render(
     m_model_info_uniform_pools[*current_flightframe][index].uniform.write(
         device, &model_info);
   }
+  
+  // TODO: overhaul the texture updating system so we use handles instead of the
+  // texture ptrs and make the thing more reusable so it isint duplicated in
+  // every pipeline.
+  TextureSamplerReadOnly *last_ambient_texture = &m_ambient.default_texture;
+  TextureSamplerReadOnly *last_diffuse_texture = &m_diffuse.default_texture;
+  TextureSamplerReadOnly *last_specular_texture = &m_specular.default_texture;
+  TextureSamplerReadOnly *last_normal_texture = &m_normal.default_texture;
 
   // TODO: do something when we reach more animated renderables than we have
   // descriptor sets for!
@@ -976,13 +964,6 @@ void AnimatedPipeline::render(
     uint32_t vertices_length = mesh->vertexbuffer.impl->length;
     std::array<vk::Buffer, bindingCount> buffers{
         mesh->vertexbuffer.impl->buffer.get()};
-
-    // TODO: We need to have an entirely new descriptor set here so we can
-
-    // commandbuffer.bindDescriptorSets() and swap it out with one that fits
-    // the animation ModelInfo data we are trying to render...
-    // https://docs.vulkan.org/refpages/latest/refpages/source/vkUpdateDescriptorSets.html
-
     commandbuffer.bindVertexBuffers(firstBinding, bindingCount, buffers.data(),
                                     offsets.data());
 

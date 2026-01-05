@@ -49,9 +49,9 @@ int Bone::GetBoneID() { return m_ID; }
 /* Gets the current index on mKeyPositions to interpolate to based on
 the current animation time*/
 int Bone::GetPositionIndex(float animationTime) {
-  for (int index = 0; index < m_NumPositions - 1; ++index) {
-    if (animationTime < m_Positions[index + 1].timeStamp)
-      return index;
+  for (int i = 0; i < m_Positions.size() - 1; ++i) {
+    if (animationTime < m_Positions[i + 1].timeStamp)
+      return i;
   }
   assert(0);
   return 0;
@@ -60,9 +60,9 @@ int Bone::GetPositionIndex(float animationTime) {
 /* Gets the current index on mKeyRotations to interpolate to based on the
 current animation time*/
 int Bone::GetRotationIndex(float animationTime) {
-  for (int index = 0; index < m_NumRotations - 1; ++index) {
-    if (animationTime < m_Rotations[index + 1].timeStamp)
-      return index;
+  for (int i = 0; i < m_Rotations.size() - 1; ++i) {
+    if (animationTime < m_Rotations[i + 1].timeStamp)
+      return i;
   }
   assert(0);
   return 0;
@@ -71,9 +71,9 @@ int Bone::GetRotationIndex(float animationTime) {
 /* Gets the current index on mKeyScalings to interpolate to based on the
 current animation time */
 int Bone::GetScaleIndex(float animationTime) {
-  for (int index = 0; index < m_NumScalings - 1; ++index) {
-    if (animationTime < m_Scales[index + 1].timeStamp)
-      return index;
+  for (int i = 0; i < m_Scales.size() - 1; ++i) {
+    if (animationTime < m_Scales[i + 1].timeStamp)
+      return i;
   }
   assert(0);
   return 0;
@@ -92,7 +92,7 @@ float Bone::GetScaleFactor(float lastTimeStamp, float nextTimeStamp,
 /*figures out which position keys to interpolate b/w and performs the
 interpolation and returns the translation matrix*/
 glm::mat4 Bone::InterpolatePosition(float animationTime) {
-  if (1 == m_NumPositions)
+  if (1 == m_Positions.size())
     return glm::translate(glm::mat4(1.0f), m_Positions[0].position);
 
   int p0Index = GetPositionIndex(animationTime);
@@ -109,7 +109,7 @@ glm::mat4 Bone::InterpolatePosition(float animationTime) {
 /*figures out which rotations keys to interpolate b/w and performs the
 interpolation and returns the rotation matrix*/
 glm::mat4 Bone::InterpolateRotation(float animationTime) {
-  if (1 == m_NumRotations) {
+  if (1 == m_Rotations.size()) {
     auto rotation = glm::normalize(m_Rotations[0].orientation);
     return glm::toMat4(rotation);
   }
@@ -129,7 +129,7 @@ glm::mat4 Bone::InterpolateRotation(float animationTime) {
 /*figures out which scaling keys to interpolate b/w and performs the
 interpolation and returns the scale matrix*/
 glm::mat4 Bone::InterpolateScaling(float animationTime) {
-  if (1 == m_NumScalings)
+  if (1 == m_Scales.size())
     return glm::scale(glm::mat4(1.0f), m_Scales[0].scale);
 
   int p0Index = GetScaleIndex(animationTime);
@@ -184,7 +184,6 @@ void Animator::CalculateBoneTransform(const AssimpNodeData *node,
   glm::mat4 nodeTransform = node->transformation;
 
   Bone *Bone = m_CurrentAnimation->FindBone(nodeName);
-
   if (Bone) {
     Bone->Update(m_CurrentTime);
     nodeTransform = Bone->GetLocalTransform();
@@ -192,16 +191,18 @@ void Animator::CalculateBoneTransform(const AssimpNodeData *node,
 
   glm::mat4 globalTransformation = parentTransform * nodeTransform;
   auto boneInfoMap = m_CurrentAnimation->GetBoneIDMap();
+
   if (boneInfoMap.find(nodeName) != boneInfoMap.end()) {
     int index = boneInfoMap[nodeName].id;
     glm::mat4 offset = boneInfoMap[nodeName].offset;
     m_FinalBoneMatrices[index] = globalTransformation * offset;
   }
 
-  for (int i = 0; i < node->childrenCount; i++)
+  for (int i = 0; i < node->children.size(); i++)
     CalculateBoneTransform(&node->children[i], globalTransformation);
 }
 
+//TODO: copy being made here...
 std::vector<glm::mat4> Animator::GetFinalBoneMatrices() {
   return m_FinalBoneMatrices;
 }

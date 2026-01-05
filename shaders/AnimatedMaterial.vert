@@ -52,7 +52,7 @@ uniform ModelInfo
 
 void main()
 {
-	vec4 animationModel = vec4(0.0f);
+	vec4 animated_vertex = vec4(0.0f);
     for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
 	{
 		if (vertex_bone_ids[i] == -1) 
@@ -60,17 +60,17 @@ void main()
 
         if (vertex_bone_ids[i] >= MAX_BONES) 
         {
-            animationModel = vec4(vertex_position, 1.0f);
+            animated_vertex = vec4(vertex_position, 1.0f);
             break;
         }
 
         vec4 localPosition =
 			 model_info.bone_matrices[vertex_bone_ids[i]] * vec4(vertex_position, 1.0f);
-        animationModel += localPosition * vertex_weights[i];
-		vec3 localNormal =
-			 mat3(model_info.bone_matrices[vertex_bone_ids[i]]) * vertex_normal;
+
+        animated_vertex += localPosition * vertex_weights[i];
     }
-     gl_Position = global.proj * global.view * model_info.model * animationModel;
+
+     gl_Position = global.proj * global.view * model_info.model * animated_vertex;
 
 	 out_texcoord = vertex_texcoord;
 

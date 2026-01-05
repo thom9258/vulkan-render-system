@@ -9,8 +9,8 @@
 
 struct BoneInfo
 {
-    int id;
-    glm::mat4 offset;
+    int id{-1};
+    glm::mat4 offset{glm::mat4(1.0f)};
 };
 
 class BoneInfos {
@@ -53,9 +53,9 @@ public:
     std::vector<KeyPosition> m_Positions;
     std::vector<KeyRotation> m_Rotations;
     std::vector<KeyScale> m_Scales;
-    int m_NumPositions;
-    int m_NumRotations;
-    int m_NumScalings;
+//   int m_NumPositions;
+//   int m_NumRotations;
+//   int m_NumScalings;
 	
     glm::mat4 m_LocalTransform;
     std::string m_Name;
@@ -82,7 +82,6 @@ struct AssimpNodeData
 {
     glm::mat4 transformation;
     std::string name;
-    int childrenCount;
     std::vector<AssimpNodeData> children;
 };
 
@@ -98,7 +97,7 @@ public:
     float GetTicksPerSecond();
     float GetDuration(); 
     const AssimpNodeData& GetRootNode();
-    const std::map<std::string,BoneInfo>& GetBoneIDMap() ;
+    const std::map<std::string,BoneInfo>& GetBoneIDMap();
     float m_Duration;
     int m_TicksPerSecond;
     std::vector<Bone> m_Bones;

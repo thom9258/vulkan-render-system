@@ -10,7 +10,7 @@ Required Features:
 - [X] Model & Texture support - includes loaders and renderer handling.
 - [X] LightCasters - support basic untextured lights (directional, point, spot)
 - [X] Shadowmaps - simple support for a single directional and spot light.
-- [ ] gltf loading (not animated).
+- [X] gltf loading (not animated).
 - [ ] Animated meshes - limit support to gltf models.
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Add a gpu physical device selection method.
@@ -18,6 +18,7 @@ Required Features:
 - [ ] Windows support.
    
 Optional Features:
+- [ ] Make logger a singleton so it actually can be used everywhere instead of passed all over. It should probably be multithread applicable?
 - [ ] Shadowmaps - multiple spot lights.
 - [ ] Fix point interpolation for textures.
 - [ ] Fix screen extent and render extents, so they are disconnected.
@@ -25,10 +26,10 @@ Optional Features:
 - [ ] Async render thread.
 - [ ] Animation Blending.
 - [ ] Soft Shadows.
-- [ ] Decals.
+- [ ] Decals & Billboards (Alpha discardable).
+- [ ] instanced rendering for non-animated models.
 - [ ] Skybox.
-- [ ] Billboards.
-- [ ] Transparency (the sorted kind).
+- [ ] Transparency (the manually sorted kind).
 - [ ] fix commandbuffer connection between rendering and presentation - potentially just disallow headless rendering.
 - [ ] disable validation layer for release builds.
 - [ ] move stb_image and objloader headers behind interface.
