@@ -505,6 +505,10 @@ auto process_animated_mesh(Render::Context &context,
     auto weights = mesh->mBones[boneIndex]->mWeights;
     int numWeights = mesh->mBones[boneIndex]->mNumWeights;
 
+    if (numWeights > 4) {
+		throw std::runtime_error("Fatal! the model you are trying to load has more animation weighs than we support!");
+    }
+
     for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex) {
       int vertexId = weights[weightIndex].mVertexId;
       float weight = weights[weightIndex].mWeight;
