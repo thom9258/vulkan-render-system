@@ -414,7 +414,6 @@ void ReadHeirarchyData(Animation &animation, AssimpNodeData &dest,
 void print_heirarchy_data(std::ostream &os, AssimpNodeData &node, int indent) {
   const std::string indentstring(indent * 2, ' ');
   std::println(os, "{}{}:", indentstring, node.name);
-  std::println(os, "{}{}", indentstring, glm::to_string(node.transformation));
 
   for (AssimpNodeData &child : node.children) {
     print_heirarchy_data(os, child, indent + 1);

@@ -3,31 +3,48 @@
 	[
 		{
 			"name": "asset-smg", 
-			"path": "../../../assets/models/smg/smg.obj"
+			"path": "../../../assets/models/smg/smg.obj",
+			"draw-mode": "static"
 		},
 		{
 			"name": "asset-chest", 
-			"path": "../../../assets/models/ChestWowStyle/Chest.obj"
+			"path": "../../../assets/models/ChestWowStyle/Chest.obj",
+			"draw-mode": "static"
 		},
 		{
 			"name": "corset", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf",
+			"draw-mode": "static"
 		},
 		{
 			"name": "fox", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf",
+			"draw-mode": "static"
+		},
+		{
+			"name": "fox-animated", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf",
+			"draw-mode": "animated"
+		},
+		{
+			"name": "wolf", 
+			"path": "../../../assets/models/gltf-wolf/Wolf-Blender-2.82a.gltf",
+			"draw-mode": "animated"
 		},
 		{
 			"name": "helmet", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf",
+			"draw-mode": "static"
 		},
 		{
 			"name": "asset-backpack", 
-			"path": "../../../assets/models/backpack/backpack.obj"
+			"path": "../../../assets/models/backpack/backpack.obj",
+			"draw-mode": "static"
 		},
 		{
 			"name": "asset-monster", 
-			"path": "../../../assets/models/glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb"
+			"path": "../../../assets/models/glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb",
+			"draw-mode": "static"
 		}
 	],
     "level" : 
@@ -36,9 +53,27 @@
 			"name": "fox", 
 			"draw-mode": "material",
 			"has-shadow": "yes",
-			"position": [2, 0, 0],
+			"position": [3, 0, 0],
 			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [0.05, 0.05, 0.05]
+		},
+		{
+			"name": "fox-animated", 
+			"draw-mode": "animated",
+			"animation": 2,
+			"has-shadow": "yes",
+			"position": [0, 0, 0],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [0.05, 0.05, 0.05]
+		},
+		{
+			"name": "wolf",
+			"draw-mode": "animated",
+			"animation": 0,
+			"has-shadow": "yes",
+			"position": [-5, 0, 0],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [10, 10, 10]
 		}
 	],
     "lights" : 

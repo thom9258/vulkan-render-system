@@ -31,6 +31,14 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+void insert_animator(Animator *animator, RenderableNodePtr &renderable) {
+  for (RenderableNode::Model &model : renderable->models) {
+    if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+      p->animator = animator;
+    }
+  }
+}
+
 std::filesystem::path root = "../../../";
 std::filesystem::path shaders_root = root / "compiled_shaders/";
 // std::filesystem::path scenes_root = "../scenes/";
@@ -76,6 +84,7 @@ std::vector<VertexPosNormColorUV> triangle_vertices = {
 
 struct Scene {
   std::vector<Renderable> renderables;
+  std::vector<std::unique_ptr<Animator>> animators;
   std::vector<Light> lights;
   ShadowCasters shadowcasters;
 };
@@ -90,6 +99,10 @@ auto parse_transform(json j) -> Render::Transform {
   glm::vec3 const scale = parse_vec3(j["scale"]);
   return {pos, rot, scale};
 }
+
+using LoadedAsset = std::variant<RenderableNodePtr, LoadedAnimatedModel>;
+
+std::map<std::string, LoadedAsset> loaded_assets;
 
 auto load_scene_from_path(std::filesystem::path const path,
                           Render::Context &context,
@@ -107,24 +120,29 @@ auto load_scene_from_path(std::filesystem::path const path,
 
   json j = json::parse(content);
 
-  std::map<std::string, RenderableNodePtr> loaded_assets;
-
   json assets = j["assets"];
   for (auto &asset : assets) {
     std::string name = asset["name"];
     std::string path = asset["path"];
+    std::string draw_mode = asset["draw-mode"];
 
-    RenderableNodePtr loaded_model =
-        load_model(context, mesh_cache, texture_cache, path);
-
-    if (loaded_model) {
-      loaded_assets[name] = loaded_model;
-      std::cout << std::format("Loaded asset {} from path: {}", name, path)
-                << std::endl;
-    } else {
-      std::cout << std::format("Could NOT Load asset {} from path: {}", name,
-                               path)
-                << std::endl;
+    if (draw_mode == "static") {
+      RenderableNodePtr loaded_model =
+          load_model(context, mesh_cache, texture_cache, path);
+      if (loaded_model != nullptr) {
+        loaded_assets[name] = loaded_model;
+      } else {
+        std::println("Could NOT Load asset {} from path: {}", name, path);
+      }
+    } else if (draw_mode == "animated") {
+      std::expected<LoadedAnimatedModel, std::string> loaded_model =
+          load_animated_model(context, mesh_cache, texture_cache, path);
+      if (loaded_model.has_value()) {
+        loaded_assets[name] = loaded_model.value();
+      } else {
+        std::println("Could NOT Load asset {} from path: {}, error: {}", name,
+                     path, loaded_model.error());
+      }
     }
   }
 
@@ -260,15 +278,34 @@ auto load_scene_from_path(std::filesystem::path const path,
         std::cout << "Unknown draw mode for " << name << std::endl;
       }
     } else {
+
       auto found = loaded_assets.find(name);
       if (found == loaded_assets.end()) {
         std::cout << "Unknown renderable " << name << std::endl;
         continue;
       }
 
-      RenderableNodePtr renderable = found->second;
-      renderable->model_matrix = transform.as_matrix();
-      scene.renderables.push_back(renderable);
+      LoadedAsset& asset = found->second;
+      if (auto p = std::get_if<RenderableNodePtr>(&asset)) {
+        std::println("added loaded static asset");
+        (*p)->model_matrix = transform.as_matrix();
+        scene.renderables.push_back(*p);
+      } else if (auto p = std::get_if<LoadedAnimatedModel>(&asset)) {
+        std::println("added loaded animated asset");
+        p->renderable->model_matrix = transform.as_matrix();
+		auto animator = std::make_unique<Animator>();
+
+
+        std::size_t animation_index = prefab["animation"];
+		std::println("Creating animated model {}", name);
+
+		animator->PlayAnimation(&p->animations.at(animation_index));
+        foreach_node(std::bind_front(insert_animator, animator.get()),
+                     p->renderable);
+
+        scene.renderables.push_back(p->renderable);
+        scene.animators.push_back(std::move(animator));
+      }
     }
   }
 
@@ -486,42 +523,41 @@ int main(int argc, char **argv) {
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
   Resources resources{context, mesh_cache, texture_cache, assets_root};
 
-  std::expected<LoadedAnimatedModel, std::string> animated =
-      load_animated_model(context, mesh_cache, texture_cache,
-                          models_root /
-                              "glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf");
-                              //"gltf-wolf/Wolf-Blender-2.82a.gltf");
+  // std::expected<LoadedAnimatedModel, std::string> animated =
+  //     load_animated_model(context, mesh_cache, texture_cache,
+  //                         models_root /
+  //                             "glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf");
+  //
+  // if (!animated.has_value()) {
+  //   throw std::runtime_error(animated.error());
+  // }
+  //
+  // std::println("has meshes: {}", animated.value().renderable != nullptr);
+  // std::println("bone infos count: {}",
+  //              animated.value().bone_infos.get().size());
+  // std::println("animations count: {}", animated.value().animations.size());
+  //
+  // Animator animator;
+  // animator.PlayAnimation(&animated.value().animations[1]);
+  // https://github.khronos.org/glTF-Sample-Viewer-Release/?model=https://raw.GithubUserContent.com/KhronosGroup/glTF-Sample-Assets/main/./Models/Fox/glTF-Binary/Fox.glb
 
-  if (!animated.has_value()) {
-    throw std::runtime_error(animated.error());
-  }
-
-  std::println("has meshes: {}", animated.value().renderable != nullptr);
-  std::println("bone infos count: {}",
-               animated.value().bone_infos.get().size());
-  std::println("animations count: {}", animated.value().animations.size());
-
-  Animator animator;
-  animator.PlayAnimation(&animated.value().animations[1]);
- //https://github.khronos.org/glTF-Sample-Viewer-Release/?model=https://raw.GithubUserContent.com/KhronosGroup/glTF-Sample-Assets/main/./Models/Fox/glTF-Binary/Fox.glb
-
-  foreach_node(
-      [&](RenderableNodePtr &renderable) {
-#if 0
-        renderable->model_matrix = glm::mat4(1.0f); 
-#else
-		renderable->model_matrix = glm::translate(
-            glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.2f)),
-            glm::vec3(0.0f, 0.0f, 0.0f));
-#endif
-
-        for (RenderableNode::Model &model : renderable->models) {
-          if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
-			  p->animator = &animator;
-          }
-        }
-      },
-      animated.value().renderable);
+  // foreach_node(
+  //     [&](RenderableNodePtr &renderable) {
+  // if 0
+  //       renderable->model_matrix = glm::mat4(1.0f);
+  // else
+  //       renderable->model_matrix = glm::translate(
+  //           glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.2f)),
+  //           glm::vec3(0.0f, 0.0f, 0.0f));
+  // endif
+  //
+  //       for (RenderableNode::Model &model : renderable->models) {
+  //         if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+  //           p->animator = &animator;
+  //         }
+  //       }
+  //     },
+  //     animated.value().renderable);
 
   std::cout << "STARTING DRAW LOOP" << std::endl;
   /** ************************************************************************
@@ -532,14 +568,18 @@ int main(int argc, char **argv) {
   Scene scene = load_scene_from_path(scene_path, context, texture_cache,
                                      mesh_cache, resources);
 
-  scene.renderables.push_back(animated.value().renderable);
+  // scene.renderables.push_back(animated.value().renderable);
   bool exit = false;
   uint64_t framecount = 0;
   double delta_time = 0;
   double total_time = 0;
 
   while (!exit) {
-    animator.UpdateAnimation(delta_time / 1000);
+
+    for (std::unique_ptr<Animator> &animator : scene.animators) {
+      animator->UpdateAnimation(delta_time / 1000);
+    }
+
     auto duration_delta_time = with_time_measurement([&]() {
       /** ************************************************************************
        * Handle Inputs
@@ -635,7 +675,7 @@ int main(int argc, char **argv) {
         if (reload_scene) {
           scene = load_scene_from_path(scene_path, context, texture_cache,
                                        mesh_cache, resources);
-          scene.renderables.push_back(animated.value().renderable);
+          //scene.renderables.push_back(animated.value().renderable);
           reload_scene = false;
         }
 
@@ -670,11 +710,11 @@ int main(int argc, char **argv) {
       framecount++;
     });
 
-    delta_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(duration_delta_time)
-            .count();
+    delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     duration_delta_time)
+                     .count();
 
-	total_time += delta_time;
+    total_time += delta_time;
   }
 
   context.wait_until_idle();
