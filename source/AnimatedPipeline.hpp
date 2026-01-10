@@ -128,6 +128,7 @@ private:
 	static constexpr std::size_t max_bone_matrices = 100;
 	struct ModelInfoUniformData {
 		glm::mat4 model_matrix;
+		glm::ivec4 bind_info;
 		glm::mat4 bone_matrices[max_bone_matrices];
 	};
 

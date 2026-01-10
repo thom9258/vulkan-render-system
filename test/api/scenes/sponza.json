@@ -3,7 +3,8 @@
 	[
 		{
 			"name": "sponza", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Sponza/glTF/Sponza.gltf",
+			"draw-mode": "static"
 		}
 	],
     "level" : 

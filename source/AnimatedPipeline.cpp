@@ -564,13 +564,20 @@ AnimatedPipeline::AnimatedPipeline(
   const auto model_info_uniform_allocate_info =
       vk::DescriptorSetAllocateInfo{}
           .setDescriptorPool(descriptor_pool->descriptor_pool.get())
-          .setDescriptorSetCount(layouts_size)
+          .setDescriptorSetCount(model_info_layouts_size)
           .setSetLayouts(m_model_info_layout.get());
 
-  size_t pool_index = 0;
-  size_t model_info_index = 0;
-  for (ModelInfoUniformPool &pool : m_model_info_uniform_pools) {
-    for (ModelInfoUniform &model_info : pool) {
+  ModelInfoUniformData model_info_init_data;
+  model_info_init_data.model_matrix = glm::mat4(1.0f);
+  initialize_bone_matrices(model_info_init_data.bone_matrices,
+                           max_bone_matrices);
+
+  for (auto [pool_index, pool] :
+       std::views::enumerate(m_model_info_uniform_pools)) {
+    for (auto [model_info_index, model_info] : std::views::enumerate(pool)) {
+
+      model_info_init_data.bind_info =
+          glm::ivec4(pool_index, model_info_index, 0, 0);
 
       std::vector<vk::UniqueDescriptorSet> sets =
           context->device.get().allocateDescriptorSetsUnique(
@@ -580,12 +587,6 @@ AnimatedPipeline::AnimatedPipeline(
       model_info.uniform = UniformMemoryDirectWrite<ModelInfoUniformData>(
           context->physical_device, context->device.get(),
           spot_shadowcasters_count);
-
-      ModelInfoUniformData model_info_init_data;
-      glm::vec3 pos(pool_index, model_info_index, 7.5f);
-      model_info_init_data.model_matrix = glm::translate(glm::mat4(1.0f), pos);
-      initialize_bone_matrices(model_info_init_data.bone_matrices,
-                               max_bone_matrices);
 
       model_info.uniform.write(context->device.get(), &model_info_init_data,
                                model_infos_count);
@@ -602,10 +603,7 @@ AnimatedPipeline::AnimatedPipeline(
 
       context->device.get().updateDescriptorSets(write.size(), write.data(), 0,
                                                  nullptr);
-      model_info_index++;
     }
-
-    pool_index++;
   }
 }
 
@@ -769,7 +767,7 @@ void AnimatedPipeline::render(
       m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
       shadowcasters.directional.descriptorset,
       shadowcasters.spot.descriptorset,
-      m_model_info_uniform_pools[*current_flightframe][0].set.get(),
+      m_model_info_uniform_pools[*current_flightframe][1].set.get(),
   };
 
   const uint32_t first_set = 0;
@@ -800,14 +798,20 @@ void AnimatedPipeline::render(
     }
     // https://docs.vulkan.org/tutorial/latest/16_Multiple_Objects.html
     ModelInfoUniformData model_info;
+    model_info.bind_info = glm::ivec4(*current_flightframe, index, 0, 0);
+
+    std::println("bound animation renderable flightframe: {} model: {}",
+                 *current_flightframe, index);
+
     model_info.model_matrix = renderable.model;
 
     if (renderable.animator == nullptr) {
-		initialize_bone_matrices(model_info.bone_matrices, max_bone_matrices);
+      initialize_bone_matrices(model_info.bone_matrices, max_bone_matrices);
     } else {
       std::vector<glm::mat4> bone_matrices =
           renderable.animator->GetFinalBoneMatrices();
-      for (size_t i = 0; i < std::min(bone_matrices.size(), max_bone_matrices); i++) {
+      for (size_t i = 0; i < std::min(bone_matrices.size(), max_bone_matrices);
+           i++) {
         model_info.bone_matrices[i] = bone_matrices[i];
       }
     }
@@ -815,7 +819,7 @@ void AnimatedPipeline::render(
     m_model_info_uniform_pools[*current_flightframe][index].uniform.write(
         device, &model_info);
   }
-  
+
   // TODO: overhaul the texture updating system so we use handles instead of the
   // texture ptrs and make the thing more reusable so it isint duplicated in
   // every pipeline.

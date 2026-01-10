@@ -523,42 +523,6 @@ int main(int argc, char **argv) {
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
   Resources resources{context, mesh_cache, texture_cache, assets_root};
 
-  // std::expected<LoadedAnimatedModel, std::string> animated =
-  //     load_animated_model(context, mesh_cache, texture_cache,
-  //                         models_root /
-  //                             "glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf");
-  //
-  // if (!animated.has_value()) {
-  //   throw std::runtime_error(animated.error());
-  // }
-  //
-  // std::println("has meshes: {}", animated.value().renderable != nullptr);
-  // std::println("bone infos count: {}",
-  //              animated.value().bone_infos.get().size());
-  // std::println("animations count: {}", animated.value().animations.size());
-  //
-  // Animator animator;
-  // animator.PlayAnimation(&animated.value().animations[1]);
-  // https://github.khronos.org/glTF-Sample-Viewer-Release/?model=https://raw.GithubUserContent.com/KhronosGroup/glTF-Sample-Assets/main/./Models/Fox/glTF-Binary/Fox.glb
-
-  // foreach_node(
-  //     [&](RenderableNodePtr &renderable) {
-  // if 0
-  //       renderable->model_matrix = glm::mat4(1.0f);
-  // else
-  //       renderable->model_matrix = glm::translate(
-  //           glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.2f)),
-  //           glm::vec3(0.0f, 0.0f, 0.0f));
-  // endif
-  //
-  //       for (RenderableNode::Model &model : renderable->models) {
-  //         if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
-  //           p->animator = &animator;
-  //         }
-  //       }
-  //     },
-  //     animated.value().renderable);
-
   std::cout << "STARTING DRAW LOOP" << std::endl;
   /** ************************************************************************
    * Frame Loop
@@ -568,7 +532,6 @@ int main(int argc, char **argv) {
   Scene scene = load_scene_from_path(scene_path, context, texture_cache,
                                      mesh_cache, resources);
 
-  // scene.renderables.push_back(animated.value().renderable);
   bool exit = false;
   uint64_t framecount = 0;
   double delta_time = 0;
@@ -675,7 +638,6 @@ int main(int argc, char **argv) {
         if (reload_scene) {
           scene = load_scene_from_path(scene_path, context, texture_cache,
                                        mesh_cache, resources);
-          //scene.renderables.push_back(animated.value().renderable);
           reload_scene = false;
         }
 

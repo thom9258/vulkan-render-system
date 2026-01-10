@@ -483,6 +483,12 @@ auto process_animated_mesh(Render::Context &context,
   }
 
   // NOTE: we extract all the bone ids and weights afterwards for each vertex
+  if (mesh->mNumBones > 100) {
+    throw std::runtime_error(std::format(
+        "The model to load has {} animation bones, but max {} is supported",
+        mesh->mNumBones, 100));
+  }
+
   for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
     std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
     std::optional<int> boneID;
@@ -506,7 +512,9 @@ auto process_animated_mesh(Render::Context &context,
     int numWeights = mesh->mBones[boneIndex]->mNumWeights;
 
     if (numWeights > 4) {
-		throw std::runtime_error("Fatal! the model you are trying to load has more animation weighs than we support!");
+      std::println(
+          "WARNING: The model to load has {} animation weighs, but max {} is supported",
+          numWeights, 4);
     }
 
     for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex) {

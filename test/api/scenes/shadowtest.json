@@ -3,31 +3,38 @@
 	[
 		{
 			"name": "asset-smg", 
-			"path": "../../../assets/models/smg/smg.obj"
+			"path": "../../../assets/models/smg/smg.obj",
+			"draw-mode": "static"
 		},
 		{
 			"name": "asset-chest", 
-			"path": "../../../assets/models/ChestWowStyle/Chest.obj"
+			"path": "../../../assets/models/ChestWowStyle/Chest.obj",
+			"draw-mode": "static"
 		},
 		{
 			"name": "corset", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf",
+			"draw-mode": "static"
 		},
 		{
 			"name": "fox", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf",
+			"draw-mode": "static"
 		},
 		{
 			"name": "helmet", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf"
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf",
+			"draw-mode": "static"
 		},
 		{
 			"name": "asset-backpack", 
-			"path": "../../../assets/models/backpack/backpack.obj"
+			"path": "../../../assets/models/backpack/backpack.obj",
+			"draw-mode": "static"
 		},
 		{
 			"name": "asset-monster", 
-			"path": "../../../assets/models/glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb"
+			"path": "../../../assets/models/glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb",
+			"draw-mode": "static"
 		}
 	],
     "level" : 

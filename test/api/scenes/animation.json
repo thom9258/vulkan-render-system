@@ -58,6 +58,15 @@
 			"scale": [0.05, 0.05, 0.05]
 		},
 		{
+			"name": "fox-animated", 
+			"draw-mode": "animated",
+			"animation": 0,
+			"has-shadow": "yes",
+			"position": [0, 0, 0],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [0.05, 0.05, 0.05]
+		},
+		{
 			"name": "wolf",
 			"draw-mode": "animated",
 			"animation": 4,
@@ -65,8 +74,7 @@
 			"position": [-5, 0, 0],
 			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [10, 10, 10]
-		}
-	],
+		}	],
 	"ignored":
 	[
 		{
@@ -77,6 +85,15 @@
 			"position": [0, 0, 0],
 			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [0.05, 0.05, 0.05]
+		},
+		{
+			"name": "wolf",
+			"draw-mode": "animated",
+			"animation": 4,
+			"has-shadow": "yes",
+			"position": [-5, 0, 0],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [10, 10, 10]
 		}
 	],
     "lights" : 

@@ -46,6 +46,7 @@ layout(set = 7, binding = 0)
 uniform ModelInfo
 {
 	mat4 model;
+	ivec4 bind_info;
 	mat4 bone_matrices[MAX_BONES];
 } model_info;
 

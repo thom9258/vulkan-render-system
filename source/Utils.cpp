@@ -364,6 +364,7 @@ copy_to_allocated_memory(vk::Device& device,
 										 0,
 										 size,
 										 vk::MemoryMapFlags());
+	if (!staging_ptr) throw std::runtime_error("COULD NOT MAP ALLOCATED MEMORY");
 	memcpy(staging_ptr, data, size);
 	device.unmapMemory(allocated_memory.memory.get());
 }
