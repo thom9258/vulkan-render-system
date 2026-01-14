@@ -641,7 +641,7 @@ int main(int argc, char **argv) {
           reload_scene = false;
         }
 
-        auto *textureptr = renderer.render(
+        auto *textureptr = renderer.render(&context,
             texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
             frameInfo.total_frame_count, world_info, scene.renderables,
             scene.lights, scene.shadowcasters);

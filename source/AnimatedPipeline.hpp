@@ -58,8 +58,10 @@ struct AnimatedPipeline
 		};
 		SpotShadowCasterTexture spot;
 	};
-	
-	void render(FrameInfo& frame_info,
+
+        void render(
+							  Render::Context::Impl *context, 
+					FrameInfo& frame_info,
 				Logger& logger,
 				vk::Device& device,
 				vk::DescriptorPool descriptor_pool,
@@ -135,11 +137,11 @@ private:
 	struct ModelInfoUniform
 	{
 		vk::UniqueDescriptorSet set;
-		UniformMemoryDirectWrite<ModelInfoUniformData> uniform; 
+		UniformMemory<ModelInfoUniformData> uniform; 
 	};
 	static constexpr uint32_t model_info_uniform_count = 1;
 	static constexpr uint32_t model_info_set_index = 7;
-	static constexpr size_t model_info_uniforms_per_frame = 100;
+	static constexpr size_t model_info_uniforms_per_frame = 10;
 	using ModelInfoUniformPool = std::array<ModelInfoUniform, model_info_uniforms_per_frame>;
 	vk::UniqueDescriptorSetLayout m_model_info_layout;
 	FlightFramesArray<ModelInfoUniformPool> m_model_info_uniform_pools;

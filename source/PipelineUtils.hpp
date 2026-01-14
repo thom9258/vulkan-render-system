@@ -2,8 +2,9 @@
 
 #include <VulkanRenderer/StrongType.hpp>
 
-#include "ShaderTextureImpl.hpp"
+#include "Context.hpp"
 #include "FlightFrames.hpp"
+#include "ShaderTextureImpl.hpp"
 
 #include <vulkan/vulkan.hpp>
 
@@ -11,110 +12,177 @@
 #include <utility>
 
 using BindingIndex = StrongType<uint32_t, struct BindingIndexTag>;
-using TotalDescriptorCount = StrongType<uint32_t, struct TotalDescriptorCountTag>;
+using TotalDescriptorCount =
+    StrongType<uint32_t, struct TotalDescriptorCountTag>;
 using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
 using FragmentPath = StrongType<std::filesystem::path, struct FragmentPathTag>;
 using VertexPath = StrongType<std::filesystem::path, struct VertexPathTag>;
 
 using DescriptorSetIndex = StrongType<uint32_t, struct DescriptorSetIndexTag>;
-using DescriptorSetBindingIndex = StrongType<uint32_t, struct DescriptorSetBindingIndexTag>;
+using DescriptorSetBindingIndex =
+    StrongType<uint32_t, struct DescriptorSetBindingIndexTag>;
 
-
-auto create_descriptorset_for_texture(vk::Device device,
-									  vk::DescriptorSetLayout descriptorset_layout,
-									  vk::DescriptorPool descriptor_pool,
-									  size_t frames_in_flight,
-									  TextureSamplerReadOnly& texture)
-	-> std::vector<vk::UniqueDescriptorSet>;
+auto create_descriptorset_for_texture(
+    vk::Device device, vk::DescriptorSetLayout descriptorset_layout,
+    vk::DescriptorPool descriptor_pool, size_t frames_in_flight,
+    TextureSamplerReadOnly &texture) -> std::vector<vk::UniqueDescriptorSet>;
 
 auto create_texture_descriptorset(vk::Device device,
-								  vk::DescriptorSetLayout descriptorset_layout,
-								  vk::DescriptorPool descriptor_pool,
-								  TextureSamplerReadOnly& texture)
-	-> FlightFramesArray<vk::UniqueDescriptorSet>;
+                                  vk::DescriptorSetLayout descriptorset_layout,
+                                  vk::DescriptorPool descriptor_pool,
+                                  TextureSamplerReadOnly &texture)
+    -> FlightFramesArray<vk::UniqueDescriptorSet>;
 
-struct ShaderStageInfos
-{
-	struct {
-		vk::UniqueShaderModule vertex;
-		vk::UniqueShaderModule fragment;
-	} modules;
+struct ShaderStageInfos {
+  struct {
+    vk::UniqueShaderModule vertex;
+    vk::UniqueShaderModule fragment;
+  } modules;
 
-	std::array<vk::PipelineShaderStageCreateInfo, 2> create_info;
+  std::array<vk::PipelineShaderStageCreateInfo, 2> create_info;
 };
 
-auto create_shaderstage_infos(vk::Device device,
-							  VertexPath const vertex_path,
-							  FragmentPath const fragment_path)
-	noexcept -> std::optional<ShaderStageInfos>;
+auto create_shaderstage_infos(vk::Device device, VertexPath const vertex_path,
+                              FragmentPath const fragment_path) noexcept
+    -> std::optional<ShaderStageInfos>;
 
+template <typename TData> struct UniformMemoryDirectWrite {
+  using Data = std::remove_cvref_t<TData>;
+  size_t m_count{0};
+  AllocatedMemory m_memory;
+	vk::DescriptorBufferInfo m_buffer_info;
 
-template<typename TData>
-struct UniformMemoryDirectWrite
-{
-	using Data = std::remove_cvref_t<TData>;
-	size_t m_count;
-	AllocatedMemory m_memory;
+  UniformMemoryDirectWrite() = default;
+
+  UniformMemoryDirectWrite(const UniformMemoryDirectWrite &rhs) = delete;
+  UniformMemoryDirectWrite(UniformMemoryDirectWrite &&rhs) {
+    std::swap(m_memory, rhs.m_memory);
+    std::swap(m_count, rhs.m_count);
+    std::swap(m_buffer_info, rhs.m_buffer_info);
+  }
+
+  UniformMemoryDirectWrite &
+  operator=(const UniformMemoryDirectWrite &) = delete;
+  UniformMemoryDirectWrite &operator=(UniformMemoryDirectWrite &&rhs) {
+    std::swap(m_memory, rhs.m_memory);
+    std::swap(m_count, rhs.m_count);
+    std::swap(m_buffer_info, rhs.m_buffer_info);
+    return *this;
+  }
+
+  explicit UniformMemoryDirectWrite(vk::PhysicalDevice physical_device,
+                                    vk::Device device, size_t count) {
+    m_count = (count < 1) ? 1 : count;
+    m_memory = allocate_memory(physical_device, device, sizeof(Data) * m_count,
+                               vk::BufferUsageFlagBits::eTransferDst |
+                                   vk::BufferUsageFlagBits::eUniformBuffer,
+                               // Host Visible and Coherent allows direct
+                               // writes into the buffers without sync issues.
+                               // but it can be slower overall
+                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                   vk::MemoryPropertyFlagBits::eHostCoherent);
 	
-	UniformMemoryDirectWrite() = default;
+	m_buffer_info = vk::DescriptorBufferInfo{}
+		.setBuffer(m_memory.buffer.get())
+		.setOffset(0)
+		.setRange(sizeof(Data) * m_count);
+  }
 
-	UniformMemoryDirectWrite(const UniformMemoryDirectWrite& rhs) = delete;
-	UniformMemoryDirectWrite(UniformMemoryDirectWrite&& rhs)
-	{
-		std::swap(m_memory, rhs.m_memory);
-		std::swap(m_count, rhs.m_count);
-	}
+  void write(vk::Device device, Data *data, size_t length) {
+    if (length == 0)
+      throw std::runtime_error("UniformMemoryDirectWrite: zero length write");
+    if (data == nullptr)
+      throw std::runtime_error("UniformMemoryDirectWrite: nullptr write");
+    if (length > m_count)
+      length = m_count;
+    copy_to_allocated_memory(device, m_memory, reinterpret_cast<void *>(data),
+                             sizeof(Data) * length);
+  }
 
-	UniformMemoryDirectWrite& operator=(const UniformMemoryDirectWrite&) = delete;
-	UniformMemoryDirectWrite& operator=(UniformMemoryDirectWrite&& rhs)
-	{
-		std::swap(m_memory, rhs.m_memory);
-		std::swap(m_count, rhs.m_count);
-		return *this;
-	}
+  void write(vk::Device device, Data *data) { write(device, data, 1); }
 
-	explicit UniformMemoryDirectWrite(vk::PhysicalDevice physical_device,
-									  vk::Device device,
-									  size_t count)
-	{
-		m_count = (count < 1) ? 1 : count;
-		m_memory = allocate_memory(physical_device,
-								   device,
-								   sizeof(Data) * m_count,
-								   vk::BufferUsageFlagBits::eTransferSrc
-								   | vk::BufferUsageFlagBits::eUniformBuffer,
-								   // Host Visible and Coherent allows direct
-								   // writes into the buffers without sync issues.
-								   // but it can be slower overall
-								   vk::MemoryPropertyFlagBits::eHostVisible
-								   | vk::MemoryPropertyFlagBits::eHostCoherent);
-	}
+  vk::DescriptorBufferInfo& buffer_info() {
+    return m_buffer_info;
+  }
+};
+
+// TODO: Creating a uniform memory class that has proper staging and devicelocal memory was not fixing my uniform problem, BUT, it is basically a working prototype for making the same memory setup for uniform buffers, and eventually also per-frame uniforms IF it make a performance difference, who knows...
+template <typename TData> struct UniformMemory {
+  using Data = std::remove_cvref_t<TData>;
+  using DataSpan = std::span<Data>;
+
+  size_t m_count{0};
+  AllocatedMemory m_memory;
+  StagingMemory m_staging;
+vk::DescriptorBufferInfo m_buffer_info;
+
+  UniformMemory() = default;
+
+  UniformMemory(const UniformMemory &rhs) = delete;
+  UniformMemory(UniformMemory &&rhs) {
+    std::swap(m_memory, rhs.m_memory);
+    std::swap(m_staging, rhs.m_staging);
+    std::swap(m_count, rhs.m_count);
+    std::swap(m_buffer_info, rhs.m_buffer_info);
+  }
+
+  UniformMemory &operator=(const UniformMemory &) = delete;
+  UniformMemory &operator=(UniformMemory &&rhs) {
+    std::swap(m_memory, rhs.m_memory);
+    std::swap(m_staging, rhs.m_staging);
+    std::swap(m_count, rhs.m_count);
+    std::swap(m_buffer_info, rhs.m_buffer_info);
+    return *this;
+  }
+
+  explicit UniformMemory(vk::PhysicalDevice physical_device, vk::Device device,
+                         size_t count)
+      : m_count((count < 1) ? 1 : count) {
+
+    m_staging = allocate_staging_memory(physical_device, device,
+                                        sizeof(Data) * m_count);
+
+    m_memory = allocate_memory(physical_device, device, sizeof(Data) * m_count,
+                               vk::BufferUsageFlagBits::eTransferDst |
+                                   vk::BufferUsageFlagBits::eUniformBuffer,
+                               vk::MemoryPropertyFlagBits::eDeviceLocal);
 	
-	void write(vk::Device device, Data* data, size_t length)
-	{
-		if (length == 0) throw std::runtime_error("UniformMemoryDirectWrite: zero length write");
-		if (data == nullptr) throw std::runtime_error("UniformMemoryDirectWrite: nullptr write");
-		if (length > m_count) length = m_count;
-		copy_to_allocated_memory(device,
-								 m_memory,
-								 reinterpret_cast<void*>(data),
-								 sizeof(Data) * length);
-	}
+	m_buffer_info = vk::DescriptorBufferInfo{}
+		.setBuffer(m_memory.buffer.get())
+		.setOffset(0)
+		.setRange(sizeof(Data) * m_count);
+  }
+
+  void write(Render::Context::Impl &context, Data *data, size_t length) {
+    if (length == 0)
+      throw std::runtime_error("UniformMemory: zero length write");
+    if (data == nullptr)
+      throw std::runtime_error("UniformMemory: nullptr write");
+    if (length > m_count)
+      length = m_count;
 
 
-        void write(vk::Device device, Data *data) {
-			write(device, data, 1);
-        }
-	
-	vk::DescriptorBufferInfo& buffer_info() const
-	{
-		static auto info = vk::DescriptorBufferInfo{}
-			.setBuffer(m_memory.buffer.get())
-			.setOffset(0)
-			.setRange(sizeof(Data) * m_count);
-		return info;
-	}
-	
+	const std::size_t memory_length = sizeof(Data) * length;
+
+    // copy to staging buffer
+    copy_to_staging_buffer(context.device.get(), m_staging,
+                           reinterpret_cast<void *>(data),
+                           memory_length);
+
+    with_buffer_submit(
+        context.device.get(), context.commandpool.get(),
+        context.graphics_queue(), [&](vk::CommandBuffer &commandbuffer) {
+          copy_staging_to_uniform(m_staging, m_memory, memory_length, commandbuffer);
+        });
+  }
+
+  void write(Render::Context::Impl &context, Data *data) {
+    write(context, data, 1);
+  }
+
+  vk::DescriptorBufferInfo& buffer_info() {
+    return m_buffer_info;
+  }
 };
 
 #if 0
@@ -204,17 +272,16 @@ struct Uniform {
 
 #endif
 
-template <DescriptorSetIndex t_set_index>
-struct TextureDescriptor
-{
-	DescriptorSetIndex static constexpr set_index = t_set_index;
-	TextureSamplerReadOnly default_texture;
-	vk::UniqueDescriptorSetLayout layout;
-	std::map<TextureSamplerReadOnly*, FlightFramesArray<vk::UniqueDescriptorSet>> sets;
+template <DescriptorSetIndex t_set_index> struct TextureDescriptor {
+  DescriptorSetIndex static constexpr set_index = t_set_index;
+  TextureSamplerReadOnly default_texture;
+  vk::UniqueDescriptorSetLayout layout;
+  std::map<TextureSamplerReadOnly *, FlightFramesArray<vk::UniqueDescriptorSet>>
+      sets;
 };
 
-//TODO: This was an attempt at making it nice to automatically get textures
-//      for a material, but it was abandoned..
+// TODO: This was an attempt at making it nice to automatically get textures
+//       for a material, but it was abandoned..
 #if 0
 struct TextureMaterial
 {

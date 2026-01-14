@@ -1,5 +1,9 @@
 #!/bin/bash
 
+
+# TODO: at some point we want to compile the shader binaries directly into the engine...
+#       but for testing it is an independent step
+
 SHADER_SOURCE_DIR="shaders"
 RESOURCES_DIR="compiled_shaders"
 

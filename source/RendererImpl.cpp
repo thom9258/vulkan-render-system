@@ -235,6 +235,7 @@ auto create_geometry_pass(Render::Context::Impl *context,
 }
 
 auto render_geometry_pass(
+						  Render::Context::Impl* context,
     GeometryPass &pass, Renderer::Impl::ShadowPasses &shadow_passes,
     // TODO: Pipelines are captured as a ptr because bind_front
     //       does not want to capture a reference for it...
@@ -397,7 +398,7 @@ auto render_geometry_pass(
     animated_frame_info.view = world_info.view;
     animated_frame_info.proj = world_info.projection;
     animated_frame_info.camera_position = world_info.camera_position;
-    pipelines->animated.render(
+    pipelines->animated.render(context,
         animated_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
         current_flightframe, max_flightframes, sorted.animated_renderables,
         lights, animated_shadowcasters);
@@ -462,7 +463,9 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
 
 Renderer::Impl::~Impl() {}
 
-auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
+auto Renderer::Impl::render(
+							Render::Context::Impl* context,
+							TextureSamplerCache &texture_cache,
                             MeshCache &mesh_cache,
                             const uint32_t current_frame_in_flight,
                             const uint64_t total_frames,
@@ -470,7 +473,8 @@ auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
                             std::vector<Renderable> &renderables,
                             std::vector<Light> &lights,
                             ShadowCasters &shadowcasters) -> Texture2D::Impl * {
-  return render_geometry_pass(
+  return render_geometry_pass(context,
+
       geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
       mesh_cache, current_frame_in_flight,
       presenter->max_frames_in_flight, total_frames, context->device.get(),
@@ -479,7 +483,9 @@ auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
       shadowcasters);
 }
 
-auto Renderer::render(TextureSamplerCache &texture_cache,
+auto Renderer::render(
+					  Render::Context* context,
+					  TextureSamplerCache &texture_cache,
                       MeshCache &mesh_cache,
                       const uint32_t current_frame_in_flight,
                       const uint64_t total_frames,
@@ -487,7 +493,7 @@ auto Renderer::render(TextureSamplerCache &texture_cache,
                       std::vector<Renderable> &renderables,
                       std::vector<Light> &lights, ShadowCasters &shadowcasters)
     -> Texture2D::Impl * {
-  return impl->render(texture_cache, mesh_cache,
+  return impl->render(context->impl.get(), texture_cache, mesh_cache,
                       current_frame_in_flight, total_frames, world_info,
                       renderables, lights, shadowcasters);
 }
