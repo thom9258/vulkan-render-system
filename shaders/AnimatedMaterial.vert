@@ -1,6 +1,7 @@
 #version 450
 
 #include "Material.shared"
+#include "Animation.shared"
 
 layout(location = 0) in vec3 vertex_position;
 layout(location = 1) in vec3 vertex_normal;
@@ -40,8 +41,6 @@ uniform SpotShadowCasterUniform
 	bool exists;
 } spot_shadowcaster;
 
-#define MAX_BONES 100
-#define MAX_BONE_INFLUENCES 4
 layout(set = 7, binding = 0)
 uniform ModelInfo
 {
@@ -53,36 +52,24 @@ uniform ModelInfo
 
 void main()
 {
-	vec4 animated_vertex = vec4(0.0f);
-    for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
-	{
-		if (vertex_bone_ids[i] == -1) 
-            continue;
+	vec4 animated_vertex = animate_vertex(
+		 vertex_position,
+		 vertex_bone_ids,
+		 vertex_weights,
+		 model_info.bone_matrices);
 
-        if (vertex_bone_ids[i] >= MAX_BONES) 
-        {
-            animated_vertex = vec4(vertex_position, 1.0f);
-            break;
-        }
-
-        vec4 localPosition =
-			 model_info.bone_matrices[vertex_bone_ids[i]] * vec4(vertex_position, 1.0f);
-
-        animated_vertex += localPosition * vertex_weights[i];
-    }
-
-     gl_Position = global.proj * global.view * model_info.model * animated_vertex;
-
-	 out_texcoord = vertex_texcoord;
-
-	 // world space vertex normal from model space vertex normal
-	 out_normal = mat3(transpose(inverse(model_info.model))) * vertex_normal;   
-	 out_fragpos = vec3(model_info.model * vec4(vertex_position, 1.0));
- 	 out_view_position = vec3(global.camera_position);
-
-	 out_dirshadowcaster_lightspace_fragpos =
-	     directional_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
-		 
-	 out_spotshadowcaster_lightspace_fragpos =
-	     spot_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
+	gl_Position = global.proj * global.view * model_info.model * animated_vertex;
+    
+    out_texcoord = vertex_texcoord;
+    
+    // world space vertex normal from model space vertex normal
+    out_normal = mat3(transpose(inverse(model_info.model))) * vertex_normal;   
+    out_fragpos = vec3(model_info.model * vec4(vertex_position, 1.0));
+    out_view_position = vec3(global.camera_position);
+    
+    out_dirshadowcaster_lightspace_fragpos =
+        directional_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
+     
+    out_spotshadowcaster_lightspace_fragpos =
+        spot_shadowcaster.viewproj_matrix * vec4(out_fragpos, 1.0);
 }

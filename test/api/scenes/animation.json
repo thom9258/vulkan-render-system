@@ -2,21 +2,6 @@
 	"assets" : 
 	[
 		{
-			"name": "asset-smg", 
-			"path": "../../../assets/models/smg/smg.obj",
-			"draw-mode": "static"
-		},
-		{
-			"name": "asset-chest", 
-			"path": "../../../assets/models/ChestWowStyle/Chest.obj",
-			"draw-mode": "static"
-		},
-		{
-			"name": "corset", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/Corset/glTF/Corset.gltf",
-			"draw-mode": "static"
-		},
-		{
 			"name": "fox", 
 			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf",
 			"draw-mode": "static"
@@ -30,53 +15,25 @@
 			"name": "wolf", 
 			"path": "../../../assets/models/gltf-wolf/Wolf-Blender-2.82a.gltf",
 			"draw-mode": "animated"
-		},
-		{
-			"name": "helmet", 
-			"path": "../../../assets/models/glTF-Sample-Models/2.0/SciFiHelmet/glTF/SciFiHelmet.gltf",
-			"draw-mode": "static"
-		},
-		{
-			"name": "asset-backpack", 
-			"path": "../../../assets/models/backpack/backpack.obj",
-			"draw-mode": "static"
-		},
-		{
-			"name": "asset-monster", 
-			"path": "../../../assets/models/glTF-Sample-Models/1.0/Monster/glTF-Binary/Monster.glb",
-			"draw-mode": "static"
 		}
 	],
     "level" : 
 	[
 		{
-			"name": "fox-animated", 
-			"draw-mode": "animated",
-			"animation": 0,
+			"name": "fox", 
+			"draw-mode": "static",
 			"has-shadow": "yes",
-			"position": [0, 0, 0],
-			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"position": [0, -2, 7],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
 			"scale": [0.05, 0.05, 0.05]
 		},
-		{
-			"name": "wolf",
-			"draw-mode": "animated",
-			"animation": 3,
-			"has-shadow": "yes",
-			"position": [-5, 0, 0],
-			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
-			"scale": [10, 10, 10]
-		}
-	],
-	"ignored":
-	[
 		{
 			"name": "fox-animated", 
 			"draw-mode": "animated",
 			"animation": 2,
 			"has-shadow": "yes",
-			"position": [0, 0, 0],
-			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"position": [5, -2, 7],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
 			"scale": [0.05, 0.05, 0.05]
 		},
 		{
@@ -84,18 +41,17 @@
 			"draw-mode": "animated",
 			"animation": 1,
 			"has-shadow": "yes",
-			"position": [-5, 0, 0],
-			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"position": [-5, -2, 7],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
 			"scale": [10, 10, 10]
 		},
 		{
-			"name": "wolf",
-			"draw-mode": "animated",
-			"animation": 4,
+			"name": "floor", 
+			"draw-mode": "material",
 			"has-shadow": "yes",
-			"position": [-5, 0, 0],
+			"position": [0, -2.1, 7],
 			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
-			"scale": [10, 10, 10]
+			"scale": [20, 0.2, 20]
 		}
 	],
     "lights" : 
@@ -108,7 +64,18 @@
 			"direction": [0.0, -1.0, 0.0],
 			"diffuse": [0, 0, 0],
 			"specular": [0.0, 0.0, 0.0],
-			"ambient": [0.4, 0.4, 0.4]
+			"ambient": [0.1, 0.1, 0.1]
+		},
+		{
+			"type": "directional", 
+			"casts-shadow": "yes",
+			"draw-gizmo": "no",
+			"position": [0, 15, 0],
+
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0.5, 0.5, 0.5],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.03, 0.03, 0.03]
 		}
 	]
 }

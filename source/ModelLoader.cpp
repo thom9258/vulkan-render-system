@@ -489,33 +489,43 @@ auto process_animated_mesh(Render::Context &context,
         mesh->mNumBones, 100));
   }
 
-  for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
+  std::size_t numBones = std::min(static_cast<std::size_t>(mesh->mNumBones),
+                                  static_cast<std::size_t>(100));
+
+  for (int boneIndex = 0; boneIndex < numBones; ++boneIndex) {
     std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
     std::optional<int> boneID;
     if (!bone_infos.has_bone(boneName)) {
-
+#if 0
       std::println("Found new BoneInfo by name {}", boneName);
+      std::println(">> and matrix {}",
+                   glm::to_string(assimp_to_glm::matrix(
+                       mesh->mBones[boneIndex]->mOffsetMatrix)));
+#endif
+
       boneID = bone_infos.insert_bone(
           boneName,
           assimp_to_glm::matrix(mesh->mBones[boneIndex]->mOffsetMatrix));
 
-      std::println(">> and matrix {}",
-                   glm::to_string(assimp_to_glm::matrix(
-                       mesh->mBones[boneIndex]->mOffsetMatrix)));
     } else {
-      std::println("Found existing BoneInfo by name {}", boneName);
       boneID = bone_infos.find_bone_id(boneName);
     }
 
     assert(boneID != std::nullopt);
     auto weights = mesh->mBones[boneIndex]->mWeights;
-    int numWeights = mesh->mBones[boneIndex]->mNumWeights;
-
-    if (numWeights > 4) {
-      std::println(
-          "WARNING: The model to load has {} animation weighs, but max {} is supported",
-          numWeights, 4);
+    if (mesh->mBones[boneIndex]->mNumWeights > 4) {
+      std::println("WARNING: The model to load has {} animation weighs, but "
+                   "max {} is supported",
+                   mesh->mBones[boneIndex]->mNumWeights, 4);
     }
+
+#if 0
+    std::size_t numWeights =
+        std::min(static_cast<std::size_t>(mesh->mBones[boneIndex]->mNumWeights),
+                 static_cast<std::size_t>(4));
+#else
+    std::size_t numWeights = mesh->mBones[boneIndex]->mNumWeights;
+#endif
 
     for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex) {
       int vertexId = weights[weightIndex].mVertexId;
