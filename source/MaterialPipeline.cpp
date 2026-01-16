@@ -3,22 +3,6 @@
 
 #include <format>
 
-void sort_light(Logger* logger,
-				SortedLights* sorted,
-				Light light)
-{
-	if (auto p = std::get_if<DirectionalLight>(&light))
-		sorted->directionals.push_back(*p);
-	else if (auto p = std::get_if<PointLight>(&light))
-		sorted->points.push_back(*p);
-	else if (auto p = std::get_if<SpotLight>(&light))
-		sorted->spots.push_back(*p);
-	else {
-		logger->warn(std::source_location::current(),
-					 "Found unknown Light that can not be sorted and used for drawing");
-	}
-}
-
 MaterialPipeline::MaterialPipeline(Logger& logger,
 								   Render::Context::Impl* context,
 								   Presenter::Impl* presenter,
@@ -595,7 +579,6 @@ MaterialPipeline& MaterialPipeline::operator=(MaterialPipeline&& rhs) noexcept
 	std::swap(m_layout, rhs.m_layout);
 	std::swap(m_pipeline, rhs.m_pipeline);
 	std::swap(m_global_set_layout, rhs.m_global_set_layout);
-	std::swap(m_global_set_layout, rhs.m_global_set_layout);
 	std::swap(m_global_set_uniforms, rhs.m_global_set_uniforms);
 	std::swap(m_ambient, rhs.m_ambient);
 	std::swap(m_diffuse, rhs.m_diffuse);
@@ -612,7 +595,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							  Logger& logger,
 							  vk::Device& device,
 							  vk::DescriptorPool descriptor_pool,
-							  TexturedMeshCache& texturedmesh_cache,
+							  MeshCache& mesh_cache,
 							  TextureSamplerCache& texturesampler_cache,
 							  vk::CommandBuffer& commandbuffer,
 							  CurrentFlightFrame const current_flightframe,
@@ -709,15 +692,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 																		 &lightarray_lengths_data,
 																		 lightarray_lengths_count);
 
-#if 0
-	const auto msg = std::format("Pointlights: {}\nSpotlights: {}\n DirLights: {}",
-								 lightarray_lengths_data.point_length,
-								 lightarray_lengths_data.spot_length,
-								 lightarray_lengths_data.directional_length);
-	logger.info(std::source_location::current(),
-				msg.c_str());
-#endif	
-	
+
 	if (shadowcasters.directional.caster.has_value()) {
 		DirectionalShadowCasterUniformData data(shadowcasters.directional.caster.value());
 		m_global_set_uniforms[*current_flightframe]
@@ -754,12 +729,14 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 							   m_pipeline.get());
 	
 	//NOTE: thsese MUST match the indices of each individual set
-	std::array<vk::DescriptorSet, 5> init_sets{
+	std::array<vk::DescriptorSet, 7> init_sets{
 		m_global_set_uniforms[*current_flightframe].set.get(),
 		m_ambient.sets[&m_ambient.default_texture][*current_flightframe].get(),
 		m_diffuse.sets[&m_diffuse.default_texture][*current_flightframe].get(),
 		m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
 		m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
+		shadowcasters.directional.descriptorset,
+		shadowcasters.spot.descriptorset,
 	};
 
 	const uint32_t first_set = 0;
@@ -778,6 +755,11 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 
 	int i = 0;
 	for (MaterialRenderable& renderable: renderables) {
+
+          if (!renderable.mesh.has_value()) {
+			  logger.error(std::source_location::current(), "Got Renderable that has no Mesh!");
+			  continue;
+          }
 		
 		auto try_get_texture_from_cache =
 			[] (TextureSamplerCache& texturesampler_cache, std::optional<TextureSamplerRef> ref)
@@ -796,9 +778,9 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		
 		TextureSamplerReadOnly* ambient_texture = try_get_texture_from_cache(texturesampler_cache,
 																			 renderable.ambient);
-		if (!ambient_texture) 
+		if (ambient_texture == nullptr) {
 			ambient_texture = &m_ambient.default_texture;
-
+		}
 		if (ambient_texture != last_ambient_texture) {
 			if (!m_ambient.sets.contains(ambient_texture)) {
 				m_ambient.sets.insert({ambient_texture,
@@ -826,9 +808,6 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		}
 
 		TextureSamplerReadOnly* diffuse_texture = try_get_texture_from_cache(texturesampler_cache, renderable.diffuse);
-		if (!diffuse_texture) 
-			diffuse_texture = &m_diffuse.default_texture;
-		
 		if (diffuse_texture == nullptr) {
 			diffuse_texture = &m_diffuse.default_texture;
 		}
@@ -857,11 +836,11 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 											 nullptr);
 			last_diffuse_texture = diffuse_texture;
 		}
+
+
 	
 		TextureSamplerReadOnly* specular_texture = try_get_texture_from_cache(texturesampler_cache,
 																			  renderable.specular);
-		if (!specular_texture) 
-			specular_texture = &m_specular.default_texture;
 	
 		if (specular_texture == nullptr) {
 			specular_texture = &m_specular.default_texture;
@@ -894,8 +873,9 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		
 		TextureSamplerReadOnly* normal_texture = try_get_texture_from_cache(texturesampler_cache,
 																			renderable.normal);
-		if (!normal_texture) 
+		if (!normal_texture) {
 			normal_texture = &m_normal.default_texture;
+		}
 		
 		if (normal_texture != last_normal_texture) {
 			if (!m_normal.sets.contains(normal_texture)) {
@@ -907,7 +887,8 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 
 				logger.info(std::source_location::current(),
 							"Added new normal texture to cache");
-			}	
+			}
+
 
 			{
 			std::array<vk::DescriptorSet, 1> descriptorset{
@@ -922,37 +903,8 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 											 nullptr);
 			last_normal_texture = normal_texture;
 			}
-			
-			{
-			std::array<vk::DescriptorSet, 1> descriptorset{
-				shadowcasters.directional.descriptorset
-			};
-			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-											 m_layout.get(),
-											 directional_shadowcaster_set_index,
-											 descriptorset.size(),
-											 descriptorset.data(),
-											 0,
-											 nullptr);
-			}
-			
-			{
-			std::array<vk::DescriptorSet, 1> descriptorset{
-				shadowcasters.spot.descriptorset
-			};
-			commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-											 m_layout.get(),
-											 spot_shadowcaster_set_index,
-											 descriptorset.size(),
-											 descriptorset.data(),
-											 0,
-											 nullptr);
-			}
 		}
 		
-		if (!renderable.mesh.has_value())
-			continue;
-
 		PushConstants push{};
 		push.model = renderable.model;
 		const uint32_t push_offset = 0;
@@ -965,11 +917,12 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		const uint32_t firstBinding = 0;
 		const uint32_t bindingCount = 1;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
-		
-		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
+		TexturedMesh* mesh = mesh_cache.get(renderable.mesh.value());
+		uint32_t vertices_length = mesh->vertexbuffer.impl->length;
 		std::array<vk::Buffer, bindingCount> buffers {
-			mesh->vertexbuffer.impl->buffer.get(),
+			mesh->vertexbuffer.impl->buffer.get()                 
 		};
+
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
 										buffers.data(),
@@ -978,7 +931,7 @@ void MaterialPipeline::render(MaterialPipeline::FrameInfo& frame_info,
 		const uint32_t instanceCount = 1;
 		const uint32_t firstVertex = 0;
 		const uint32_t firstInstance = 0;
-		commandbuffer.draw(mesh->vertexbuffer.impl->length,
+		commandbuffer.draw(vertices_length,
 						   instanceCount,
 						   firstVertex,
 						   firstInstance);

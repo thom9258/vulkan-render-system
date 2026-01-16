@@ -23,22 +23,18 @@
 #include <algorithm>
 #include <map>
 
-struct MaterialPipeline
+struct AnimatedPipeline
 {
-	MaterialPipeline() = default;
-	explicit MaterialPipeline(Logger& logger,
+	AnimatedPipeline() = default;
+	explicit AnimatedPipeline(Logger& logger,
 							  Render::Context::Impl* context,
 							  Presenter::Impl* presenter,
 							  DescriptorPool::Impl* descriptor_pool,
 							  vk::RenderPass& renderpass,
 							  std::filesystem::path const shader_root_path);
 
-	~MaterialPipeline();
+	~AnimatedPipeline();
 	
-	/* The Camera descriptor loads persistent perspective
-	 * data, and should happen as a single descriptor load
-	 * every frame.
-	 */
 	struct FrameInfo
 	{
 		glm::mat4 view;
@@ -62,8 +58,10 @@ struct MaterialPipeline
 		};
 		SpotShadowCasterTexture spot;
 	};
-	
-	void render(FrameInfo& frame_info,
+
+        void render(
+							  Render::Context::Impl *context, 
+					FrameInfo& frame_info,
 				Logger& logger,
 				vk::Device& device,
 				vk::DescriptorPool descriptor_pool,
@@ -72,18 +70,16 @@ struct MaterialPipeline
 				vk::CommandBuffer& commandbuffer,
 				CurrentFlightFrame const current_flightframe,
 				MaxFlightFrames const max_frames_in_flight,
-				std::vector<MaterialRenderable>& renderables,
+				std::vector<AnimatedRenderable>& renderables,
 				std::vector<Light>& lights,
 				MaterialShadowCasters shadowcasters);
 
-	MaterialPipeline(MaterialPipeline&& rhs) noexcept;
-	MaterialPipeline& operator=(MaterialPipeline&& rhs) noexcept;
+	AnimatedPipeline(AnimatedPipeline&& rhs) noexcept;
+	AnimatedPipeline& operator=(AnimatedPipeline&& rhs) noexcept;
+	
 	
 private:
-	struct PushConstants {
-		glm::mat4 model;
-	};
-	
+
 	vk::UniquePipelineLayout m_layout;
     vk::UniquePipeline m_pipeline;
 	
@@ -107,6 +103,7 @@ private:
 	static constexpr size_t lightarray_lengths_count = 1;
 	static constexpr size_t directional_shadowcasters_count = 1;
 	static constexpr size_t spot_shadowcasters_count = 1;
+	static constexpr size_t model_infos_count = 1;
 
 	static constexpr uint32_t directional_shadowcaster_set_index = 5;
 	static constexpr uint32_t spot_shadowcaster_set_index = 6;
@@ -129,6 +126,25 @@ private:
 	
 	vk::UniqueDescriptorSetLayout m_global_set_layout;
 	FlightFramesArray<GlobalSetUniform> m_global_set_uniforms;
+	
+	static constexpr std::size_t max_bone_matrices = 100;
+	struct ModelInfoUniformData {
+		glm::mat4 model_matrix;
+		glm::ivec4 bind_info;
+		glm::mat4 bone_matrices[max_bone_matrices];
+	};
+
+	struct ModelInfoUniform
+	{
+		vk::UniqueDescriptorSet set;
+		UniformMemory<ModelInfoUniformData> uniform; 
+	};
+	static constexpr uint32_t model_info_uniform_count = 1;
+	static constexpr uint32_t model_info_set_index = 7;
+	static constexpr size_t model_info_uniforms_per_frame = 10;
+	using ModelInfoUniformPool = std::array<ModelInfoUniform, model_info_uniforms_per_frame>;
+	vk::UniqueDescriptorSetLayout m_model_info_layout;
+	FlightFramesArray<ModelInfoUniformPool> m_model_info_uniform_pools;
 
 	//TODO make all the samplers part of a single sampler uniform set
 	TextureDescriptor<DescriptorSetIndex{1}> m_ambient;
@@ -139,4 +155,3 @@ private:
 	vk::UniqueDescriptorSetLayout m_directional_shadowmap_layout;
 	vk::UniqueDescriptorSetLayout m_spot_shadowmap_layout;
 };
-

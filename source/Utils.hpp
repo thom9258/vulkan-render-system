@@ -133,6 +133,24 @@ create_staging_buffer(vk::PhysicalDevice& physical_device,
 					  void const* data,
 					  const vk::DeviceSize size);
 
+struct StagingMemory
+{
+	vk::UniqueBuffer buffer; 
+	vk::UniqueDeviceMemory memory;
+};
+
+[[nodiscard]]
+StagingMemory
+allocate_staging_memory(vk::PhysicalDevice& physical_device,
+						vk::Device& device,
+						const vk::DeviceSize size);
+
+void
+copy_to_staging_buffer(vk::Device& device,
+					   StagingMemory& allocated_memory,
+					   void const* data,
+					   const size_t size);
+
 struct AllocatedImage
 {
 	vk::UniqueImage image;
@@ -195,5 +213,12 @@ copy_buffer_to_image(vk::Buffer& buffer,
 					 const uint32_t width,
 					 const uint32_t height,
 					 vk::CommandBuffer& commandbuffer);
+
+void
+copy_staging_to_uniform(StagingMemory& staging,
+						AllocatedMemory& uniform,
+						const vk::DeviceSize size,
+						vk::CommandBuffer& commandbuffer);
+
 
 #endif //_VULKANRENDERER_UTILS_

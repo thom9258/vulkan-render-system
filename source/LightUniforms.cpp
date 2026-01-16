@@ -94,3 +94,18 @@ SpotShadowCasterUniformData::SpotShadowCasterUniformData(
 {}
 
 
+void sort_light(Logger* logger,
+				SortedLights* sorted,
+				Light light)
+{
+	if (auto p = std::get_if<DirectionalLight>(&light))
+		sorted->directionals.push_back(*p);
+	else if (auto p = std::get_if<PointLight>(&light))
+		sorted->points.push_back(*p);
+	else if (auto p = std::get_if<SpotLight>(&light))
+		sorted->spots.push_back(*p);
+	else {
+		logger->warn(std::source_location::current(),
+					 "Found unknown Light that can not be sorted and used for drawing");
+	}
+}

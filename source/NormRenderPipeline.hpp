@@ -355,7 +355,7 @@ create_norm_render_pipeline(Logger& logger,
 
 void draw_normcolors(vk::Device& device,
 					 NormRenderPipeline& pipeline,
-					 TexturedMeshCache& texturedmesh_cache,
+					 MeshCache& mesh_cache,
 					 vk::CommandBuffer& commandbuffer,
 					 const uint32_t frame_in_flight,
 					 const NormColorRenderInfo& info,
@@ -396,7 +396,7 @@ void draw_normcolors(vk::Device& device,
 	for (auto renderable: renderables) {
 		if (!renderable.mesh.has_value())
 			continue;
-		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
+		TexturedMesh* mesh = mesh_cache.get(renderable.mesh.value());
 		if (!mesh)
 			continue;
 		

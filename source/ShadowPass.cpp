@@ -157,7 +157,7 @@ OrthographicShadowPass::OrthographicShadowPass(Logger& logger,
 
 void OrthographicShadowPass::record(Logger* logger,
 									vk::Device& device,
-									TexturedMeshCache& texturedmesh_cache,
+									MeshCache& mesh_cache,
 									CurrentFlightFrame current_flightframe,
 									vk::CommandBuffer& commandbuffer,
 									std::optional<CameraUniformData> camera_data,
@@ -165,7 +165,7 @@ void OrthographicShadowPass::record(Logger* logger,
 {
 	GenericShadowPass::record(logger,
 							  device,
-							  texturedmesh_cache,
+							  mesh_cache,
 							  current_flightframe,
 							  commandbuffer,
 							  camera_data,
@@ -199,7 +199,7 @@ PerspectiveShadowPass::PerspectiveShadowPass(Logger& logger,
 
 void PerspectiveShadowPass::record(Logger* logger,
 								   vk::Device& device,
-								   TexturedMeshCache& texturedmesh_cache,
+								   MeshCache& mesh_cache,
 								   CurrentFlightFrame current_flightframe,
 								   vk::CommandBuffer& commandbuffer,
 								   std::optional<CameraUniformData> camera_data,
@@ -207,7 +207,7 @@ void PerspectiveShadowPass::record(Logger* logger,
 {
 	GenericShadowPass::record(logger,
 							  device,
-							  texturedmesh_cache,
+							  mesh_cache,
 							  current_flightframe,
 							  commandbuffer,
 							  camera_data,
@@ -628,7 +628,7 @@ GenericShadowPass::GenericShadowPass(Logger& logger,
 
 void GenericShadowPass::record(Logger* logger,
 							   vk::Device& device,
-							   TexturedMeshCache& texturedmesh_cache,
+							   MeshCache& mesh_cache,
 							   CurrentFlightFrame current_flightframe,
 							   vk::CommandBuffer& commandbuffer,
 							   std::optional<CameraUniformData> camera_data,
@@ -720,21 +720,22 @@ void GenericShadowPass::record(Logger* logger,
 		const uint32_t firstBinding = 0;
 		const uint32_t bindingCount = 1;
 		std::array<vk::DeviceSize, bindingCount> offsets = {0};
-		
-		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
+
+		TexturedMesh* mesh = mesh_cache.get(renderable.mesh.value());
+		uint32_t vertex_length = mesh->vertexbuffer.impl->length;
 		std::array<vk::Buffer, bindingCount> buffers {
-			mesh->vertexbuffer.impl->buffer.get(),
+			mesh->vertexbuffer.impl->buffer.get()                 
 		};
+
 		commandbuffer.bindVertexBuffers(firstBinding,
 										bindingCount,
 										buffers.data(),
 										offsets.data());
 		
-		
 		const uint32_t instanceCount = 1;
 		const uint32_t firstVertex = 0;
 		const uint32_t firstInstance = 0;
-		commandbuffer.draw(mesh->vertexbuffer.impl->length,
+		commandbuffer.draw(vertex_length,
 						   instanceCount,
 						   firstVertex,
 						   firstInstance);

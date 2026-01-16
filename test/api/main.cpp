@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <print>
 #include <ranges>
 #include <sstream>
 #include <streambuf>
@@ -29,6 +30,14 @@
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+
+void insert_animator(Animator *animator, RenderableNodePtr &renderable) {
+  for (RenderableNode::Model &model : renderable->models) {
+    if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+      p->animator = animator;
+    }
+  }
+}
 
 std::filesystem::path root = "../../../";
 std::filesystem::path shaders_root = root / "compiled_shaders/";
@@ -75,6 +84,7 @@ std::vector<VertexPosNormColorUV> triangle_vertices = {
 
 struct Scene {
   std::vector<Renderable> renderables;
+  std::vector<std::unique_ptr<Animator>> animators;
   std::vector<Light> lights;
   ShadowCasters shadowcasters;
 };
@@ -90,11 +100,15 @@ auto parse_transform(json j) -> Render::Transform {
   return {pos, rot, scale};
 }
 
+using LoadedAsset = std::variant<RenderableNodePtr, LoadedAnimatedModel>;
+
+std::map<std::string, LoadedAsset> loaded_assets;
+
 auto load_scene_from_path(std::filesystem::path const path,
-						  Render::Context &context,
-						  TextureSamplerCache &texture_cache,
-						  TexturedMeshCache &texturedmesh_cache,
-                          Resources &resources) -> Scene {
+                          Render::Context &context,
+                          TextureSamplerCache &texture_cache,
+                          MeshCache &mesh_cache, Resources &resources)
+    -> Scene {
   std::ifstream fs(path.string());
   std::string content;
   fs.seekg(0, std::ios::end);
@@ -105,28 +119,31 @@ auto load_scene_from_path(std::filesystem::path const path,
                  std::istreambuf_iterator<char>());
 
   json j = json::parse(content);
-  
-  std::map<std::string, RenderableNodePtr> loaded_assets;
 
   json assets = j["assets"];
   for (auto &asset : assets) {
-	  std::string name = asset["name"];
-	  std::string path = asset["path"];
-	  
-	  RenderableNodePtr loaded_model = load_model(context,
-												  texturedmesh_cache,
-												  texture_cache,
-												  path);
-	  
-	  if (loaded_model) {
-		  loaded_assets[name] = loaded_model;
-		  std::cout << std::format("Loaded asset {} from path: {}", name, path) << std::endl;
-	  } else {
-		  std::cout << std::format("Could NOT Load asset {} from path: {}", name, path) << std::endl;
-	  }
+    std::string name = asset["name"];
+    std::string path = asset["path"];
+    std::string draw_mode = asset["draw-mode"];
 
-
-
+    if (draw_mode == "static") {
+      RenderableNodePtr loaded_model =
+          load_model(context, mesh_cache, texture_cache, path);
+      if (loaded_model != nullptr) {
+        loaded_assets[name] = loaded_model;
+      } else {
+        std::println("Could NOT Load asset {} from path: {}", name, path);
+      }
+    } else if (draw_mode == "animated") {
+      std::expected<LoadedAnimatedModel, std::string> loaded_model =
+          load_animated_model(context, mesh_cache, texture_cache, path);
+      if (loaded_model.has_value()) {
+        loaded_assets[name] = loaded_model.value();
+      } else {
+        std::println("Could NOT Load asset {} from path: {}, error: {}", name,
+                     path, loaded_model.error());
+      }
+    }
   }
 
   Scene scene;
@@ -179,7 +196,7 @@ auto load_scene_from_path(std::filesystem::path const path,
       } else if (prefab["draw-mode"] == "wireframe") {
         WireframeRenderable chest{};
         chest.mesh = resources.chest.textured_mesh;
-		chest.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+        chest.basecolor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
         chest.model = transform.as_matrix();
         scene.renderables.push_back(chest);
       } else {
@@ -261,15 +278,34 @@ auto load_scene_from_path(std::filesystem::path const path,
         std::cout << "Unknown draw mode for " << name << std::endl;
       }
     } else {
-		auto found = loaded_assets.find(name);
-		if (found == loaded_assets.end()) {
-			std::cout << "Unknown renderable " << name << std::endl;
-			continue;
-		}
 
-		RenderableNodePtr renderable = found->second;
-        renderable->model = transform.as_matrix();
-        scene.renderables.push_back(renderable);
+      auto found = loaded_assets.find(name);
+      if (found == loaded_assets.end()) {
+        std::cout << "Unknown renderable " << name << std::endl;
+        continue;
+      }
+
+      LoadedAsset& asset = found->second;
+      if (auto p = std::get_if<RenderableNodePtr>(&asset)) {
+        std::println("added loaded static asset");
+        (*p)->model_matrix = transform.as_matrix();
+        scene.renderables.push_back(*p);
+      } else if (auto p = std::get_if<LoadedAnimatedModel>(&asset)) {
+        std::println("added loaded animated asset");
+        p->renderable->model_matrix = transform.as_matrix();
+		auto animator = std::make_unique<Animator>();
+
+
+        std::size_t animation_index = prefab["animation"];
+		std::println("Creating animated model {}", name);
+
+		animator->PlayAnimation(&p->animations.at(animation_index));
+        foreach_node(std::bind_front(insert_animator, animator.get()),
+                     p->renderable);
+
+        scene.renderables.push_back(p->renderable);
+        scene.animators.push_back(std::move(animator));
+      }
     }
   }
 
@@ -284,13 +320,16 @@ auto load_scene_from_path(std::filesystem::path const path,
       p.specular = parse_vec3(obj["specular"]);
       p.diffuse = parse_vec3(obj["diffuse"]);
 
-      const float near_plane = 0.1f, far_plane = 30.0f;
+      const float ortho_size = 50.0f;
+      const float near_plane = 0.1f;
+      const float far_plane = ortho_size * 2;
       const glm::vec3 position = parse_vec3(obj["position"]);
 
-      DirectionalShadowCaster caster{
-          OrthographicProjection{
-              glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane)},
-          p, PositionVector{position}, UpVector{world_up}};
+      DirectionalShadowCaster caster{OrthographicProjection{glm::ortho(
+                                         -ortho_size, ortho_size, -ortho_size,
+                                         ortho_size, near_plane, far_plane)},
+                                     p, PositionVector{position},
+                                     UpVector{world_up}};
 
       if (obj["casts-shadow"] == "yes") {
         scene.shadowcasters.directional_caster = caster;
@@ -480,9 +519,9 @@ int main(int argc, char **argv) {
   DescriptorPool descriptor_pool(descriptor_pool_info, context);
 
   TextureSamplerCache texture_cache;
-  TexturedMeshCache texturedmesh_cache;
+  MeshCache mesh_cache;
   Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
-  Resources resources{context, texturedmesh_cache, texture_cache, assets_root};
+  Resources resources{context, mesh_cache, texture_cache, assets_root};
 
   std::cout << "STARTING DRAW LOOP" << std::endl;
   /** ************************************************************************
@@ -490,138 +529,154 @@ int main(int argc, char **argv) {
    */
   SDL_Event event{};
   bool reload_scene = false;
-  Scene scene = load_scene_from_path(scene_path, context, texture_cache, texturedmesh_cache, resources);
+  Scene scene = load_scene_from_path(scene_path, context, texture_cache,
+                                     mesh_cache, resources);
+
   bool exit = false;
   uint64_t framecount = 0;
-  // std::size_t scene_index = 0;
+  double delta_time = 0;
+  double total_time = 0;
 
   while (!exit) {
-    /** ************************************************************************
-     * Handle Inputs
-     */
-    glm::vec3 const camera_right = camera.rotation[0];
-    glm::vec3 const camera_up = camera.rotation[1];
-    glm::vec3 const camera_forward = camera.rotation[2];
-    float constexpr move_speed = 0.5f;
-    float constexpr rotate_speed = 3.0f;
 
-    while (SDL_PollEvent(&event)) {
-      switch (event.type) {
-      case SDL_QUIT:
-        exit = true;
-        break;
+    for (std::unique_ptr<Animator> &animator : scene.animators) {
+      animator->UpdateAnimation(delta_time / 1000);
+    }
 
-      case SDL_KEYDOWN:
-        switch (event.key.keysym.sym) {
-        case SDLK_ESCAPE:
+    auto duration_delta_time = with_time_measurement([&]() {
+      /** ************************************************************************
+       * Handle Inputs
+       */
+      glm::vec3 const camera_right = camera.rotation[0];
+      glm::vec3 const camera_up = camera.rotation[1];
+      glm::vec3 const camera_forward = camera.rotation[2];
+      float constexpr move_speed = 0.5f;
+      float constexpr rotate_speed = 3.0f;
+
+      while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_QUIT:
           exit = true;
           break;
 
-          //			case SDLK_n:
-          //				scene_index++;
-          //				break;
-        case SDLK_w:
-          camera.position += camera_forward * move_speed;
+        case SDL_KEYDOWN:
+          switch (event.key.keysym.sym) {
+          case SDLK_ESCAPE:
+            exit = true;
+            break;
+
+            //			case SDLK_n:
+            //				scene_index++;
+            //				break;
+          case SDLK_w:
+            camera.position += camera_forward * move_speed;
+            break;
+          case SDLK_s:
+            camera.position += camera_forward * -move_speed;
+            break;
+          case SDLK_d:
+            camera.position += camera_right * -move_speed;
+            break;
+          case SDLK_a:
+            camera.position += camera_right * move_speed;
+            break;
+          case SDLK_e:
+            camera.position += camera_up * -move_speed;
+            break;
+          case SDLK_q:
+            camera.position += camera_up * move_speed;
+            break;
+          case SDLK_r:
+            reload_scene = true;
+            break;
+          case SDLK_LEFT:
+            camera.rotation =
+                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                      glm::radians(rotate_speed), world_up));
+            break;
+          case SDLK_RIGHT:
+            camera.rotation =
+                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                      glm::radians(-rotate_speed), world_up));
+            break;
+          case SDLK_UP:
+            camera.rotation =
+                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                      glm::radians(rotate_speed), world_right));
+            break;
+          case SDLK_DOWN:
+            camera.rotation = glm::mat3(glm::rotate(glm::mat4(camera.rotation),
+                                                    glm::radians(-rotate_speed),
+                                                    world_right));
+            break;
+          }
           break;
-        case SDLK_s:
-          camera.position += camera_forward * -move_speed;
-          break;
-        case SDLK_d:
-          camera.position += camera_right * -move_speed;
-          break;
-        case SDLK_a:
-          camera.position += camera_right * move_speed;
-          break;
-        case SDLK_e:
-          camera.position += camera_up * -move_speed;
-          break;
-        case SDLK_q:
-          camera.position += camera_up * move_speed;
-          break;
-        case SDLK_r:
-          reload_scene = true;
-          break;
-        case SDLK_LEFT:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(rotate_speed), world_up));
-          break;
-        case SDLK_RIGHT:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(-rotate_speed), world_up));
-          break;
-        case SDLK_UP:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(rotate_speed), world_right));
-          break;
-        case SDLK_DOWN:
-          camera.rotation =
-              glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                    glm::radians(-rotate_speed), world_right));
-          break;
+
+        case SDL_WINDOWEVENT: {
+          switch (event.window.event) {
+          case SDL_WINDOWEVENT_RESIZED:
+          case SDL_WINDOWEVENT_SIZE_CHANGED:
+            context.window_resize_event_triggered();
+            // TODO: DO RESIZE
+            break;
+          case SDL_WINDOWEVENT_CLOSE:
+            exit = true;
+            break;
+          }
+        } break;
         }
-        break;
+      }
 
-      case SDL_WINDOWEVENT: {
-        switch (event.window.event) {
-        case SDL_WINDOWEVENT_RESIZED:
-        case SDL_WINDOWEVENT_SIZE_CHANGED:
-          context.window_resize_event_triggered();
-          // TODO: DO RESIZE
-          break;
-        case SDL_WINDOWEVENT_CLOSE:
-          exit = true;
-          break;
+      world_info.camera_position = camera.position;
+      world_info.view = camera.view();
+
+      /** ************************************************************************
+       * Render Loop
+       */
+      FrameProducer frameGenerator =
+          [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
+        if (reload_scene) {
+          scene = load_scene_from_path(scene_path, context, texture_cache,
+                                       mesh_cache, resources);
+          reload_scene = false;
         }
-      } break;
+
+        auto *textureptr = renderer.render(&context,
+            texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
+            frameInfo.total_frame_count, world_info, scene.renderables,
+            scene.lights, scene.shadowcasters);
+
+        if (textureptr == nullptr)
+          return std::nullopt;
+        return textureptr;
+      };
+
+      auto render_time = with_time_measurement(
+          [&]() { presenter.with_presentation(frameGenerator); });
+
+      if (slowframes) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       }
-    }
+      if (printframerate) {
+        if (framecount % printframerateinterval == 0) {
+          const auto frame_time_ms =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  render_time);
 
-    world_info.camera_position = camera.position;
-    world_info.view = camera.view();
-
-    /** ************************************************************************
-     * Render Loop
-     */
-    FrameProducer frameGenerator =
-        [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
-		
-		if (reload_scene) {
-			scene = load_scene_from_path(scene_path, context, texture_cache, texturedmesh_cache, resources);
-			reload_scene = false;
-		}
-
-
-      auto *textureptr =
-          renderer.render(texture_cache, texturedmesh_cache, frameInfo.current_flight_frame_index,
-                          frameInfo.total_frame_count, world_info,
-                          scene.renderables, scene.lights, scene.shadowcasters);
-
-      if (textureptr == nullptr)
-        return std::nullopt;
-      return textureptr;
-    };
-
-    auto render_time = with_time_measurement(
-        [&]() { presenter.with_presentation(frameGenerator); });
-
-    if (slowframes) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    }
-    if (printframerate) {
-      if (framecount % printframerateinterval == 0) {
-        const auto frame_time_ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(render_time);
-
-        std::cout << "Frame Time [ms]: " << frame_time_ms.count() << "\n"
-                  << "Frame Count:     " << framecount << "\n"
-                  << "=====================================" << std::endl;
+          std::cout << "Frame Time [ms]: " << frame_time_ms.count() << "\n"
+                    << "Frame Count:     " << framecount << "\n"
+                    << "=====================================" << std::endl;
+        }
       }
-    }
 
-    framecount++;
+      framecount++;
+    });
+
+    delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     duration_delta_time)
+                     .count();
+
+    total_time += delta_time;
   }
 
   context.wait_until_idle();

@@ -364,6 +364,22 @@ copy_to_allocated_memory(vk::Device& device,
 										 0,
 										 size,
 										 vk::MemoryMapFlags());
+	if (!staging_ptr) throw std::runtime_error("COULD NOT MAP ALLOCATED MEMORY");
+	memcpy(staging_ptr, data, size);
+	device.unmapMemory(allocated_memory.memory.get());
+}
+
+void
+copy_to_staging_buffer(vk::Device& device,
+						 StagingMemory& allocated_memory,
+						 void const* data,
+						 const size_t size)
+{
+	void* staging_ptr = device.mapMemory(allocated_memory.memory.get(),
+										 0,
+										 size,
+										 vk::MemoryMapFlags());
+	if (!staging_ptr) throw std::runtime_error("COULD NOT MAP STAGING BUFFER");
 	memcpy(staging_ptr, data, size);
 	device.unmapMemory(allocated_memory.memory.get());
 }
@@ -389,6 +405,24 @@ create_staging_buffer(vk::PhysicalDevice& physical_device,
 							 size);
 	return staging;
 }
+
+StagingMemory allocate_staging_memory(vk::PhysicalDevice &physical_device,
+									  vk::Device &device,
+									  vk::DeviceSize size) {
+ 	AllocatedMemory buffer =
+		allocate_memory(physical_device,
+							  device, 
+							  size,
+							  vk::BufferUsageFlagBits::eTransferSrc,
+							  vk::MemoryPropertyFlagBits::eHostVisible
+							  | vk::MemoryPropertyFlagBits::eHostCoherent);
+ 
+	StagingMemory staging;
+	std::swap(staging.memory, buffer.memory);
+	std::swap(staging.buffer, buffer.buffer);
+	return staging;
+}    
+
 
 vk::Image&
 get_image(AllocatedImage& allocatedImage)
@@ -629,4 +663,14 @@ copy_buffer_to_image(vk::Buffer& buffer,
 }
 
 
+void
+copy_staging_to_uniform(StagingMemory& staging,
+						AllocatedMemory& uniform,
+						const vk::DeviceSize size,
+						vk::CommandBuffer& commandbuffer)
+{
+  auto buffercopy = vk::BufferCopy{}.setSrcOffset(0)
+	  .setDstOffset(0).setSize(size);
 
+  commandbuffer.copyBuffer(staging.buffer.get(), uniform.buffer.get(), {buffercopy});
+}

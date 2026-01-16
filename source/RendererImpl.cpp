@@ -36,6 +36,8 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
     sorted->wireframes.push_back(*p);
   else if (auto p = std::get_if<MaterialRenderable>(&renderable))
     sorted->materialrenderables.push_back(*p);
+  else if (auto p = std::get_if<AnimatedRenderable>(&renderable))
+    sorted->animated_renderables.push_back(*p);
   else if (auto p = std::get_if<RenderableNodePtr>(&renderable))
     sorted->renderablenodes.push_back(*p);
   else {
@@ -44,37 +46,52 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
   }
 }
 
-auto unwind_renderablenode(std::vector<MaterialRenderable> &renderables,
+auto unwind_renderablenode(std::vector<MaterialRenderable> &simple,
+						   std::vector<AnimatedRenderable> &animated,
 						   glm::mat4 parent_model_matrix,
                            RenderableNode *node) -> void {
   if (!node)
     return;
   
-  glm::mat4 model_matrix = node->model * parent_model_matrix;
+  glm::mat4 model_matrix = node->model_matrix * parent_model_matrix;
 
-  for (auto &mesh : node->meshes) {
-    MaterialRenderable renderable;
-    renderable.model = model_matrix;
-    renderable.mesh = mesh.mesh;
-    renderable.ambient = mesh.ambient;
-    renderable.diffuse = mesh.diffuse;
-    renderable.specular = mesh.specular;
-    renderable.normal = mesh.normal;
-    renderable.has_shadow = mesh.has_shadow;
-	renderables.push_back(renderable);
+  for (auto &mesh : node->models) {
+	  if (auto* p = std::get_if<RenderableNode::SimpleModel>(&mesh)) {
+		  MaterialRenderable renderable;
+		  renderable.model = model_matrix;
+		  renderable.mesh = p->mesh;
+		  renderable.ambient = p->ambient;
+		  renderable.diffuse = p->diffuse;
+		  renderable.specular = p->specular;
+		  renderable.normal = p->normal;
+		  renderable.has_shadow = p->has_shadow;
+		  simple.push_back(renderable);
+	  }
+	  else if (auto* p = std::get_if<RenderableNode::AnimatedModel>(&mesh)) {
+		  AnimatedRenderable renderable;
+		  renderable.model = model_matrix;
+		  renderable.mesh = p->mesh;
+		  renderable.ambient = p->ambient;
+		  renderable.diffuse = p->diffuse;
+		  renderable.specular = p->specular;
+		  renderable.normal = p->normal;
+		  renderable.has_shadow = p->has_shadow;
+		  renderable.animator = p->animator;
+		  animated.push_back(renderable);
+	  }
   }
 
   for (auto &child : node->children) {
-    unwind_renderablenode(renderables, model_matrix, child.get());
+    unwind_renderablenode(simple, animated, model_matrix, child.get());
   }
 }
 
-auto unwind_renderablenode(RenderableNode *node)
-    -> std::vector<MaterialRenderable> {
-  std::vector<MaterialRenderable> renderables;
+void unwind_renderablenode(std::vector<MaterialRenderable>& simple,
+						   std::vector<AnimatedRenderable>& animated,
+						   RenderableNode *node)
+{
   glm::mat4 parent_model_matrix(1.0f);
-  unwind_renderablenode(renderables, parent_model_matrix, node);
-  return renderables;
+  unwind_renderablenode(simple, animated, parent_model_matrix, node);
 }
 
 auto create_geometry_pass(Render::Context::Impl *context,
@@ -218,11 +235,12 @@ auto create_geometry_pass(Render::Context::Impl *context,
 }
 
 auto render_geometry_pass(
+						  Render::Context::Impl* context,
     GeometryPass &pass, Renderer::Impl::ShadowPasses &shadow_passes,
     // TODO: Pipelines are captured as a ptr because bind_front
     //       does not want to capture a reference for it...
     GeometryPipelines *pipelines, Logger *logger,
-    TextureSamplerCache &texture_cache, TexturedMeshCache &texturedmesh_cache,
+    TextureSamplerCache &texture_cache, MeshCache &mesh_cache,
     const uint32_t current_frame_in_flight, const uint32_t max_frames_in_flight,
     const uint64_t total_frames, vk::Device &device,
     vk::DescriptorPool descriptor_pool, vk::CommandPool &command_pool,
@@ -241,13 +259,20 @@ auto render_geometry_pass(
                         std::bind_front(sort_renderable, logger, &sorted));
 
   // TODO: this is PROBABLY dirty to do, but we need to unwind the node tree
-  // into something
+  // into something...
   //       simple the render pipelines can understand...
   for (auto &renderablenode : sorted.renderablenodes) {
-    std::vector<MaterialRenderable> renderables = unwind_renderablenode(
-        renderablenode.get());
-    for (auto &renderable : renderables) {
-      sorted.materialrenderables.push_back(renderable);
+	  std::vector<MaterialRenderable> simple;
+	  std::vector<AnimatedRenderable> animated;
+	  unwind_renderablenode(simple,
+							animated,
+							renderablenode.get());
+
+    for (auto &s : simple) {
+      sorted.materialrenderables.push_back(s);
+    }
+    for (auto &a : animated) {
+      sorted.animated_renderables.push_back(a);
     }
   }
 
@@ -262,7 +287,7 @@ auto render_geometry_pass(
     }
 
     shadow_passes.orthographic.record(
-        logger, device, texturedmesh_cache, CurrentFlightFrame{current_frame_in_flight},
+        logger, device, mesh_cache, CurrentFlightFrame{current_frame_in_flight},
         commandbuffer, ortho_caster_data, sorted.materialrenderables);
 
     std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
@@ -275,7 +300,7 @@ auto render_geometry_pass(
 
     // TODO: have multiple spot casters
     shadow_passes.perspective.record(
-        logger, device, texturedmesh_cache, CurrentFlightFrame{current_frame_in_flight},
+        logger, device, mesh_cache, CurrentFlightFrame{current_frame_in_flight},
         commandbuffer, pers_caster_data, sorted.materialrenderables);
   };
 
@@ -321,13 +346,13 @@ auto render_geometry_pass(
     normcolor_info.view = world_info.view;
     normcolor_info.proj = world_info.projection;
 
-    draw_normcolors(device, pipelines->normcolor, texturedmesh_cache, commandbuffer,
+    draw_normcolors(device, pipelines->normcolor, mesh_cache, commandbuffer,
                     current_frame_in_flight, normcolor_info, sorted.normcolors);
 
     WireframeRenderInfo wireframe_info{};
     wireframe_info.viewproj = world_info.projection * world_info.view;
 
-    draw_wireframes(pipelines->wireframe, texturedmesh_cache, commandbuffer, wireframe_info,
+    draw_wireframes(pipelines->wireframe, mesh_cache, commandbuffer, wireframe_info,
                     sorted.wireframes);
 
     CurrentFlightFrame const current_flightframe{current_frame_in_flight};
@@ -354,9 +379,29 @@ auto render_geometry_pass(
     material_frame_info.proj = world_info.projection;
     material_frame_info.camera_position = world_info.camera_position;
     pipelines->material.render(
-        material_frame_info, *logger, device, descriptor_pool, texturedmesh_cache, texture_cache, commandbuffer,
+        material_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
         current_flightframe, max_flightframes, sorted.materialrenderables,
         lights, material_shadowcasters);
+
+    AnimatedPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture
+        adirectional_texture{dirshadowtexture.descriptorset.get(),
+                            shadowcasters.directional_caster};
+
+    AnimatedPipeline::MaterialShadowCasters::SpotShadowCasterTexture
+        aspot_texture{spotshadowtexture.descriptorset.get(),
+                     shadowcasters.spot_caster};
+
+    AnimatedPipeline::MaterialShadowCasters animated_shadowcasters{
+        adirectional_texture, aspot_texture};
+
+    AnimatedPipeline::FrameInfo animated_frame_info{};
+    animated_frame_info.view = world_info.view;
+    animated_frame_info.proj = world_info.projection;
+    animated_frame_info.camera_position = world_info.camera_position;
+    pipelines->animated.render(context,
+        animated_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
+        current_flightframe, max_flightframes, sorted.animated_renderables,
+        lights, animated_shadowcasters);
 
     commandbuffer.endRenderPass();
   };
@@ -396,6 +441,12 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
   context->logger.info(std::source_location::current(),
                        "Created Material Pipeline");
 
+  geometry_pipelines.animated =
+      AnimatedPipeline(logger, context, presenter, descriptor_pool,
+                       geometry_pass.renderpass.get(), shaders_root);
+  context->logger.info(std::source_location::current(),
+                       "Created Animated Material Pipeline");
+
   geometry_pipelines.normcolor = create_norm_render_pipeline(
       context->logger, context->physical_device, context->device.get(),
       geometry_pass.renderpass.get(), presenter->max_frames_in_flight,
@@ -412,32 +463,37 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
 
 Renderer::Impl::~Impl() {}
 
-auto Renderer::Impl::render(TextureSamplerCache &texture_cache,
-                            TexturedMeshCache &texturedmesh_cache,
+auto Renderer::Impl::render(
+							Render::Context::Impl* context,
+							TextureSamplerCache &texture_cache,
+                            MeshCache &mesh_cache,
                             const uint32_t current_frame_in_flight,
                             const uint64_t total_frames,
                             const WorldRenderInfo &world_info,
                             std::vector<Renderable> &renderables,
                             std::vector<Light> &lights,
                             ShadowCasters &shadowcasters) -> Texture2D::Impl * {
-  return render_geometry_pass(
+  return render_geometry_pass(context,
+
       geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
-      texturedmesh_cache, current_frame_in_flight,
+      mesh_cache, current_frame_in_flight,
       presenter->max_frames_in_flight, total_frames, context->device.get(),
       descriptor_pool->descriptor_pool.get(), presenter->command_pool(),
       context->graphics_queue(), world_info, renderables, lights,
       shadowcasters);
 }
 
-auto Renderer::render(TextureSamplerCache &texture_cache,
-                      TexturedMeshCache &texturedmesh_cache,
+auto Renderer::render(
+					  Render::Context* context,
+					  TextureSamplerCache &texture_cache,
+                      MeshCache &mesh_cache,
                       const uint32_t current_frame_in_flight,
                       const uint64_t total_frames,
                       const WorldRenderInfo &world_info,
                       std::vector<Renderable> &renderables,
                       std::vector<Light> &lights, ShadowCasters &shadowcasters)
     -> Texture2D::Impl * {
-  return impl->render(texture_cache, texturedmesh_cache,
+  return impl->render(context->impl.get(), texture_cache, mesh_cache,
                       current_frame_in_flight, total_frames, world_info,
                       renderables, lights, shadowcasters);
 }

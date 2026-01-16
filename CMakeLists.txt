@@ -19,7 +19,7 @@ find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(assimp REQUIRED)
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE "")
 
 target_include_directories(${PROJECT_NAME} 
@@ -50,12 +50,13 @@ set(PUBLIC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/glm.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Mesh.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ModelLoader.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Animation.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Renderable.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Light.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ShadowCaster.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/ShaderTexture.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/TextureSamplerCache.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/TexturedMeshCache.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/MeshCache.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/StrongType.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Texture.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}${PUBLIC_HEADER_PATH}/Vertex.hpp
@@ -68,6 +69,8 @@ set(PUBLIC_HEADERS
 )
 
 set(PRIVATE_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Arena.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Renderable.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Camera.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/FlightFrames.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ContextImpl.cpp
@@ -79,13 +82,15 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexBufferImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShaderTextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/TextureSamplerCache.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/source/TexturedMeshCache.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/MeshCache.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PipelineUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/AnimatedPipeline.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ModelLoader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/Animation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Utils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/TextureImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexImpl.cpp

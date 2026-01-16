@@ -45,7 +45,6 @@ uniform SpotShadowCasterUniform
 } spot_shadowcaster;
 
 
-
 void main()
 {
      mat4 transform = global.proj * global.view * push.model;

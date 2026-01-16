@@ -235,7 +235,7 @@ create_wireframe_render_pipeline(Logger& logger,
 }
 
 void draw_wireframes(WireframePipeline& pipeline,
-					 TexturedMeshCache& texturedmesh_cache,
+					 MeshCache& mesh_cache,
 					 vk::CommandBuffer& commandbuffer,
 					 const WireframeRenderInfo& info,
 					 std::vector<WireframeRenderable> renderables)
@@ -250,7 +250,7 @@ void draw_wireframes(WireframePipeline& pipeline,
 	for (auto renderable: renderables) {
 		if (!renderable.mesh.has_value())
 			continue;
-		TexturedMesh* mesh = texturedmesh_cache.get(renderable.mesh.value());
+		TexturedMesh* mesh = mesh_cache.get(renderable.mesh.value());
 		if (!mesh)
 			continue;
 

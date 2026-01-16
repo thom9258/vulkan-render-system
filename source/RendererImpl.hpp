@@ -11,6 +11,7 @@
 #include "NormRenderPipeline.hpp"
 #include "WireframePipeline.hpp"
 #include "MaterialPipeline.hpp"
+#include "AnimatedPipeline.hpp"
 
 struct GeometryPass
 {
@@ -28,6 +29,7 @@ struct GeometryPipelines
 	NormRenderPipeline normcolor;
 	WireframePipeline wireframe;
 	MaterialPipeline material;
+	AnimatedPipeline animated;
 };
 
 struct SortedRenderables
@@ -35,6 +37,7 @@ struct SortedRenderables
 	std::vector<NormColorRenderable> normcolors;
 	std::vector<WireframeRenderable> wireframes;
 	std::vector<MaterialRenderable> materialrenderables;
+	std::vector<AnimatedRenderable> animated_renderables;
 	std::vector<RenderableNodePtr> renderablenodes;
 };
 
@@ -48,8 +51,10 @@ public:
 				  const std::filesystem::path shaders_root);
     ~Impl();
 
-    auto render(TextureSamplerCache &texture_cache,
-				TexturedMeshCache& texturedmesh_cache,
+    auto render(
+				Render::Context::Impl* context,
+				TextureSamplerCache &texture_cache,
+				MeshCache& mesh_cache,
                 const uint32_t current_frame_in_flight,
 				const uint64_t total_frames,
 				const WorldRenderInfo& world_info,
@@ -88,7 +93,9 @@ auto create_geometry_pass(vk::PhysicalDevice& physical_device,
 						  const bool debug_print)
 	-> GeometryPass;
 
-auto render_geometry_pass(GeometryPass& pass,
+auto render_geometry_pass(
+				Render::Context::Impl* context,
+						  GeometryPass& pass,
 						  Renderer::Impl::ShadowPasses& shadow_passes,
 						  // TODO: Pipelines are captured as a ptr because bind_front
 						  //       does not want to capture a reference for it...

@@ -1,0 +1,81 @@
+{
+	"assets" : 
+	[
+		{
+			"name": "fox", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf",
+			"draw-mode": "static"
+		},
+		{
+			"name": "fox-animated", 
+			"path": "../../../assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf",
+			"draw-mode": "animated"
+		},
+		{
+			"name": "wolf", 
+			"path": "../../../assets/models/gltf-wolf/Wolf-Blender-2.82a.gltf",
+			"draw-mode": "animated"
+		}
+	],
+    "level" : 
+	[
+		{
+			"name": "fox", 
+			"draw-mode": "static",
+			"has-shadow": "yes",
+			"position": [0, -2, 7],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.05, 0.05, 0.05]
+		},
+		{
+			"name": "fox-animated", 
+			"draw-mode": "animated",
+			"animation": 2,
+			"has-shadow": "yes",
+			"position": [5, -2, 7],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [0.05, 0.05, 0.05]
+		},
+		{
+			"name": "wolf",
+			"draw-mode": "animated",
+			"animation": 1,
+			"has-shadow": "yes",
+			"position": [-5, -2, 7],
+			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
+			"scale": [10, 10, 10]
+		},
+		{
+			"name": "floor", 
+			"draw-mode": "material",
+			"has-shadow": "yes",
+			"position": [0, -2.1, 7],
+			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
+			"scale": [20, 0.2, 20]
+		}
+	],
+    "lights" : 
+	[
+		{
+			"type": "directional", 
+			"casts-shadow": "no",
+			"draw-gizmo": "no",
+			"position": [0, 0, 0],
+			"direction": [0.0, -1.0, 0.0],
+			"diffuse": [0, 0, 0],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.1, 0.1, 0.1]
+		},
+		{
+			"type": "directional", 
+			"casts-shadow": "yes",
+			"draw-gizmo": "no",
+			"position": [0, 15, 0],
+
+			"direction": [-0.3, -1.0, -0.2],
+			"diffuse": [0.5, 0.5, 0.5],
+			"specular": [0.0, 0.0, 0.0],
+			"ambient": [0.03, 0.03, 0.03]
+		}
+	]
+}

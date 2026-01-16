@@ -3,6 +3,8 @@
 #include <VulkanRenderer/Light.hpp>
 #include <VulkanRenderer/ShadowCaster.hpp>
 
+#include "ContextImpl.hpp"
+
 
 struct DirectionalLightUniformData
 {
@@ -110,4 +112,13 @@ struct SpotShadowCasterUniformData
 	SpotShadowCasterUniformData(SpotShadowCaster caster);
 };
 
+struct SortedLights
+{
+	std::vector<DirectionalLight> directionals;
+	std::vector<PointLight> points;
+	std::vector<SpotLight> spots;
+};
 
+void sort_light(Logger* logger,
+				SortedLights* sorted,
+				Light light);

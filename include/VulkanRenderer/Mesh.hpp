@@ -4,10 +4,21 @@
 #include <variant>
 #include "VertexBuffer.hpp"
 
+#include "Animation.hpp"
+
 struct TexturedMesh
 {
+	//TOOD: enforce typed vertexbuffers to ensure compile errors on bugs
 	//VertexBuffer<VertexPosNormColorUV> vertexbuffer;
 	VertexBuffer vertexbuffer;
+};
+
+struct AnimatedMesh
+{
+	//TOOD: enforce typed vertexbuffers to ensure compile errors on bugs
+	//VertexBuffer<VertexAnimatedPosNormColorUV> vertexbuffer;
+	VertexBuffer vertexbuffer;
+	BoneInfos bone_infos;
 };
 
 struct TexturedMeshWithWarning
