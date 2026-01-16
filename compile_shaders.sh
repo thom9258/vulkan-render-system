@@ -9,6 +9,12 @@ RESOURCES_DIR="compiled_shaders"
 
 [[ -d ${RESOURCES_DIR} ]] || mkdir ${RESOURCES_DIR}
 
+function compile_vert()
+{
+  glslc ${SHADER_SOURCE_DIR}/"$1".vert -o ${RESOURCES_DIR}/"$1".vert.spv
+  echo "compiled ${SHADER_SOURCE_DIR}/""$1"".vert to ${RESOURCES_DIR}/""$1"".vert.spv"
+}
+
 function compile_vert_frag ()
 {
   glslc ${SHADER_SOURCE_DIR}/"$1".vert -o ${RESOURCES_DIR}/"$1".vert.spv
@@ -24,3 +30,4 @@ compile_vert_frag "Diffuse"
 compile_vert_frag "Material"
 compile_vert_frag "OrthographicDepth"
 compile_vert_frag "PerspectiveDepth"
+compile_vert "AnimatedOrthographicDepth"
