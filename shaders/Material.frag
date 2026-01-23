@@ -115,9 +115,6 @@ void main()
 #endif
 }
 
-#define SHADOW_BIAS 0.005 
-#define SHININESS 32
-
 bool is_in_directional_shadow(vec4 fragpos_lightspace)
 {
 	vec3 projection_coords = fragpos_lightspace.xyz / fragpos_lightspace.w;

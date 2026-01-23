@@ -39,7 +39,7 @@
 		{
 			"name": "floor", 
 			"draw-mode": "material",
-			"has-shadow": "no",
+			"has-shadow": "yes",
 			"position": [0, -2.1, 7],
 			"rotation-quat-wxyz": [1.0, 0.0, 0.0, 0.0],
 			"scale": [20, 0.2, 20]
