@@ -14,6 +14,7 @@ Required Features:
 - [X] Animated meshes - limit support to gltf models.
 - [X] Shadows for animated meshes.
 - [ ] Support vertex indices.
+- [ ] Investigate weird singular vertices that has wrong animated transformations (potentially fixed by supporting indices).
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Add a gpu physical device selection method.
 - [ ] Changeable Background color.
