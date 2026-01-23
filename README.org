@@ -15,12 +15,12 @@ Required Features:
 - [X] Shadows for animated meshes.
 - [ ] Support vertex indices.
 - [ ] Investigate weird singular vertices that has wrong animated transformations (potentially fixed by supporting indices).
-- [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Add a gpu physical device selection method.
 - [ ] Changeable Background color.
 - [ ] Windows support.
    
 Less Important Features:
+- [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Custom static mesh binary format, something that has a ascii name + version, then a binary blob that is just <TYPE><SIZE><DATA><TYPE><SIZE><DATA> so it is really easy and quick to parse (this must support changing endians aswell).
 - [ ] Make logger a singleton so it actually can be used everywhere instead of passed all over. It should probably be multithread applicable?
 - [ ] non-animated Vertex color pipeline.

@@ -46,7 +46,7 @@ public:
 
 private:
   U32Extent m_extent;
-	std::string m]_name;
+	std::string m_name;
   vk::UniquePipelineLayout m_layout;
   vk::UniquePipeline m_pipeline;
   vk::UniqueDescriptorSetLayout m_descriptor_layout;

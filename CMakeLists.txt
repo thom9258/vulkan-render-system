@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(vulkan-renderer
-  VERSION 1.4
+  VERSION 1.5
   DESCRIPTION "vulkan-renderer is a piping library designed as an alternative to for-loops."
   HOMEPAGE_URL "https://github.com/thom9258/vulkan-renderer/"
 )

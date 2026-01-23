@@ -8,7 +8,7 @@ class TestVulkanRenderer(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     def requirements(self):
-        self.requires("vulkan-renderer/1.4")
+        self.requires("vulkan-renderer/1.5")
         self.requires("nlohmann_json/3.12.0")
         
     def layout(self):
