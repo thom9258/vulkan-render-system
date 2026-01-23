@@ -12,7 +12,7 @@ Required Features:
 - [X] Shadowmaps - simple support for a single directional and spot light.
 - [X] gltf loading (not animated).
 - [X] Animated meshes - limit support to gltf models.
-- [ ] Shadows for animated meshes.
+- [X] Shadows for animated meshes.
 - [ ] Support vertex indices.
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Add a gpu physical device selection method.
