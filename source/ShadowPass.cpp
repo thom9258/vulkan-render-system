@@ -1,6 +1,7 @@
 #include "ShadowPass.hpp"
 
 #include "DescriptorPoolImpl.hpp"
+#include "StaticDepthPipeline.hpp"
 
 ShadowPassTexture::ShadowPassTexture(Render::Context::Impl *context,
                                      DescriptorPool::Impl *descriptor_pool,
@@ -132,20 +133,24 @@ ShadowPassTexture &ShadowPassTexture::operator=(ShadowPassTexture &&rhs) {
 OrthographicShadowPass::OrthographicShadowPass(
     Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
-    std::filesystem::path shader_root_path, const bool debug_print)
-    : GenericShadowPass(
-          logger, context, presenter, descriptor_pool, extent,
-          VertexPath{shader_root_path / "OrthographicDepth.vert.spv"},
-          FragmentPath{shader_root_path / "OrthographicDepth.frag.spv"},
-          debug_print) {}
+    StaticVertexPath static_vertex_path,
+    StaticFragmentPath static_fragment_path,
+    AnimatedVertexPath animated_vertex_path,
+    AnimatedFragmentPath animated_fragment_path, const bool debug_print)
+    : GenericShadowPass("OrthoGraphicShadowPass", context, logger, presenter, descriptor_pool, extent,
+                        static_vertex_path, static_fragment_path,
+                        animated_vertex_path, animated_fragment_path,
+                        debug_print) {}
 
 void OrthographicShadowPass::record(
-    Logger *logger, vk::Device &device, MeshCache &mesh_cache,
-    CurrentFlightFrame current_flightframe, vk::CommandBuffer &commandbuffer,
+    Render::Context::Impl *context, Logger *logger, vk::Device &device,
+    MeshCache &mesh_cache, CurrentFlightFrame current_flightframe,
+    vk::CommandBuffer &commandbuffer,
     std::optional<CameraUniformData> camera_data,
-    std::vector<MaterialRenderable> &renderables) {
-  GenericShadowPass::record(logger, device, mesh_cache, current_flightframe,
-                            commandbuffer, camera_data, renderables);
+    std::vector<ShadowRenderable> &renderables) {
+  GenericShadowPass::record(context, logger, device, mesh_cache,
+                            current_flightframe, commandbuffer, camera_data,
+                            renderables);
 }
 
 auto OrthographicShadowPass::get_shadowtexture(
@@ -156,20 +161,26 @@ auto OrthographicShadowPass::get_shadowtexture(
 PerspectiveShadowPass::PerspectiveShadowPass(
     Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
-    std::filesystem::path shader_root_path, const bool debug_print)
-    : GenericShadowPass(
-          logger, context, presenter, descriptor_pool, extent,
-          VertexPath{shader_root_path / "PerspectiveDepth.vert.spv"},
-          FragmentPath{shader_root_path / "PerspectiveDepth.frag.spv"},
+    StaticVertexPath static_vertex_path,
+    StaticFragmentPath static_fragment_path,
+    AnimatedVertexPath animated_vertex_path,
+    AnimatedFragmentPath animated_fragment_path, const bool debug_print)
+    : GenericShadowPass("PerspectiveShadowPass", 
+          context, logger, presenter, descriptor_pool, extent,
+          static_vertex_path, static_fragment_path, animated_vertex_path,
+          animated_fragment_path,
           debug_print) {}
 
-void PerspectiveShadowPass::record(
-    Logger *logger, vk::Device &device, MeshCache &mesh_cache,
-    CurrentFlightFrame current_flightframe, vk::CommandBuffer &commandbuffer,
-    std::optional<CameraUniformData> camera_data,
-    std::vector<MaterialRenderable> &renderables) {
-  GenericShadowPass::record(logger, device, mesh_cache, current_flightframe,
-                            commandbuffer, camera_data, renderables);
+void PerspectiveShadowPass::record(Render::Context::Impl *context,
+                                   Logger *logger, vk::Device &device,
+                                   MeshCache &mesh_cache,
+                                   CurrentFlightFrame current_flightframe,
+                                   vk::CommandBuffer &commandbuffer,
+                                   std::optional<CameraUniformData> camera_data,
+                                   std::vector<ShadowRenderable> &renderables) {
+  GenericShadowPass::record(context, logger, device, mesh_cache,
+                            current_flightframe, commandbuffer, camera_data,
+                            renderables);
 }
 
 auto PerspectiveShadowPass::get_shadowtexture(
@@ -179,28 +190,30 @@ auto PerspectiveShadowPass::get_shadowtexture(
 
 GenericShadowPass &GenericShadowPass::operator=(GenericShadowPass &&rhs) {
   std::swap(m_extent, rhs.m_extent);
+  std::swap(m_name, rhs.m_name);
   std::swap(m_renderpass, rhs.m_renderpass);
   std::swap(m_framestextures, rhs.m_framestextures);
-  std::swap(m_pipeline, rhs.m_pipeline);
+  std::swap(m_static_pipeline, rhs.m_static_pipeline);
+  std::swap(m_animated_pipeline, rhs.m_animated_pipeline);
   return *this;
 }
 
 GenericShadowPass::GenericShadowPass(GenericShadowPass &&rhs) {
-  std::swap(m_extent, rhs.m_extent);
-  std::swap(m_renderpass, rhs.m_renderpass);
-  std::swap(m_framestextures, rhs.m_framestextures);
-  std::swap(m_pipeline, rhs.m_pipeline);
+	*this = std::move(rhs);
 }
 
-GenericShadowPass::GenericShadowPass(
-    Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
+GenericShadowPass::GenericShadowPass(std::string_view name,
+    Render::Context::Impl *context, Logger &logger, Presenter::Impl *presenter,
     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
-    VertexPath vertex_path, FragmentPath fragment_path, const bool debug_print)
-    : m_extent{extent} {
+    StaticVertexPath static_vertex_path,
+    StaticFragmentPath static_fragment_path,
+    AnimatedVertexPath animated_vertex_path,
+    AnimatedFragmentPath animated_fragment_path, const bool debug_print)
+    : m_extent{extent}
+    , m_name{std::string(name)} {
   auto constexpr color_format = vk::Format::eR32Sfloat;
   auto constexpr depth_format = vk::Format::eD32Sfloat;
   auto constexpr colorComponentFlags(vk::ColorComponentFlagBits::eR);
-  const std::string pipeline_name = "ShadowPass";
   auto const frames_in_flight =
       MaxFlightFrames{presenter->max_frames_in_flight};
 
@@ -313,265 +326,21 @@ GenericShadowPass::GenericShadowPass(
   context->logger.info(std::source_location::current(),
                        "Created Shadowpass FramePasses!");
 
-  auto shaderstage_infos = create_shaderstage_infos(context->device.get(),
-                                                    vertex_path, fragment_path);
+  m_static_pipeline = StaticDepthPipeline(m_name + "::StaticDepthPipeline",
+      logger, context, presenter, m_renderpass.get(), static_vertex_path,
+      static_fragment_path, m_extent, debug_print);
 
-  if (!shaderstage_infos) {
-    std::string const msg = std::format(
-        "{} could not load vertex/fragment sources {} / {}", pipeline_name,
-        vertex_path.get().string(), fragment_path.get().string());
-    logger.fatal(std::source_location::current(), msg);
-    throw std::runtime_error(msg);
-  }
-
-  std::array<vk::DynamicState, 2> dynamic_states{vk::DynamicState::eViewport,
-                                                 vk::DynamicState::eScissor};
-
-  auto pipelineDynamicStateCreateInfo =
-      vk::PipelineDynamicStateCreateInfo{}
-          .setFlags(vk::PipelineDynamicStateCreateFlags())
-          .setDynamicStates(dynamic_states);
-
-  const auto bindingDescriptions = binding_descriptions(VertexPosNormColorUV{});
-  const auto attributeDescriptions =
-      attribute_descriptions(VertexPosNormColorUV{});
-
-  auto pipelineVertexInputStateCreateInfo =
-      vk::PipelineVertexInputStateCreateInfo{}
-          .setFlags(vk::PipelineVertexInputStateCreateFlags())
-          .setVertexBindingDescriptions(bindingDescriptions)
-          .setVertexAttributeDescriptions(attributeDescriptions);
-
-  auto pipelineInputAssemblyStateCreateInfo =
-      vk::PipelineInputAssemblyStateCreateInfo{}
-          .setFlags(vk::PipelineInputAssemblyStateCreateFlags())
-          .setPrimitiveRestartEnable(vk::False)
-          .setTopology(vk::PrimitiveTopology::eTriangleList);
-
-  const auto initial_viewport =
-      vk::Viewport{}
-          .setX(0.0f)
-          .setY(0.0f)
-          .setWidth(static_cast<float>(m_extent.width()))
-          .setHeight(static_cast<float>(m_extent.height()))
-          .setMinDepth(0.0f)
-          .setMaxDepth(1.0f);
-
-  auto initial_scissor =
-      vk::Rect2D{}.setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f));
-
-  auto pipelineViewportStateCreateInfo =
-      vk::PipelineViewportStateCreateInfo{}
-          .setFlags(vk::PipelineViewportStateCreateFlags())
-          .setViewports(initial_viewport)
-          .setScissors(initial_scissor);
-
-  auto pipelineRasterizationStateCreateInfo =
-      vk::PipelineRasterizationStateCreateInfo{}
-          .setFlags(vk::PipelineRasterizationStateCreateFlags())
-          .setDepthClampEnable(false)
-          .setRasterizerDiscardEnable(false)
-          .setPolygonMode(vk::PolygonMode::eFill)
-          // NOTE we cull front faces so we draw backfaces to the shadow depth.
-          //      this helps with peter panning where shadows makes objects seem
-          //      to float.
-          .setCullMode(vk::CullModeFlagBits::eFront)
-          .setFrontFace(vk::FrontFace::eCounterClockwise)
-          .setDepthBiasEnable(false)
-          .setDepthBiasConstantFactor(0.0f)
-          .setDepthBiasClamp(0.0f)
-          .setDepthBiasSlopeFactor(0.0f)
-          .setLineWidth(1.0f);
-
-  auto pipelineMultisampleStateCreateInfo =
-      vk::PipelineMultisampleStateCreateInfo{}
-          .setFlags(vk::PipelineMultisampleStateCreateFlags())
-          .setSampleShadingEnable(false)
-          .setRasterizationSamples(vk::SampleCountFlagBits::e1);
-
-  auto pipelineColorBlendAttachmentState =
-      vk::PipelineColorBlendAttachmentState{}
-          .setBlendEnable(false)
-          .setSrcColorBlendFactor(vk::BlendFactor::eOne)
-          .setDstColorBlendFactor(vk::BlendFactor::eZero)
-          .setColorBlendOp(vk::BlendOp::eAdd)
-          .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
-          .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
-          .setAlphaBlendOp(vk::BlendOp::eAdd)
-          .setColorWriteMask(colorComponentFlags);
-
-  auto pipelineColorBlendStateCreateInfo =
-      vk::PipelineColorBlendStateCreateInfo{}
-          .setFlags(vk::PipelineColorBlendStateCreateFlags())
-          .setLogicOpEnable(false)
-          .setLogicOp(vk::LogicOp::eNoOp)
-          .setAttachments(pipelineColorBlendAttachmentState)
-          .setBlendConstants({1.0f, 1.0f, 1.0f, 1.0f});
-
-  const auto push_constant_range =
-      vk::PushConstantRange{}
-          .setOffset(0)
-          .setSize(sizeof(RenderPipeline::PushConstants))
-          .setStageFlags(vk::ShaderStageFlagBits::eVertex);
-
-  if (sizeof(RenderPipeline::PushConstants) > 128) {
-    logger.warn(
-        std::source_location::current(),
-        std::format(
-            "PushConstant size={} is larger than minimum supported (128)"
-            "This can cause compatability issues on some devices",
-            sizeof(RenderPipeline::PushConstants)));
-  }
-
-  const auto layout_binding =
-      vk::DescriptorSetLayoutBinding{}
-          .setStageFlags(vk::ShaderStageFlagBits::eVertex)
-          .setBinding(0)
-          .setDescriptorCount(1)
-          .setDescriptorType(vk::DescriptorType::eUniformBuffer);
-
-  const auto set_info = vk::DescriptorSetLayoutCreateInfo{}
-                            .setFlags(vk::DescriptorSetLayoutCreateFlags())
-                            .setBindingCount(1)
-                            .setBindings(layout_binding);
-
-  m_pipeline.descriptor_layout =
-      context->device.get().createDescriptorSetLayoutUnique(set_info, nullptr);
-
-  auto pipelineLayoutCreateInfo =
-      vk::PipelineLayoutCreateInfo{}
-          .setFlags(vk::PipelineLayoutCreateFlags())
-          .setSetLayouts(m_pipeline.descriptor_layout.get())
-          .setPushConstantRanges(push_constant_range);
-
-  m_pipeline.layout = context->device.get().createPipelineLayoutUnique(
-      pipelineLayoutCreateInfo);
-
-  logger.info(std::source_location::current(), "Created Pipeline Layout");
-
-  auto depth_stencil_state_info = vk::PipelineDepthStencilStateCreateInfo{}
-                                      .setDepthTestEnable(true)
-                                      .setDepthWriteEnable(true)
-                                      .setDepthCompareOp(vk::CompareOp::eLess)
-                                      .setDepthBoundsTestEnable(false)
-                                      .setMinDepthBounds(0.0f)
-                                      .setMaxDepthBounds(1.0f)
-                                      .setStencilTestEnable(false);
-
-  auto graphicsPipelineCreateInfo =
-      vk::GraphicsPipelineCreateInfo{}
-          .setFlags(vk::PipelineCreateFlags())
-          .setStages(shaderstage_infos.value().create_info)
-          .setPVertexInputState(&pipelineVertexInputStateCreateInfo)
-          .setPInputAssemblyState(&pipelineInputAssemblyStateCreateInfo)
-          .setPTessellationState(nullptr)
-          .setPViewportState(&pipelineViewportStateCreateInfo)
-          .setPRasterizationState(&pipelineRasterizationStateCreateInfo)
-          .setPMultisampleState(&pipelineMultisampleStateCreateInfo)
-          .setPDepthStencilState(&depth_stencil_state_info)
-          .setPColorBlendState(&pipelineColorBlendStateCreateInfo)
-          .setPDynamicState(&pipelineDynamicStateCreateInfo)
-          .setLayout(m_pipeline.layout.get())
-          .setRenderPass(m_renderpass.get());
-
-  vk::ResultValue<vk::UniquePipeline> result =
-      context->device.get().createGraphicsPipelineUnique(
-          nullptr, graphicsPipelineCreateInfo);
-
-  switch (result.result) {
-  case vk::Result::eSuccess:
-    break;
-  case vk::Result::ePipelineCompileRequiredEXT:
-    logger.error(std::source_location::current(),
-                 "Creating pipeline error: PipelineCompileRequiredEXT");
-  default:
-    logger.error(std::source_location::current(),
-                 "Creating pipeline error: Unknown invalid Result state");
-  }
-
-  m_pipeline.pipeline = std::move(result.value);
-  logger.info(std::source_location::current(), "Created Pipeline");
-
-  std::array<vk::DescriptorPoolSize, 1> sizes{
-      vk::DescriptorPoolSize{}
-          .setType(vk::DescriptorType::eUniformBuffer)
-          .setDescriptorCount(10),
-  };
-
-  const auto pool_info =
-      vk::DescriptorPoolCreateInfo{}
-          .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-          .setMaxSets(10)
-          .setPoolSizes(sizes);
-
-  m_pipeline.descriptor_pool =
-      context->device.get().createDescriptorPoolUnique(pool_info, nullptr);
-  logger.info(std::source_location::current(), "Created Descriptor Pool");
-
-  for (uint32_t i = 0; i < frames_in_flight.get(); i++) {
-    m_pipeline.descriptor_memories.push_back(
-        allocate_memory(context->physical_device, context->device.get(),
-                        sizeof(CameraUniformData),
-                        vk::BufferUsageFlagBits::eTransferSrc |
-                            vk::BufferUsageFlagBits::eUniformBuffer,
-                        // Host Visible and Coherent allows direct
-                        // writes into the buffers without sync issues.
-                        vk::MemoryPropertyFlagBits::eHostVisible |
-                            vk::MemoryPropertyFlagBits::eHostCoherent));
-
-    const auto allocate_info =
-        vk::DescriptorSetAllocateInfo{}
-            .setDescriptorPool(m_pipeline.descriptor_pool.get())
-            .setDescriptorSetCount(1)
-            .setSetLayouts(m_pipeline.descriptor_layout.get());
-
-    auto sets =
-        context->device.get().allocateDescriptorSetsUnique(allocate_info);
-    if (sets.size() != 1) {
-      logger.error(std::source_location::current(),
-                   "This system only allows handling 1 set per frame in flight"
-                   "\n if you want more sets find another way to store them..");
-    }
-
-    m_pipeline.descriptor_sets.push_back(std::move(sets[0]));
-
-    const auto buffer_info =
-        vk::DescriptorBufferInfo{}
-            .setBuffer(m_pipeline.descriptor_memories[i].buffer.get())
-            .setOffset(0)
-            .setRange(sizeof(CameraUniformData));
-
-    const auto write_descriptor =
-        vk::WriteDescriptorSet{}
-            .setDstBinding(0)
-            .setDstSet(m_pipeline.descriptor_sets[i].get())
-            .setDstArrayElement(0)
-            .setDescriptorCount(1)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            // here images can be set aswell
-            .setBufferInfo(buffer_info);
-
-    const uint32_t write_count = 1;
-    const uint32_t copy_count = 0;
-    context->device.get().updateDescriptorSets(write_count, &write_descriptor,
-                                               copy_count, nullptr);
-  }
-
-  logger.info(
-      std::source_location::current(),
-      std::format("Allocated {} descriptor sets for {} frames in flight",
-                  m_pipeline.descriptor_sets.size(), frames_in_flight.get()));
-
-  logger.info(std::source_location::current(),
-              "Created Shadowpass RenderPipeline!");
+  m_animated_pipeline = AnimatedDepthPipeline(m_name + "::AnimatedDepthPipeline",
+      logger, context, presenter, m_renderpass.get(), animated_vertex_path,
+      animated_fragment_path, m_extent, debug_print);
 }
 
-void GenericShadowPass::record(Logger *logger, vk::Device &device,
-                               MeshCache &mesh_cache,
+void GenericShadowPass::record(Render::Context::Impl *context, Logger *logger,
+                               vk::Device &device, MeshCache &mesh_cache,
                                CurrentFlightFrame current_flightframe,
                                vk::CommandBuffer &commandbuffer,
                                std::optional<CameraUniformData> camera_data,
-                               std::vector<MaterialRenderable> &renderables) {
+                               std::vector<ShadowRenderable> &renderables) {
   const auto render_area =
       vk::Rect2D{}
           .setOffset(vk::Offset2D{}.setX(0.0f).setY(0.0f))
@@ -594,8 +363,7 @@ void GenericShadowPass::record(Logger *logger, vk::Device &device,
 
   // if there is no shadow camera we end the renderpass immediately
   // we still need to begin/end it so that the implicit shadow texture
-  // commands are applied.
-  // commands are applied.
+  // commands are applied, and allows us to bind it to the geometry pipeline.
   if (!camera_data.has_value()) {
     commandbuffer.endRenderPass();
     return;
@@ -619,54 +387,19 @@ void GenericShadowPass::record(Logger *logger, vk::Device &device,
   const uint32_t scissor_start = 0;
   commandbuffer.setScissor(scissor_start, scissors);
 
-  commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                             m_pipeline.pipeline.get());
+  StaticDepthPipeline::CameraUniformData static_depth_camera_data;
+  static_depth_camera_data.view = camera_data.value().view;
+  static_depth_camera_data.proj = camera_data.value().proj;
+  m_static_pipeline.record(logger, device, mesh_cache, current_flightframe,
+                           commandbuffer, static_depth_camera_data,
+                           renderables);
 
-  CameraUniformData camera_uniform_data = camera_data.value();
-  copy_to_allocated_memory(
-      device, m_pipeline.descriptor_memories[current_flightframe.get()],
-      reinterpret_cast<void *>(&camera_uniform_data),
-      sizeof(camera_uniform_data));
-  const uint32_t first_set = 0;
-  const uint32_t descriptor_set_count = 1;
-  auto descriptor_sets =
-      &(m_pipeline.descriptor_sets[current_flightframe.get()].get());
-  const uint32_t dynamic_offset_count = 0;
-  const uint32_t *dynamic_offsets = nullptr;
-  commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                   m_pipeline.layout.get(), first_set,
-                                   descriptor_set_count, descriptor_sets,
-                                   dynamic_offset_count, dynamic_offsets);
-
-  for (auto renderable : renderables) {
-    if (!renderable.has_shadow)
-      continue;
-
-    RenderPipeline::PushConstants push{};
-    push.model = renderable.model;
-    const uint32_t push_offset = 0;
-    commandbuffer.pushConstants(m_pipeline.layout.get(),
-                                vk::ShaderStageFlagBits::eVertex, push_offset,
-                                sizeof(push), &push);
-
-    const uint32_t firstBinding = 0;
-    const uint32_t bindingCount = 1;
-    std::array<vk::DeviceSize, bindingCount> offsets = {0};
-
-    TexturedMesh *mesh = mesh_cache.get(renderable.mesh.value());
-    uint32_t vertex_length = mesh->vertexbuffer.impl->length;
-    std::array<vk::Buffer, bindingCount> buffers{
-        mesh->vertexbuffer.impl->buffer.get()};
-
-    commandbuffer.bindVertexBuffers(firstBinding, bindingCount, buffers.data(),
-                                    offsets.data());
-
-    const uint32_t instanceCount = 1;
-    const uint32_t firstVertex = 0;
-    const uint32_t firstInstance = 0;
-    commandbuffer.draw(vertex_length, instanceCount, firstVertex,
-                       firstInstance);
-  }
+  AnimatedDepthPipeline::CameraUniformData animated_depth_camera_data;
+  animated_depth_camera_data.view = camera_data.value().view;
+  animated_depth_camera_data.proj = camera_data.value().proj;
+  m_animated_pipeline.record(context, logger, device, mesh_cache,
+                             current_flightframe, commandbuffer,
+                             animated_depth_camera_data, renderables);
 
   commandbuffer.endRenderPass();
 }

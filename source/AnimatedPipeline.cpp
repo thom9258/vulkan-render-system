@@ -1,18 +1,10 @@
 #include "AnimatedPipeline.hpp"
+#include "AnimationUtils.hpp"
 #include "VertexBufferImpl.hpp"
 
 #include <format>
 #include <print>
 #include <ranges>
-
-void initialize_mat4(glm::mat4 &m) { m = glm::mat4(1.0f); }
-
-void initialize_bone_matrices(glm::mat4 *bone_matrices,
-                              size_t bone_matrices_count) {
-  for (size_t i = 0; i < bone_matrices_count; i++) {
-    bone_matrices[i] = glm::mat4(1.0f);
-  }
-}
 
 AnimatedPipeline::AnimatedPipeline(
     Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
@@ -569,13 +561,12 @@ AnimatedPipeline::AnimatedPipeline(
 
   ModelInfoUniformData model_info_init_data;
   model_info_init_data.model_matrix = glm::mat4(1.0f);
-  initialize_bone_matrices(model_info_init_data.bone_matrices,
-                           max_bone_matrices);
+  animation::initialize_bone_matrices(model_info_init_data.bone_matrices,
+                                      max_bone_matrices);
 
   for (auto [pool_index, pool] :
        std::views::enumerate(m_model_info_uniform_pools)) {
     for (auto [model_info_index, model_info] : std::views::enumerate(pool)) {
-
       model_info_init_data.bind_info =
           glm::ivec4(pool_index, model_info_index, 0, 0);
 
@@ -585,23 +576,22 @@ AnimatedPipeline::AnimatedPipeline(
 
       model_info.set = std::move(sets[0]);
       model_info.uniform = UniformMemory<ModelInfoUniformData>(
-          context->physical_device, context->device.get(),
-          model_infos_count);
+          context->physical_device, context->device.get(), model_infos_count);
 
       model_info.uniform.write(*context, &model_info_init_data);
 
-	  std::array<vk::WriteDescriptorSet, 1> write{
-		  vk::WriteDescriptorSet{}
-		  .setDstSet(model_info.set.get())
-		  .setDstBinding(0)
-		  .setDstArrayElement(0)
-		  .setDescriptorCount(1)
-		  .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-		  .setBufferInfo(model_info.uniform.buffer_info()),
-	  };
-	  
-	  context->device.get().updateDescriptorSets(write.size(), write.data(), 0,
-												 nullptr);
+      std::array<vk::WriteDescriptorSet, 1> write{
+          vk::WriteDescriptorSet{}
+              .setDstSet(model_info.set.get())
+              .setDstBinding(0)
+              .setDstArrayElement(0)
+              .setDescriptorCount(1)
+              .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+              .setBufferInfo(model_info.uniform.buffer_info()),
+      };
+
+      context->device.get().updateDescriptorSets(write.size(), write.data(), 0,
+                                                 nullptr);
     }
   }
 }
@@ -636,10 +626,10 @@ AnimatedPipeline &AnimatedPipeline::operator=(AnimatedPipeline &&rhs) noexcept {
 AnimatedPipeline::~AnimatedPipeline() {}
 
 void AnimatedPipeline::render(
-							  Render::Context::Impl *context, 
-    AnimatedPipeline::FrameInfo &frame_info, Logger &logger, vk::Device &device,
-    vk::DescriptorPool descriptor_pool, MeshCache &mesh_cache,
-    TextureSamplerCache &texturesampler_cache, vk::CommandBuffer &commandbuffer,
+    Render::Context::Impl *context, AnimatedPipeline::FrameInfo &frame_info,
+    Logger &logger, vk::Device &device, vk::DescriptorPool descriptor_pool,
+    MeshCache &mesh_cache, TextureSamplerCache &texturesampler_cache,
+    vk::CommandBuffer &commandbuffer,
     CurrentFlightFrame const current_flightframe,
     MaxFlightFrames const max_frames_in_flight,
     std::vector<AnimatedRenderable> &renderables, std::vector<Light> &lights,
@@ -750,17 +740,17 @@ void AnimatedPipeline::render(
 
   ModelInfoUniformData model_info_init_data;
   model_info_init_data.model_matrix = glm::mat4(1.0f);
-  model_info_init_data.bind_info = glm::ivec4(0,0, 100, 27);
-  std::ranges::for_each(model_info_init_data.bone_matrices, initialize_mat4);
+  model_info_init_data.bind_info = glm::ivec4(0, 0, 100, 27);
+  std::ranges::for_each(model_info_init_data.bone_matrices, animation::initialize_mat4);
 
-  m_model_info_uniform_pools[*current_flightframe][0].uniform.write(*context,
-      &model_info_init_data);
+  m_model_info_uniform_pools[*current_flightframe][0].uniform.write(
+      *context, &model_info_init_data);
 
   commandbuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
                              m_pipeline.get());
 
   // NOTE: thsese MUST match the indices of each individual set
-  // NOTE: we purposefully skip out on uploading model_info, as we 
+  // NOTE: we purposefully skip out on uploading model_info, as we
   //       MUST do this for every model to draw
   std::array<vk::DescriptorSet, 7> init_sets{
       m_global_set_uniforms[*current_flightframe].set.get(),
@@ -769,8 +759,7 @@ void AnimatedPipeline::render(
       m_specular.sets[&m_specular.default_texture][*current_flightframe].get(),
       m_normal.sets[&m_normal.default_texture][*current_flightframe].get(),
       shadowcasters.directional.descriptorset,
-      shadowcasters.spot.descriptorset
-  };
+      shadowcasters.spot.descriptorset};
 
   const uint32_t first_set = 0;
   commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
@@ -803,8 +792,8 @@ void AnimatedPipeline::render(
     model_info.bind_info = glm::ivec4(*current_flightframe, index, 7, 25);
     model_info.model_matrix = renderable.model;
     if (renderable.animator == nullptr) {
-      initialize_bone_matrices(model_info.bone_matrices, max_bone_matrices);
-	  std::println("Found animated renderable without an animator!");
+      animation::initialize_bone_matrices(model_info.bone_matrices, max_bone_matrices);
+      std::println("Found animated renderable without an animator!");
     } else {
       std::vector<glm::mat4> bone_matrices =
           renderable.animator->GetFinalBoneMatrices();
@@ -937,7 +926,8 @@ void AnimatedPipeline::render(
     if (normal_texture != last_normal_texture) {
       if (!m_normal.sets.contains(normal_texture)) {
         m_normal.sets.insert(
-            {normal_texture, create_texture_descriptorset(device, m_normal.layout.get(),
+            {normal_texture,
+             create_texture_descriptorset(device, m_normal.layout.get(),
                                           descriptor_pool, *normal_texture)});
 
         logger.info(std::source_location::current(),
@@ -954,7 +944,7 @@ void AnimatedPipeline::render(
         last_normal_texture = normal_texture;
       }
     }
-	
+
     uint32_t constexpr model_info_set_index = 7;
     std::array<vk::DescriptorSet, 1> model_info_sets{
         m_model_info_uniform_pools.at(*current_flightframe)

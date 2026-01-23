@@ -1,6 +1,7 @@
 #include "RendererImpl.hpp"
 
 #include "MaterialPipeline.hpp"
+#include "StaticDepthPipeline.hpp"
 
 auto create_texture_view(vk::Device &device, Texture2D &texture,
                          const vk::ImageAspectFlags aspect)
@@ -47,38 +48,37 @@ void sort_renderable(Logger *logger, SortedRenderables *sorted,
 }
 
 auto unwind_renderablenode(std::vector<MaterialRenderable> &simple,
-						   std::vector<AnimatedRenderable> &animated,
-						   glm::mat4 parent_model_matrix,
-                           RenderableNode *node) -> void {
+                           std::vector<AnimatedRenderable> &animated,
+                           glm::mat4 parent_model_matrix, RenderableNode *node)
+    -> void {
   if (!node)
     return;
-  
+
   glm::mat4 model_matrix = node->model_matrix * parent_model_matrix;
 
   for (auto &mesh : node->models) {
-	  if (auto* p = std::get_if<RenderableNode::SimpleModel>(&mesh)) {
-		  MaterialRenderable renderable;
-		  renderable.model = model_matrix;
-		  renderable.mesh = p->mesh;
-		  renderable.ambient = p->ambient;
-		  renderable.diffuse = p->diffuse;
-		  renderable.specular = p->specular;
-		  renderable.normal = p->normal;
-		  renderable.has_shadow = p->has_shadow;
-		  simple.push_back(renderable);
-	  }
-	  else if (auto* p = std::get_if<RenderableNode::AnimatedModel>(&mesh)) {
-		  AnimatedRenderable renderable;
-		  renderable.model = model_matrix;
-		  renderable.mesh = p->mesh;
-		  renderable.ambient = p->ambient;
-		  renderable.diffuse = p->diffuse;
-		  renderable.specular = p->specular;
-		  renderable.normal = p->normal;
-		  renderable.has_shadow = p->has_shadow;
-		  renderable.animator = p->animator;
-		  animated.push_back(renderable);
-	  }
+    if (auto *p = std::get_if<RenderableNode::SimpleModel>(&mesh)) {
+      MaterialRenderable renderable;
+      renderable.model = model_matrix;
+      renderable.mesh = p->mesh;
+      renderable.ambient = p->ambient;
+      renderable.diffuse = p->diffuse;
+      renderable.specular = p->specular;
+      renderable.normal = p->normal;
+      renderable.has_shadow = p->has_shadow;
+      simple.push_back(renderable);
+    } else if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&mesh)) {
+      AnimatedRenderable renderable;
+      renderable.model = model_matrix;
+      renderable.mesh = p->mesh;
+      renderable.ambient = p->ambient;
+      renderable.diffuse = p->diffuse;
+      renderable.specular = p->specular;
+      renderable.normal = p->normal;
+      renderable.has_shadow = p->has_shadow;
+      renderable.animator = p->animator;
+      animated.push_back(renderable);
+    }
   }
 
   for (auto &child : node->children) {
@@ -86,10 +86,9 @@ auto unwind_renderablenode(std::vector<MaterialRenderable> &simple,
   }
 }
 
-void unwind_renderablenode(std::vector<MaterialRenderable>& simple,
-						   std::vector<AnimatedRenderable>& animated,
-						   RenderableNode *node)
-{
+void unwind_renderablenode(std::vector<MaterialRenderable> &simple,
+                           std::vector<AnimatedRenderable> &animated,
+                           RenderableNode *node) {
   glm::mat4 parent_model_matrix(1.0f);
   unwind_renderablenode(simple, animated, parent_model_matrix, node);
 }
@@ -235,8 +234,8 @@ auto create_geometry_pass(Render::Context::Impl *context,
 }
 
 auto render_geometry_pass(
-						  Render::Context::Impl* context,
-    GeometryPass &pass, Renderer::Impl::ShadowPasses &shadow_passes,
+    Render::Context::Impl *context, GeometryPass &pass,
+    Renderer::Impl::ShadowPasses &shadow_passes,
     // TODO: Pipelines are captured as a ptr because bind_front
     //       does not want to capture a reference for it...
     GeometryPipelines *pipelines, Logger *logger,
@@ -262,11 +261,9 @@ auto render_geometry_pass(
   // into something...
   //       simple the render pipelines can understand...
   for (auto &renderablenode : sorted.renderablenodes) {
-	  std::vector<MaterialRenderable> simple;
-	  std::vector<AnimatedRenderable> animated;
-	  unwind_renderablenode(simple,
-							animated,
-							renderablenode.get());
+    std::vector<MaterialRenderable> simple;
+    std::vector<AnimatedRenderable> animated;
+    unwind_renderablenode(simple, animated, renderablenode.get());
 
     for (auto &s : simple) {
       sorted.materialrenderables.push_back(s);
@@ -277,6 +274,12 @@ auto render_geometry_pass(
   }
 
   auto generate_shadow_passes = [&](vk::CommandBuffer &commandbuffer) {
+    std::vector<ShadowRenderable> shadow_renderables;
+    for (auto renderable : sorted.materialrenderables)
+      shadow_renderables.push_back(renderable);
+    for (auto renderable : sorted.animated_renderables)
+      shadow_renderables.push_back(renderable);
+
     std::optional<OrthographicShadowPass::CameraUniformData> ortho_caster_data;
     if (shadowcasters.directional_caster.has_value()) {
       ortho_caster_data.emplace();
@@ -287,8 +290,9 @@ auto render_geometry_pass(
     }
 
     shadow_passes.orthographic.record(
-        logger, device, mesh_cache, CurrentFlightFrame{current_frame_in_flight},
-        commandbuffer, ortho_caster_data, sorted.materialrenderables);
+        context, logger, device, mesh_cache,
+        CurrentFlightFrame{current_frame_in_flight}, commandbuffer,
+        ortho_caster_data, shadow_renderables);
 
     std::optional<PerspectiveShadowPass::CameraUniformData> pers_caster_data;
     if (shadowcasters.spot_caster.has_value()) {
@@ -300,8 +304,9 @@ auto render_geometry_pass(
 
     // TODO: have multiple spot casters
     shadow_passes.perspective.record(
-        logger, device, mesh_cache, CurrentFlightFrame{current_frame_in_flight},
-        commandbuffer, pers_caster_data, sorted.materialrenderables);
+        context, logger, device, mesh_cache,
+        CurrentFlightFrame{current_frame_in_flight}, commandbuffer,
+        pers_caster_data, shadow_renderables);
   };
 
   // TODO: shadow and geometry passes should be in same commandbuffer with
@@ -352,8 +357,8 @@ auto render_geometry_pass(
     WireframeRenderInfo wireframe_info{};
     wireframe_info.viewproj = world_info.projection * world_info.view;
 
-    draw_wireframes(pipelines->wireframe, mesh_cache, commandbuffer, wireframe_info,
-                    sorted.wireframes);
+    draw_wireframes(pipelines->wireframe, mesh_cache, commandbuffer,
+                    wireframe_info, sorted.wireframes);
 
     CurrentFlightFrame const current_flightframe{current_frame_in_flight};
     MaxFlightFrames const max_flightframes{max_frames_in_flight};
@@ -379,17 +384,17 @@ auto render_geometry_pass(
     material_frame_info.proj = world_info.projection;
     material_frame_info.camera_position = world_info.camera_position;
     pipelines->material.render(
-        material_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
-        current_flightframe, max_flightframes, sorted.materialrenderables,
-        lights, material_shadowcasters);
+        material_frame_info, *logger, device, descriptor_pool, mesh_cache,
+        texture_cache, commandbuffer, current_flightframe, max_flightframes,
+        sorted.materialrenderables, lights, material_shadowcasters);
 
     AnimatedPipeline::MaterialShadowCasters::DirectionalShadowCasterTexture
         adirectional_texture{dirshadowtexture.descriptorset.get(),
-                            shadowcasters.directional_caster};
+                             shadowcasters.directional_caster};
 
     AnimatedPipeline::MaterialShadowCasters::SpotShadowCasterTexture
         aspot_texture{spotshadowtexture.descriptorset.get(),
-                     shadowcasters.spot_caster};
+                      shadowcasters.spot_caster};
 
     AnimatedPipeline::MaterialShadowCasters animated_shadowcasters{
         adirectional_texture, aspot_texture};
@@ -398,10 +403,11 @@ auto render_geometry_pass(
     animated_frame_info.view = world_info.view;
     animated_frame_info.proj = world_info.projection;
     animated_frame_info.camera_position = world_info.camera_position;
-    pipelines->animated.render(context,
-        animated_frame_info, *logger, device, descriptor_pool, mesh_cache, texture_cache, commandbuffer,
-        current_flightframe, max_flightframes, sorted.animated_renderables,
-        lights, animated_shadowcasters);
+    pipelines->animated.render(context, animated_frame_info, *logger, device,
+                               descriptor_pool, mesh_cache, texture_cache,
+                               commandbuffer, current_flightframe,
+                               max_flightframes, sorted.animated_renderables,
+                               lights, animated_shadowcasters);
 
     commandbuffer.endRenderPass();
   };
@@ -424,13 +430,21 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
   // TODO: Allow debug print to be set externally
   vk::Extent2D const render_extent = context->get_window_extent();
   bool const debug_print = true;
-  shadow_passes.orthographic =
-      OrthographicShadowPass(logger, context, presenter, descriptor_pool,
-                             shadow_extent, shaders_root, debug_print);
+  shadow_passes.orthographic = OrthographicShadowPass(
+      logger, context, presenter, descriptor_pool, shadow_extent,
+      StaticVertexPath{shaders_root / "StaticDepth.vert.spv"},
+      StaticFragmentPath{shaders_root / "StaticDepth.frag.spv"},
+      AnimatedVertexPath{shaders_root / "AnimatedDepth.vert.spv"},
+      AnimatedFragmentPath{shaders_root / "StaticDepth.frag.spv"},
+      debug_print);
 
-  shadow_passes.perspective =
-      PerspectiveShadowPass(logger, context, presenter, descriptor_pool,
-                            shadow_extent, shaders_root, debug_print);
+  shadow_passes.perspective = PerspectiveShadowPass(
+      logger, context, presenter, descriptor_pool, shadow_extent,
+      StaticVertexPath{shaders_root / "StaticDepth.vert.spv"},
+      StaticFragmentPath{shaders_root / "StaticDepth.frag.spv"},
+      AnimatedVertexPath{shaders_root / "AnimatedDepth.vert.spv"},
+      AnimatedFragmentPath{shaders_root / "StaticDepth.frag.spv"},
+      debug_print);
 
   geometry_pass = create_geometry_pass(
       context, render_extent, presenter->max_frames_in_flight, debug_print);
@@ -464,29 +478,24 @@ Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
 Renderer::Impl::~Impl() {}
 
 auto Renderer::Impl::render(
-							Render::Context::Impl* context,
-							TextureSamplerCache &texture_cache,
-                            MeshCache &mesh_cache,
-                            const uint32_t current_frame_in_flight,
-                            const uint64_t total_frames,
-                            const WorldRenderInfo &world_info,
-                            std::vector<Renderable> &renderables,
-                            std::vector<Light> &lights,
-                            ShadowCasters &shadowcasters) -> Texture2D::Impl * {
-  return render_geometry_pass(context,
+    Render::Context::Impl *context, TextureSamplerCache &texture_cache,
+    MeshCache &mesh_cache, const uint32_t current_frame_in_flight,
+    const uint64_t total_frames, const WorldRenderInfo &world_info,
+    std::vector<Renderable> &renderables, std::vector<Light> &lights,
+    ShadowCasters &shadowcasters) -> Texture2D::Impl * {
+  return render_geometry_pass(
+      context,
 
       geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
-      mesh_cache, current_frame_in_flight,
-      presenter->max_frames_in_flight, total_frames, context->device.get(),
+      mesh_cache, current_frame_in_flight, presenter->max_frames_in_flight,
+      total_frames, context->device.get(),
       descriptor_pool->descriptor_pool.get(), presenter->command_pool(),
       context->graphics_queue(), world_info, renderables, lights,
       shadowcasters);
 }
 
-auto Renderer::render(
-					  Render::Context* context,
-					  TextureSamplerCache &texture_cache,
-                      MeshCache &mesh_cache,
+auto Renderer::render(Render::Context *context,
+                      TextureSamplerCache &texture_cache, MeshCache &mesh_cache,
                       const uint32_t current_frame_in_flight,
                       const uint64_t total_frames,
                       const WorldRenderInfo &world_info,

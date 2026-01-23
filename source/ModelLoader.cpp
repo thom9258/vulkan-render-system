@@ -444,7 +444,7 @@ auto create_animations(const aiScene *scene, BoneInfos &bone_infos)
     animation.m_TicksPerSecond = ai_animation->mTicksPerSecond;
     ReadHeirarchyData(animation, animation.m_RootNode, scene->mRootNode);
     ReadMissingBones(animation, bone_infos, ai_animation);
-    print_animation(std::cout, animation, std::format("{}", i));
+    //print_animation(std::cout, animation, std::format("{}", i));
     animations.push_back(animation);
   }
 
@@ -514,9 +514,9 @@ auto process_animated_mesh(Render::Context &context,
     assert(boneID != std::nullopt);
     auto weights = mesh->mBones[boneIndex]->mWeights;
     if (mesh->mBones[boneIndex]->mNumWeights > 4) {
-      std::println("WARNING: The model to load has {} animation weighs, but "
-                   "max {} is supported",
-                   mesh->mBones[boneIndex]->mNumWeights, 4);
+//     std::println("WARNING: The model to load has {} animation weighs, but "
+//                  "max {} is supported",
+//                  mesh->mBones[boneIndex]->mNumWeights, 4);
     }
 
 #if 0

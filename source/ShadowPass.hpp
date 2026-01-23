@@ -2,6 +2,7 @@
 
 #include <VulkanRenderer/Renderable.hpp>
 
+#include "AnimatedDepthPipeline.hpp"
 #include "ContextImpl.hpp"
 #include "DescriptorPoolImpl.hpp"
 #include "FlightFrames.hpp"
@@ -10,6 +11,7 @@
 #include "PresenterImpl.hpp"
 #include "ShaderTexture.hpp"
 #include "ShaderTextureImpl.hpp"
+#include "StaticDepthPipeline.hpp"
 #include "Texture.hpp"
 #include "TextureImpl.hpp"
 #include "VertexBufferImpl.hpp"
@@ -50,10 +52,13 @@ public:
 
   GenericShadowPass() = default;
   GenericShadowPass(GenericShadowPass &&rhs);
-  GenericShadowPass(Logger &logger, Render::Context::Impl *context,
+  GenericShadowPass(std::string_view name, Render::Context::Impl *context, Logger &logger,
                     Presenter::Impl *presenter,
                     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
-                    VertexPath vertex_path, FragmentPath fragment_path,
+                    StaticVertexPath static_vertex_path,
+                    StaticFragmentPath static_fragment_path,
+                    AnimatedVertexPath animated_vertex_path,
+                    AnimatedFragmentPath animated_fragment_path,
                     const bool debug_print);
 
   GenericShadowPass &operator=(GenericShadowPass &&rhs);
@@ -63,16 +68,18 @@ public:
     glm::mat4 proj;
   };
 
-  void record(Logger *logger, vk::Device &device, MeshCache &mesh_cache,
+  void record(Render::Context::Impl *context, Logger *logger,
+              vk::Device &device, MeshCache &mesh_cache,
               CurrentFlightFrame current_flightframe,
               vk::CommandBuffer &commandbuffer,
               std::optional<CameraUniformData> camera_data,
-              std::vector<MaterialRenderable> &renderables);
+              std::vector<ShadowRenderable> &renderables);
 
   auto get_shadowtexture(CurrentFlightFrame current_flightframe)
       -> ShadowPassTexture &;
 
 private:
+	std::string m_name;
   U32Extent m_extent;
   vk::UniqueRenderPass m_renderpass;
 
@@ -86,22 +93,8 @@ private:
 
   FlightFramesArray<FrameTextures> m_framestextures;
 
-  struct RenderPipeline {
-    vk::UniquePipelineLayout layout;
-    vk::UniquePipeline pipeline;
-
-    vk::UniqueDescriptorSetLayout descriptor_layout;
-    vk::UniqueDescriptorPool descriptor_pool;
-
-    struct PushConstants {
-      glm::mat4 model;
-    };
-
-    std::vector<AllocatedMemory> descriptor_memories;
-    std::vector<vk::UniqueDescriptorSet> descriptor_sets;
-  };
-
-  RenderPipeline m_pipeline;
+  StaticDepthPipeline m_static_pipeline;
+  AnimatedDepthPipeline m_animated_pipeline;
 };
 
 class OrthographicShadowPass : public GenericShadowPass {
@@ -112,17 +105,20 @@ public:
   OrthographicShadowPass(Logger &logger, Render::Context::Impl *context,
                          Presenter::Impl *presenter,
                          DescriptorPool::Impl *descriptor_pool,
-                         U32Extent extent,
-                         std::filesystem::path shader_root_path,
+                         U32Extent extent, StaticVertexPath static_vertex_path,
+                         StaticFragmentPath static_fragment_path,
+                         AnimatedVertexPath animated_vertex_path,
+                         AnimatedFragmentPath animated_fragment_path,
                          const bool debug_print);
 
   OrthographicShadowPass &operator=(OrthographicShadowPass &&rhs) = default;
 
-  void record(Logger *logger, vk::Device &device, MeshCache &mesh_cache,
+  void record(Render::Context::Impl *context, Logger *logger,
+              vk::Device &device, MeshCache &mesh_cache,
               CurrentFlightFrame current_flightframe,
               vk::CommandBuffer &commandbuffer,
               std::optional<CameraUniformData> camera_data,
-              std::vector<MaterialRenderable> &renderables);
+              std::vector<ShadowRenderable> &renderables);
 
   auto get_shadowtexture(CurrentFlightFrame current_flightframe)
       -> ShadowPassTexture &;
@@ -135,16 +131,20 @@ public:
   PerspectiveShadowPass(Logger &logger, Render::Context::Impl *context,
                         Presenter::Impl *presenter,
                         DescriptorPool::Impl *descriptor_pool, U32Extent extent,
-                        std::filesystem::path shader_root_path,
+                        StaticVertexPath static_vertex_path,
+                        StaticFragmentPath static_fragment_path,
+                        AnimatedVertexPath animated_vertex_path,
+                        AnimatedFragmentPath animated_fragment_path,
                         const bool debug_print);
 
   PerspectiveShadowPass &operator=(PerspectiveShadowPass &&rhs) = default;
 
-  void record(Logger *logger, vk::Device &device, MeshCache &mesh_cache,
+  void record(Render::Context::Impl *context, Logger *logger,
+              vk::Device &device, MeshCache &mesh_cache,
               CurrentFlightFrame current_flightframe,
               vk::CommandBuffer &commandbuffer,
               std::optional<CameraUniformData> camera_data,
-              std::vector<MaterialRenderable> &renderables);
+              std::vector<ShadowRenderable> &renderables);
 
   auto get_shadowtexture(CurrentFlightFrame current_flightframe)
       -> ShadowPassTexture &;
