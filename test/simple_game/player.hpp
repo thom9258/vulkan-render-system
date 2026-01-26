@@ -45,6 +45,7 @@ public:
       : m_transform(glm::mat4(1.0f)) {
 
     m_camera_center_offset = glm::mat4(1.0f);
+    m_gun_offset = glm::translate(glm::mat4(1.0f), glm::vec3(-0.5f, 1.0f, 0.0f));
 
     m_camera_position_offset =
         glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -3.0f));
@@ -60,6 +61,12 @@ public:
         &context, "greenbox_texture", InterpolationType::Linear,
         VerticalFlipOnLoad::No, BitmapPixelFormat::RGBA,
         "../assets/GreyboxTextures/greybox_green_grid.png");
+
+    gun_diffuse = texture_cache.load_from_path(
+        &context, "redbox_texture", InterpolationType::Linear,
+        VerticalFlipOnLoad::No, BitmapPixelFormat::RGBA,
+        "../assets/GreyboxTextures/greybox_red_grid.png");
+
   }
   ~Player() = default;
 
@@ -89,31 +96,50 @@ public:
     return m_transform * m_camera_center_offset * m_camera_lookat_offset;
   }
 
-  Renderable renderable() {
-    MaterialRenderable renderable;
-    renderable.model = glm::scale(m_transform, glm::vec3(0.6f, 2.0f, 0.6f));
-    renderable.mesh = mesh;
-    renderable.diffuse = diffuse;
-	renderable.has_shadow = true;
-    return renderable;
+  std::vector<Renderable> renderables() {
+    std::vector<Renderable> renderables;
+    MaterialRenderable player;
+    player.model = glm::scale(m_transform, glm::vec3(0.6f, 2.0f, 0.6f));
+    player.mesh = mesh;
+    player.diffuse = diffuse;
+    player.has_shadow = true;
+    renderables.push_back(player);
+
+    if (is_aiming) {
+		glm::mat4 gun_scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.6f));
+		glm::mat4 gun_transform = m_transform * m_camera_center_offset * m_gun_offset;
+		MaterialRenderable gun;
+		gun.model = gun_transform * gun_scale;
+		gun.mesh = mesh;
+		gun.diffuse = gun_diffuse;
+		gun.has_shadow = true;
+		renderables.push_back(gun);
+    }
+
+    return renderables;
   }
 
   double move_speed = 0.5f;
   double horizontal_rotate_speed = 0.7f;
   double vertical_rotate_speed = horizontal_rotate_speed * 0.6;
 
+  bool is_aiming{false};
+
   static constexpr glm::mat4 m_camera_position_near_offset =
-        glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -1.8f));
+      glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -1.8f));
   static constexpr glm::mat4 m_camera_position_far_offset =
-        glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -3.0f));
+      glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -3.0f));
 
   glm::mat4 m_camera_position_offset;
+
 private:
   glm::mat4 m_transform;
+  glm::mat4 m_gun_offset;
   glm::mat4 m_camera_center_offset;
   glm::mat4 m_camera_lookat_offset;
   std::optional<SimpleMeshRef> mesh;
   std::optional<TextureSamplerRef> diffuse;
+  std::optional<TextureSamplerRef> gun_diffuse;
 };
 
 void camera_follow_player(Camera &camera, Player &player) {
@@ -122,26 +148,3 @@ void camera_follow_player(Camera &camera, Player &player) {
   glm::vec3 target = player.camera_lookat_offset()[3];
   camera.lookat(position, target, up);
 }
-
-#if 0
-          case SDLK_LEFT:
-            camera.rotation =
-                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                      glm::radians(rotate_speed), world_up));
-            break;
-          case SDLK_RIGHT:
-            camera.rotation =
-                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                      glm::radians(-rotate_speed), world_up));
-            break;
-          case SDLK_UP:
-            camera.rotation =
-                glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                      glm::radians(rotate_speed), world_right));
-            break;
-          case SDLK_DOWN:
-            camera.rotation = glm::mat3(glm::rotate(glm::mat4(camera.rotation),
-                                                    glm::radians(-rotate_speed),
-                                                    world_right));
-            break;
-#endif

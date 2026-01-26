@@ -237,7 +237,8 @@ int main(int argc, char **argv) {
 	  pillar.has_shadow = true;
       renderables.push_back(pillar);
 
-      renderables.push_back(player.renderable());
+	  for (auto renderable: player.renderables())
+		  renderables.push_back(renderable);
 
       std::vector<Light> lights;
 

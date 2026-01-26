@@ -17,7 +17,6 @@ struct PlayerController {
   ControllerButton button_b{SDL_CONTROLLER_BUTTON_B};
   ControllerButton button_y{SDL_CONTROLLER_BUTTON_Y};
 
-
   ControllerButton button_l1{SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
 
   ControllerJoystickAxis joystick_left_x{0, 0};
@@ -72,7 +71,7 @@ struct PlayerController {
     button_a.update(joystick_events);
     button_b.update(joystick_events);
     button_y.update(joystick_events);
-	button_l1.update(joystick_events);
+    button_l1.update(joystick_events);
 
     {
       glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,
@@ -103,8 +102,10 @@ struct PlayerController {
 
     {
       if (button_l1.is_down()) {
+        player.is_aiming = true;
         player.m_camera_position_offset = player.m_camera_position_near_offset;
       } else {
+        player.is_aiming = false;
         player.m_camera_position_offset = player.m_camera_position_far_offset;
       }
     }
