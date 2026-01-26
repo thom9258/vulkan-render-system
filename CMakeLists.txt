@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(vulkan-renderer
-  VERSION 1.5
+  VERSION 1.5.1
   DESCRIPTION "vulkan renderer"
   HOMEPAGE_URL "https://github.com/thom9258/vulkan-renderer/"
 )
