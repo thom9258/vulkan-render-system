@@ -88,19 +88,23 @@ void main()
 		total_lighting += calculate_directional_light(directionallight[i]);
 	}
 
-	vec3 in_light = vec3(1.0, 1.0, 1.0);
-	vec3 in_shadow = vec3(0.0, 0.0, 0.0);
 	if (directional_shadowcaster.exists) {
-#if 0
+#if 0 // DEBUGGING SWITCH
+	   vec3 in_light = vec3(1.0, 0.0, 0.0);
+	   vec3 in_shadow = vec3(0.0, 0.0, 0.0);
 	   if (!is_in_directional_shadow(in_dirshadowcaster_lightspace_fragpos)) {
-	   		final_color = vec4(in_light, 1.0);
+	   		total_lighting = in_light;
 	   }
 	   else {
-	   		final_color = vec4(in_shadow, 1.0);
+	   		total_lighting = in_shadow;
 	   }
+	}
+
+	final_color = vec4(total_lighting, 1.0);
 
 #else		
-	   if (!is_in_directional_shadow(in_dirshadowcaster_lightspace_fragpos)) {
+
+	if (!is_in_directional_shadow(in_dirshadowcaster_lightspace_fragpos)) {
 		  total_lighting += calculate_directional_light(directional_shadowcaster.light);
 	   }
 	}
@@ -125,6 +129,14 @@ bool is_in_directional_shadow(vec4 fragpos_lightspace)
 	vec2 tex_coords = projection_coords.xy * 0.5 + 0.5;
 	float closest_depth = texture(directional_shadowmap, tex_coords).r;
 	float current_depth = projection_coords.z;
+
+//TODO: see if you can fix dir lighting
+#if 0
+    vec3 normal = normalize(in_vertex_normal);
+    vec3 light_direction = -directional_shadowcaster.light.direction;
+	float bias = max(0.01 * (1.0 - dot(normal, light_direction)), 0.001);  
+	return (current_depth - bias) > closest_depth;
+#endif
 	return (current_depth - SHADOW_BIAS) > closest_depth;
 }
 
@@ -138,6 +150,7 @@ bool is_in_spot_shadow(vec4 fragpos_lightspace)
 	vec2 tex_coords = projection_coords.xy * 0.5 + 0.5;
 	float closest_depth = texture(spot_shadowmap, tex_coords).r;
 	float current_depth = projection_coords.z;
+
 	return (current_depth - SHADOW_BIAS) > closest_depth;
 }
 
