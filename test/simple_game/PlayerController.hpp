@@ -18,11 +18,16 @@ struct PlayerController {
   ControllerButton button_y{SDL_CONTROLLER_BUTTON_Y};
 
   ControllerButton button_l1{SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
+  ControllerButton left_stick{SDL_CONTROLLER_BUTTON_LEFTSTICK};
+  ControllerButton right_stick{SDL_CONTROLLER_BUTTON_RIGHTSTICK};
 
   ControllerJoystickAxis joystick_left_x{0, 0};
   ControllerJoystickAxis joystick_left_y{0, 1};
   ControllerJoystickAxis joystick_right_x{0, 3};
   ControllerJoystickAxis joystick_right_y{0, 4};
+
+  ControllerJoystickAxis joystick_l2{0, 2};
+  ControllerJoystickAxis joystick_r2{0, 5};
 
   PlayerController() {
     // TODO::This is crucial because for some reason this is not enabled inside
@@ -71,7 +76,16 @@ struct PlayerController {
     button_a.update(joystick_events);
     button_b.update(joystick_events);
     button_y.update(joystick_events);
+    left_stick.update(joystick_events);
+    right_stick.update(joystick_events);
+
+
     button_l1.update(joystick_events);
+    joystick_l2.update(joystick_events);
+    joystick_r2.update(joystick_events);
+
+    if (button_l1.is_down() && joystick_r2.value() > 0.5f)
+		std::println("Shooting");
 
     {
       glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,

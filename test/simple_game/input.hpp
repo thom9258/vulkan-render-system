@@ -3,8 +3,13 @@
 #include <SDL_events.h>
 #include <SDL_gamecontroller.h>
 
+
+#include <VulkanRenderer/StrongType.hpp>
+
 #include <memory>
 #include <span>
+
+using Deadzone = StrongType<int, struct DeadzoneTag>;
 
 struct RawInputKey {
   void pressed_down() { m_is_down = true; }
@@ -28,7 +33,7 @@ private:
 
 class ControllerJoystickAxis {
 public:
-  static int constexpr deadzone = 8000;
+  static int constexpr deadzone = 5000;
 
   ControllerJoystickAxis(SDL_JoystickID id, std::uint8_t axis)
       : m_id{id}, m_axis{axis} {}
