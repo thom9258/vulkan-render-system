@@ -2,6 +2,7 @@
 #define MAX_SPOTLIGHTS 10
 #define MAX_DIRECTIONALLIGHTS 10
 #define SHININESS 32
+#define SHADOW_BIAS 0.005
 
 struct DirectionalLight
 {

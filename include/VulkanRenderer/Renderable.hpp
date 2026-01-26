@@ -89,3 +89,5 @@ void foreach_node(TFn &&fn, RenderableNodePtr &node)
 using Renderable =
     std::variant<NormColorRenderable, WireframeRenderable, MaterialRenderable,
                  AnimatedRenderable, RenderableNodePtr>;
+
+using ShadowRenderable = std::variant<MaterialRenderable, AnimatedRenderable>;

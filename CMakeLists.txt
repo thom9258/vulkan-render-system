@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(vulkan-renderer
-  VERSION 1.4
-  DESCRIPTION "vulkan-renderer is a piping library designed as an alternative to for-loops."
+  VERSION 1.5
+  DESCRIPTION "vulkan renderer"
   HOMEPAGE_URL "https://github.com/thom9258/vulkan-renderer/"
 )
 
@@ -81,11 +81,14 @@ set(PRIVATE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/source/DescriptorPoolImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/VertexBufferImpl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/ShaderTextureImpl.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/AnimationUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/TextureSamplerCache.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MeshCache.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/PipelineUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/MaterialPipeline.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/AnimatedPipeline.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/StaticDepthPipeline.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/source/AnimatedDepthPipeline.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Canvas.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Bitmap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/source/Mesh.cpp

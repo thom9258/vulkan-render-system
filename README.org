@@ -12,15 +12,17 @@ Required Features:
 - [X] Shadowmaps - simple support for a single directional and spot light.
 - [X] gltf loading (not animated).
 - [X] Animated meshes - limit support to gltf models.
-- [ ] Shadows for animated meshes.
+- [X] Shadows for animated meshes.
 - [ ] Support vertex indices.
-- [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
+- [ ] Investigate weird singular vertices that has wrong animated transformations (potentially fixed by supporting indices).
 - [ ] Add a gpu physical device selection method.
 - [ ] Changeable Background color.
 - [ ] Windows support.
    
 Less Important Features:
-- [ ] Custom static mesh binary format, something that has a ascii name + version, then a binary blob that is just <ID><DATA><ID><DATA> and easy to parse.
+- [ ] add a shadow_bakeable boolean to shadow pass and draw them into an "initial" shadow texture for orthographic shadows to be based on.
+- [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
+- [ ] Custom static mesh binary format, something that has a ascii name + version, then a binary blob that is just <TYPE><SIZE><DATA><TYPE><SIZE><DATA> so it is really easy and quick to parse (this must support changing endians aswell). The format should be directly copyable to the gpu. 
 - [ ] Make logger a singleton so it actually can be used everywhere instead of passed all over. It should probably be multithread applicable?
 - [ ] non-animated Vertex color pipeline.
 - [ ] Shadowmaps - multiple spot lights.
