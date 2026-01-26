@@ -20,8 +20,9 @@ Required Features:
 - [ ] Windows support.
    
 Less Important Features:
+- [ ] add a shadow_bakeable boolean to shadow pass and draw them into an "initial" shadow texture for orthographic shadows to be based on.
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
-- [ ] Custom static mesh binary format, something that has a ascii name + version, then a binary blob that is just <TYPE><SIZE><DATA><TYPE><SIZE><DATA> so it is really easy and quick to parse (this must support changing endians aswell).
+- [ ] Custom static mesh binary format, something that has a ascii name + version, then a binary blob that is just <TYPE><SIZE><DATA><TYPE><SIZE><DATA> so it is really easy and quick to parse (this must support changing endians aswell). The format should be directly copyable to the gpu. 
 - [ ] Make logger a singleton so it actually can be used everywhere instead of passed all over. It should probably be multithread applicable?
 - [ ] non-animated Vertex color pipeline.
 - [ ] Shadowmaps - multiple spot lights.
