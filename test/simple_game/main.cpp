@@ -32,6 +32,7 @@ using json = nlohmann::json;
 #include "PlayerController.hpp"
 #include "generate_textured_cube.hpp"
 #include "player.hpp"
+#include "Camera.hpp"
 
 void insert_animator(Animator *animator, RenderableNodePtr &renderable) {
   for (RenderableNode::Model &model : renderable->models) {
@@ -155,7 +156,9 @@ int main(int argc, char **argv) {
   Player player(context, mesh_cache, texture_cache);
   player.translate(glm::vec3(-2.0f, 1.0f, 0.0f));
 
+  CameraRig camera_rig;
   PlayerController player_controller;
+  CameraPlayerFollow camera_player_follow;
 
   bool reload_scene = false;
   bool exit = false;
@@ -216,8 +219,8 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Update
        */
-      player_controller(player, delta_time / 100, events);
-      camera_follow_player(camera, player);
+      player_controller(player, camera_rig, delta_time / 100, events);
+      camera_player_follow(camera, player, camera_rig, delta_time / 100);
       /** ************************************************************************
        * Render
        */
@@ -237,7 +240,7 @@ int main(int argc, char **argv) {
 	  pillar.has_shadow = true;
       renderables.push_back(pillar);
 
-	  for (auto renderable: player.renderables())
+	  for (auto renderable: player.renderables(camera_rig))
 		  renderables.push_back(renderable);
 
       std::vector<Light> lights;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "input.hpp"
+#include "interpolation.hpp"
 #include "player.hpp"
 #include <SDL_events.h>
 #include <SDL_gamecontroller.h>
@@ -44,15 +45,19 @@ struct PlayerController {
     }
   }
 
-  void operator()(Player &player, double delta_time,
+  void operator()(Player &player, CameraRig &camera_rig, double delta_time,
                   std::span<SDL_Event> events) {
 
     // TODO: seemingly a controller is found but cant be re-added after it is
     // added again
     maybe_rediscover_controller(events);
+
     if (!m_controller) {
-      std::println("No Controller!");
-      return;
+      m_controller = try_find_controller();
+      if (!m_controller) {
+        std::println("No Controller!");
+        return;
+      }
     }
 
     SDL_JoystickID joystick_id =
@@ -79,13 +84,9 @@ struct PlayerController {
     left_stick.update(joystick_events);
     right_stick.update(joystick_events);
 
-
     button_l1.update(joystick_events);
     joystick_l2.update(joystick_events);
     joystick_r2.update(joystick_events);
-
-    if (button_l1.is_down() && joystick_r2.value() > 0.5f)
-		std::println("Shooting");
 
     {
       glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,
@@ -108,7 +109,7 @@ struct PlayerController {
       glm::vec3 camera_center_offset_rotation(-joystick_right_y.value(), 0.0f,
                                               0.0f);
       if (glm::length(camera_center_offset_rotation) > 0.01f) {
-        player.rotate_camera_center(
+        camera_rig.rotate_camera_center(
             camera_center_offset_rotation *
             glm::vec3(player.vertical_rotate_speed * delta_time));
       }
@@ -117,11 +118,12 @@ struct PlayerController {
     {
       if (button_l1.is_down()) {
         player.is_aiming = true;
-        player.m_camera_position_offset = player.m_camera_position_near_offset;
       } else {
         player.is_aiming = false;
-        player.m_camera_position_offset = player.m_camera_position_far_offset;
       }
+
+      if (button_l1.is_down() && joystick_r2.value() > 0.5f)
+        std::println("Shooting");
     }
   }
 
