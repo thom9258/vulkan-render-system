@@ -1,5 +1,6 @@
 #include <VulkanRenderer/ModelLoader.hpp>
 
+#include "AnimationUtils.hpp"
 #include "MeshCache.hpp"
 #include "ShaderTexture.hpp"
 #include "Vertex.hpp"
@@ -321,12 +322,25 @@ RenderableNodePtr load_model(Render::Context &context, MeshCache &mesh_cache,
   Assimp::Importer importer;
   // https://the-asset-importer-lib-documentation.readthedocs.io/en/latest/usage/postprocessing.html
   std::uint32_t constexpr flags =
-      aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs;
+      aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs |
+      aiProcess_FixInfacingNormals | aiProcess_LimitBoneWeights;
 
   const aiScene *scene = importer.ReadFile(path, flags);
-  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
-      !scene->mRootNode) {
-    std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
+  if (!scene) {
+    std::cout << "NO SCENE ERROR::ASSIMP::" << importer.GetErrorString()
+              << std::endl;
+    return nullptr;
+  }
+
+  if (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
+    std::cout << "FLAGS INCOMPLETE ERROR::ASSIMP::" << importer.GetErrorString()
+              << std::endl;
+    return nullptr;
+  }
+
+  if (!scene->mRootNode) {
+    std::cout << "NO ROOT NODE ERROR::ASSIMP::" << importer.GetErrorString()
+              << std::endl;
     return nullptr;
   }
 
@@ -340,8 +354,10 @@ RenderableNodePtr load_model(Render::Context &context, MeshCache &mesh_cache,
 Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
   Bone bone(name, ID);
 
-  // bone.m_NumPositions = channel->mNumPositionKeys;
-  // for (int i = 0; i < bone.m_NumPositions; ++i) {
+  std::println("'{}' id={} KeyCounts: position={} rotation={} scale={}", name,
+               ID, channel->mNumPositionKeys, channel->mNumRotationKeys,
+               channel->mNumScalingKeys);
+
   for (int i = 0; i < channel->mNumPositionKeys; ++i) {
     aiVector3D aiPosition = channel->mPositionKeys[i].mValue;
     float timeStamp = channel->mPositionKeys[i].mTime;
@@ -351,8 +367,6 @@ Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
     bone.m_Positions.push_back(data);
   }
 
-  // bone.m_NumRotations = channel->mNumRotationKeys;
-  // for (int rotationIndex = 0; rotationIndex < bone.m_NumRotations;
   for (int i = 0; i < channel->mNumRotationKeys; ++i) {
     aiQuaternion aiOrientation = channel->mRotationKeys[i].mValue;
     float timeStamp = channel->mRotationKeys[i].mTime;
@@ -362,8 +376,6 @@ Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
     bone.m_Rotations.push_back(data);
   }
 
-  // bone.m_NumScalings = channel->mNumScalingKeys;
-  // for (int keyIndex = 0; keyIndex < bone.m_NumScalings; ++keyIndex) {
   for (int i = 0; i < channel->mNumScalingKeys; ++i) {
     aiVector3D scale = channel->mScalingKeys[i].mValue;
     float timeStamp = channel->mScalingKeys[i].mTime;
@@ -444,12 +456,15 @@ auto create_animations(const aiScene *scene, BoneInfos &bone_infos)
     animation.m_TicksPerSecond = ai_animation->mTicksPerSecond;
     ReadHeirarchyData(animation, animation.m_RootNode, scene->mRootNode);
     ReadMissingBones(animation, bone_infos, ai_animation);
-    //print_animation(std::cout, animation, std::format("{}", i));
+    print_animation(std::cout, animation, std::format("{}", i));
     animations.push_back(animation);
   }
 
   return animations;
 }
+
+static constexpr glm::ivec4 invalid_bone_ids(-1.0f);
+static constexpr glm::vec4 no_bone_weights(0.0f);
 
 auto process_animated_mesh(Render::Context &context,
                            TextureSamplerCache &texture_cache,
@@ -461,15 +476,11 @@ auto process_animated_mesh(Render::Context &context,
   std::vector<VertexAnimatedPosNormColorUV> vertices{};
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
     VertexAnimatedPosNormColorUV vertex;
-    vertex.pos[0] = mesh->mVertices[i].x;
-    vertex.pos[1] = mesh->mVertices[i].y;
-    vertex.pos[2] = mesh->mVertices[i].z;
-    vertex.norm[0] = mesh->mNormals[i].x;
-    vertex.norm[1] = mesh->mNormals[i].y;
-    vertex.norm[2] = mesh->mNormals[i].z;
+    vertex.pos = assimp_to_glm::vec3(mesh->mVertices[i]);
+    vertex.norm = assimp_to_glm::vec3(mesh->mNormals[i]);
     vertex.color = glm::vec3(1.0f);
-    vertex.bone_ids = glm::ivec4(-1.0f);
-    vertex.weights = glm::vec4(0.0f);
+    vertex.bone_ids = invalid_bone_ids;
+    vertex.weights = no_bone_weights;
 
     if (mesh->mTextureCoords[0]) {
       // texcoords have multiple dimensions we only care about the first
@@ -489,19 +500,17 @@ auto process_animated_mesh(Render::Context &context,
         mesh->mNumBones, 100));
   }
 
-  std::size_t numBones = std::min(static_cast<std::size_t>(mesh->mNumBones),
-                                  static_cast<std::size_t>(100));
+  std::size_t const numBones = std::min(
+      static_cast<std::size_t>(mesh->mNumBones), static_cast<std::size_t>(100));
 
   for (int boneIndex = 0; boneIndex < numBones; ++boneIndex) {
     std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
     std::optional<int> boneID;
     if (!bone_infos.has_bone(boneName)) {
-#if 0
-      std::println("Found new BoneInfo by name {}", boneName);
-      std::println(">> and matrix {}",
-                   glm::to_string(assimp_to_glm::matrix(
-                       mesh->mBones[boneIndex]->mOffsetMatrix)));
-#endif
+      glm::mat4 offset =
+          assimp_to_glm::matrix(mesh->mBones[boneIndex]->mOffsetMatrix);
+      std::println("Found new BoneInfo by name {} with translation {}",
+                   boneName, glm::to_string(offset[3]));
 
       boneID = bone_infos.insert_bone(
           boneName,
@@ -511,31 +520,25 @@ auto process_animated_mesh(Render::Context &context,
       boneID = bone_infos.find_bone_id(boneName);
     }
 
-    assert(boneID != std::nullopt);
-    auto weights = mesh->mBones[boneIndex]->mWeights;
-    if (mesh->mBones[boneIndex]->mNumWeights > 4) {
-//     std::println("WARNING: The model to load has {} animation weighs, but "
-//                  "max {} is supported",
-//                  mesh->mBones[boneIndex]->mNumWeights, 4);
-    }
+    auto set_vertex_bone_data = [&](VertexAnimatedPosNormColorUV &vertex, int boneID, float weight) {
+      for (int i = 0; i < animation::max_bone_weights; i++) {
+        if (vertex.bone_ids[i] < 0) {
+          vertex.weights[i] = weight;
+          vertex.bone_ids[i] = boneID;
+          break;
+        }
+      }
+    };
 
-#if 0
-    std::size_t numWeights =
-        std::min(static_cast<std::size_t>(mesh->mBones[boneIndex]->mNumWeights),
-                 static_cast<std::size_t>(4));
-#else
+    assert(boneID != std::nullopt);
+    aiVertexWeight *weights = mesh->mBones[boneIndex]->mWeights;
     std::size_t numWeights = mesh->mBones[boneIndex]->mNumWeights;
-#endif
 
     for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex) {
       int vertexId = weights[weightIndex].mVertexId;
       float weight = weights[weightIndex].mWeight;
       assert(vertexId <= vertices.size());
-
-      if (vertices[vertexId].bone_ids[boneIndex] < 0) {
-        vertices[vertexId].bone_ids[boneIndex] = boneID.value();
-        vertices[vertexId].weights[boneIndex] = weight;
-      }
+	  set_vertex_bone_data(vertices[vertexId], boneID.value(), weight);
     }
   }
 
@@ -725,11 +728,33 @@ auto load_animated_model(Render::Context &context, MeshCache &mesh_cache,
   Assimp::Importer importer;
   // https://the-asset-importer-lib-documentation.readthedocs.io/en/latest/usage/postprocessing.html
   std::uint32_t constexpr flags =
-      aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs;
+      aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs |
+      aiProcess_FixInfacingNormals | aiProcess_LimitBoneWeights;
 
   const aiScene *scene = importer.ReadFile(path, flags);
-  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
-      !scene->mRootNode) {
+  // if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
+  //     !scene->mRootNode) {
+  //   return std::unexpected(
+  //       std::format("ERROR::ASSIMP::{}", importer.GetErrorString()));
+  // }
+
+  if (!scene) {
+    std::cout << "NO SCENE ERROR::ASSIMP::" << importer.GetErrorString()
+              << std::endl;
+    return std::unexpected(
+        std::format("ERROR::ASSIMP::{}", importer.GetErrorString()));
+  }
+
+  if (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
+    std::cout << "FLAGS INCOMPLETE ERROR::ASSIMP::" << importer.GetErrorString()
+              << std::endl;
+    return std::unexpected(
+        std::format("ERROR::ASSIMP::{}", importer.GetErrorString()));
+  }
+
+  if (!scene->mRootNode) {
+    std::cout << "NO ROOT NODE ERROR::ASSIMP::" << importer.GetErrorString()
+              << std::endl;
     return std::unexpected(
         std::format("ERROR::ASSIMP::{}", importer.GetErrorString()));
   }

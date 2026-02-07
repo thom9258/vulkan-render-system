@@ -28,20 +28,20 @@ private:
 
 struct KeyPosition
 {
-    glm::vec3 position;
-    float timeStamp;
+    glm::vec3 position{0.0f, 0.0f, 0.0f};
+    float timeStamp{0};
 };
 
 struct KeyRotation
 {
-    glm::quat orientation;
-    float timeStamp;
+    glm::quat orientation{0.0f, 0.0f, 0.0f, 1.0f};
+    float timeStamp{0};
 };
 
 struct KeyScale
 {
-    glm::vec3 scale;
-    float timeStamp;
+    glm::vec3 scale{1.0f, 1.0f, 1.0f};
+    float timeStamp{0};
 };
 
 
@@ -53,9 +53,6 @@ public:
     std::vector<KeyPosition> m_Positions;
     std::vector<KeyRotation> m_Rotations;
     std::vector<KeyScale> m_Scales;
-//   int m_NumPositions;
-//   int m_NumRotations;
-//   int m_NumScalings;
 	
     glm::mat4 m_LocalTransform;
     std::string m_Name;

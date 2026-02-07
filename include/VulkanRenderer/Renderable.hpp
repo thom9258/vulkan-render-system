@@ -77,7 +77,7 @@ struct RenderableNode {
 using RenderableNodePtr = RenderableNode::NodePtr;
 
 template <typename TFn>
-void foreach_node(TFn &&fn, RenderableNodePtr &node)
+constexpr void foreach_node(TFn &&fn, RenderableNodePtr &node)
   requires std::invocable<TFn, RenderableNodePtr &>
 {
   std::invoke(fn, node);
