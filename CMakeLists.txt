@@ -6,7 +6,6 @@ project(vulkan-renderer
   HOMEPAGE_URL "https://github.com/thom9258/vulkan-renderer/"
 )
 
-
 add_library(${PROJECT_NAME} SHARED)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME}) 
 
@@ -20,7 +19,10 @@ find_package(SDL2 REQUIRED)
 find_package(assimp REQUIRED)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
-target_compile_options(${PROJECT_NAME} PRIVATE "")
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU") # gcc warning flags
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -g -ggdb -Werror=format-security -Werror=array-bounds)
+endif()
 
 target_include_directories(${PROJECT_NAME} 
   PUBLIC
