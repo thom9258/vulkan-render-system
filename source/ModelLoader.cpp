@@ -354,9 +354,9 @@ RenderableNodePtr load_model(Render::Context &context, MeshCache &mesh_cache,
 Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
   Bone bone(name, ID);
 
-  std::println("'{}' id={} KeyCounts: position={} rotation={} scale={}", name,
-               ID, channel->mNumPositionKeys, channel->mNumRotationKeys,
-               channel->mNumScalingKeys);
+// std::println("'{}' id={} KeyCounts: position={} rotation={} scale={}", name,
+//              ID, channel->mNumPositionKeys, channel->mNumRotationKeys,
+//              channel->mNumScalingKeys);
 
   for (int i = 0; i < channel->mNumPositionKeys; ++i) {
     aiVector3D aiPosition = channel->mPositionKeys[i].mValue;
@@ -456,7 +456,7 @@ auto create_animations(const aiScene *scene, BoneInfos &bone_infos)
     animation.m_TicksPerSecond = ai_animation->mTicksPerSecond;
     ReadHeirarchyData(animation, animation.m_RootNode, scene->mRootNode);
     ReadMissingBones(animation, bone_infos, ai_animation);
-    print_animation(std::cout, animation, std::format("{}", i));
+    //print_animation(std::cout, animation, std::format("{}", i));
     animations.push_back(animation);
   }
 
@@ -509,8 +509,8 @@ auto process_animated_mesh(Render::Context &context,
     if (!bone_infos.has_bone(boneName)) {
       glm::mat4 offset =
           assimp_to_glm::matrix(mesh->mBones[boneIndex]->mOffsetMatrix);
-      std::println("Found new BoneInfo by name {} with translation {}",
-                   boneName, glm::to_string(offset[3]));
+//     std::println("Found new BoneInfo by name {} with translation {}",
+//                  boneName, glm::to_string(offset[3]));
 
       boneID = bone_infos.insert_bone(
           boneName,

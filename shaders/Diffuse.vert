@@ -8,6 +8,8 @@ layout(location = 3) in vec2 inTexcoord;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 texcoord;
 
+
+
 layout( push_constant )
 uniform constants
 {

@@ -30,6 +30,8 @@ struct PlayerController {
   ControllerJoystickAxis joystick_l2{0, 2};
   ControllerJoystickAxis joystick_r2{0, 5};
 
+  glm::vec3 last_player_translation{0.0f};
+
   PlayerController() {
     // TODO::This is crucial because for some reason this is not enabled inside
     // SDL_INIT_EVERYTHING
@@ -90,11 +92,28 @@ struct PlayerController {
 
     {
       glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,
-                                   -joystick_left_y.value());
+                                       -joystick_left_y.value());
+
+      if (glm::length(player_translation) < 0.1f) {
+		  player_translation = glm::vec3(0.0f);
+	  }
+
       if (glm::length(player_translation) > 0.01f) {
+
         player.translate(player_translation *
                          glm::vec3(player.move_speed * delta_time));
       }
+
+      if (last_player_translation == glm::vec3(0.0f) &&
+          player_translation != glm::vec3(0.0f)) {
+          player.play_walk_animation();
+      }
+      else if (last_player_translation != glm::vec3(0.0f) &&
+          player_translation == glm::vec3(0.0f)) {
+          player.play_idle_animation();
+      }
+
+	  last_player_translation = player_translation;
     }
 
     {

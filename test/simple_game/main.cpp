@@ -242,6 +242,7 @@ int main(int argc, char **argv) {
 	  pillar.has_shadow = true;
       renderables.push_back(pillar);
 
+	  player.update(delta_time / 1000);
 	  for (auto renderable: player.renderables(camera_rig))
 		  renderables.push_back(renderable);
 

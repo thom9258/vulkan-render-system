@@ -55,24 +55,49 @@ public:
          TextureSamplerCache &texture_cache)
       : m_transform(glm::mat4(1.0f)) {
 
-    mesh = mesh_cache.add(
-        context, TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(
-                     context, get_textured_cube_vertices())});
+    std::expected<LoadedAnimatedModel, std::string> loaded_model =
+        load_animated_model(
+            context, mesh_cache, texture_cache,
+            "../assets/lowpoly_scifi_girl/lowpoly_scifi_girl.gltf");
 
-    diffuse = texture_cache.load_from_path(
-        &context, "greenbox_texture", InterpolationType::Linear,
-        VerticalFlipOnLoad::No, BitmapPixelFormat::RGBA,
-        "../assets/GreyboxTextures/greybox_green_grid.png");
+    if (loaded_model.has_value()) {
+      model = loaded_model.value();
+    } else {
+      std::println("Could NOT Load player model, error: {}",
+                   loaded_model.error());
+    }
 
-    gun_diffuse = texture_cache.load_from_path(
-        &context, "redbox_texture", InterpolationType::Linear,
-        VerticalFlipOnLoad::No, BitmapPixelFormat::RGBA,
-        "../assets/GreyboxTextures/greybox_red_grid.png");
+    auto insert_animator = [](Animator *animator,
+                              RenderableNodePtr &renderable) {
+      for (RenderableNode::Model &model : renderable->models) {
+        if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+          p->animator = animator;
+        }
+      }
+    };
+
+    foreach_node(std::bind_front(insert_animator, &animator), model.renderable);
+    animator.PlayAnimation(&model.animations.at(0));
   }
+
   ~Player() = default;
 
   void translate(glm::vec3 offset) {
     m_transform = glm::translate(m_transform, offset);
+  }
+
+  void play_walk_animation() {
+    if (m_current_animation != m_walk_animation) {
+      animator.PlayAnimation(&model.animations.at(m_walk_animation));
+	  m_current_animation = m_walk_animation;
+    }
+  }
+
+  void play_idle_animation() {
+    if (m_current_animation != m_idle_animation) {
+      animator.PlayAnimation(&model.animations.at(m_idle_animation));
+	  m_current_animation = m_idle_animation;
+    }
   }
 
   glm::vec3 translation() { return m_transform[3]; }
@@ -85,38 +110,29 @@ public:
     m_transform = m_transform * rotation_mat;
   }
 
+  void update(double delta_time) {
+    animator.UpdateAnimation(delta_time);
+  }
+
   std::vector<Renderable> renderables(CameraRig &camera_rig) {
     std::vector<Renderable> renderables;
-    MaterialRenderable player;
-    player.model = glm::scale(m_transform, glm::vec3(0.6f, 2.0f, 0.6f));
-    player.mesh = mesh;
-    player.diffuse = diffuse;
-    player.has_shadow = true;
-    renderables.push_back(player);
 
-    if (is_aiming) {
-      glm::mat4 gun_scale =
-          glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.6f));
-      glm::mat4 gun_transform =
-          m_transform * m_gun_offset * camera_rig.origin_rotation();
-      MaterialRenderable gun;
-      gun.model = gun_transform * gun_scale;
-      gun.mesh = mesh;
-      gun.diffuse = gun_diffuse;
-      gun.has_shadow = true;
-      renderables.push_back(gun);
-    }
+    model.renderable->model_matrix =
+        glm::scale(glm::translate(m_transform, glm::vec3(0.0f, -1.0f, 0.0f)),
+                   glm::vec3(0.7f));
+    renderables.push_back(model.renderable);
 
     return renderables;
   }
-
   double move_speed = 0.5f;
   double horizontal_rotate_speed = 0.7f;
   double vertical_rotate_speed = horizontal_rotate_speed * 0.6;
 
   bool is_aiming{false};
 
-  // glm::mat4 m_camera_position_offset;
+  size_t const m_idle_animation = 0;
+  size_t const m_walk_animation = 1;
+  size_t m_current_animation = m_idle_animation;
   glm::mat4 m_camera_current;
 
 private:
@@ -124,14 +140,13 @@ private:
   glm::mat4 m_gun_offset =
       glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 0.8f, 0.3f));
 
-  std::optional<SimpleMeshRef> mesh;
-  std::optional<TextureSamplerRef> diffuse;
-  std::optional<TextureSamplerRef> gun_diffuse;
+  LoadedAnimatedModel model;
+  Animator animator;
 };
 
 struct CameraPlayerFollow {
 
-  glm::mat4 current_position;
+  glm::mat4 current_position{1.0f};
   double step_percentage = 0.8f;
 
   void operator()(Camera &camera, Player &player, CameraRig &camera_rig,
