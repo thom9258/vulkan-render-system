@@ -17,13 +17,13 @@
 
 class CameraRig {
 public:
-  glm::mat4 lookat_offset =
+  static constexpr glm::mat4 lookat_offset =
       glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 20.0f));
 
-  glm::mat4 position_near_offset =
+  static constexpr glm::mat4 position_near_offset =
       glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -1.8f));
 
-  glm::mat4 position_far_offset =
+  static constexpr glm::mat4 position_far_offset =
       glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 2.0f, -3.0f));
 
   glm::mat4 origin_offset = glm::mat4(1.0f);
@@ -132,7 +132,7 @@ private:
 struct CameraPlayerFollow {
 
   glm::mat4 current_position;
-  double step_percentage = 0.7f;
+  double step_percentage = 0.8f;
 
   void operator()(Camera &camera, Player &player, CameraRig &camera_rig,
                   double delta_time) {

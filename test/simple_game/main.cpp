@@ -221,6 +221,8 @@ int main(int argc, char **argv) {
        */
       player_controller(player, camera_rig, delta_time / 100, events);
       camera_player_follow(camera, player, camera_rig, delta_time / 100);
+
+
       /** ************************************************************************
        * Render
        */
