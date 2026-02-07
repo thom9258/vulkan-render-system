@@ -94,9 +94,13 @@ struct PlayerController {
       glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,
                                        -joystick_left_y.value());
 
-      if (glm::length(player_translation) < 0.1f) {
+      if (glm::length(player_translation) < 0.05f) {
 		  player_translation = glm::vec3(0.0f);
-	  }
+      } else {
+		  static constexpr double max_player_speed = 0.7;
+		  player_translation *= max_player_speed;
+      }
+
 
       if (glm::length(player_translation) > 0.01f) {
 
