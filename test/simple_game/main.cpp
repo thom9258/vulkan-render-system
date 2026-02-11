@@ -1,3 +1,4 @@
+#include <BulletCollision/CollisionShapes/btCapsuleShape.h>
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -14,6 +15,7 @@
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/DescriptorPool.hpp>
+#include <VulkanRenderer/FlightFrames.hpp>
 #include <VulkanRenderer/Light.hpp>
 #include <VulkanRenderer/ModelLoader.hpp>
 #include <VulkanRenderer/Presenter.hpp>
@@ -29,10 +31,12 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+#include "Camera.hpp"
 #include "PlayerController.hpp"
 #include "generate_textured_cube.hpp"
 #include "player.hpp"
-#include "Camera.hpp"
+
+#include "Physics.hpp"
 
 void insert_animator(Animator *animator, RenderableNodePtr &renderable) {
   for (RenderableNode::Model &model : renderable->models) {
@@ -66,6 +70,70 @@ std::chrono::duration<double> with_time_measurement(F &&f, Args &&...args) {
 }
 
 int main(int argc, char **argv) {
+
+  physics::Physics physics;
+  // the ground is a cube of side 100 at position y = -56.
+  // the sphere will hit it at y = -6, with center at -5
+  // btCollisionShape *groundShape =
+  //     new btBoxShape(btVector3(btScalar(50.), btScalar(50.), btScalar(50.)));
+  auto groundShape = std::make_unique<btBoxShape>(
+      btVector3(btScalar(10.), btScalar(0.5f), btScalar(10.)));
+  {
+    btTransform groundTransform;
+    groundTransform.setIdentity();
+    groundTransform.setOrigin(btVector3(0, 0, 0));
+
+    btScalar mass(0.);
+
+    // rigidbody is dynamic if and only if mass is non zero, otherwise static
+    bool isDynamic = (mass != 0.f);
+
+    btVector3 localInertia(0, 0, 0);
+    if (isDynamic)
+      groundShape->calculateLocalInertia(mass, localInertia);
+
+    // using motionstate is optional, it provides interpolation capabilities,
+    // and only synchronizes 'active' objects
+    btDefaultMotionState *myMotionState =
+        new btDefaultMotionState(groundTransform);
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(
+        mass, myMotionState, groundShape.get(), localInertia);
+    btRigidBody *body = new btRigidBody(rbInfo);
+
+    // add the body to the dynamics world
+    physics.dynamicsWorld->addRigidBody(body);
+  }
+
+  // auto colShape = std::make_unique<btBoxShape>(btVector3(1, 1, 1));
+  auto colShape =
+      std::make_unique<btCapsuleShape>(btScalar(0.5f), btScalar(1.8f));
+  {
+    // create a dynamic rigidbody
+
+    /// Create Dynamic Objects
+    btTransform startTransform;
+    startTransform.setIdentity();
+
+    btScalar mass(1.f);
+
+    // rigidbody is dynamic if and only if mass is non zero, otherwise static
+    bool isDynamic = (mass != 0.f);
+
+    btVector3 localInertia(0, 0, 0);
+    if (isDynamic)
+      colShape->calculateLocalInertia(mass, localInertia);
+
+    startTransform.setOrigin(btVector3(2, 10, 0));
+
+    // using motionstate is recommended, it provides interpolation capabilities,
+    // and only synchronizes 'active' objects
+    btDefaultMotionState *myMotionState =
+        new btDefaultMotionState(startTransform);
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(
+        mass, myMotionState, colShape.get(), localInertia);
+    btRigidBody *body = new btRigidBody(rbInfo);
+    physics.dynamicsWorld->addRigidBody(body);
+  }
 
   WindowConfig window_config;
   // RenderConfig render_config;
@@ -166,6 +234,8 @@ int main(int argc, char **argv) {
   double delta_time = 0;
   double total_time = 0;
 
+  FlightFramesArray<std::optional<SimpleMeshRef>> debug_line_meshes;
+
   auto poll_all_events = []() -> std::vector<SDL_Event> {
     std::vector<SDL_Event> events;
     SDL_Event event;
@@ -217,11 +287,30 @@ int main(int argc, char **argv) {
       }
 
       /** ************************************************************************
+       * Physics Update
+       */
+      // physics.dynamicsWorld->stepSimulation(1.f / 60.f, 10);
+      physics.dynamicsWorld->stepSimulation(delta_time / 1000, 10);
+      physics.dynamicsWorld->debugDrawWorld();
+
+      for (int j = physics.dynamicsWorld->getNumCollisionObjects() - 1; j >= 0;
+           j--) {
+        btCollisionObject *obj =
+            physics.dynamicsWorld->getCollisionObjectArray()[j];
+        btRigidBody *body = btRigidBody::upcast(obj);
+        btTransform trans;
+        if (body && body->getMotionState()) {
+          body->getMotionState()->getWorldTransform(trans);
+        } else {
+          trans = obj->getWorldTransform();
+        }
+      }
+
+      /** ************************************************************************
        * Update
        */
       player_controller(player, camera_rig, delta_time / 100, events);
       camera_player_follow(camera, player, camera_rig, delta_time / 100);
-
 
       /** ************************************************************************
        * Render
@@ -231,26 +320,26 @@ int main(int argc, char **argv) {
       MaterialRenderable floor;
       floor.mesh = textured_cube;
       floor.diffuse = greybox_texture;
-      floor.model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 0.2f, 10.0f));
-	  floor.has_shadow = true;
+      floor.model = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f)), glm::vec3(10.0f, 0.2f, 10.0f));
+      floor.has_shadow = true;
       renderables.push_back(floor);
 
       MaterialRenderable pillar;
       pillar.mesh = textured_cube;
       pillar.diffuse = bluebox_texture;
       pillar.model = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 5.0f, 1.0f));
-	  pillar.has_shadow = true;
+      pillar.has_shadow = true;
       renderables.push_back(pillar);
 
-	  player.update(delta_time / 1000);
-	  for (auto renderable: player.renderables(camera_rig))
-		  renderables.push_back(renderable);
+      player.update(delta_time / 1000);
+      for (auto renderable : player.renderables())
+        renderables.push_back(renderable);
 
       std::vector<Light> lights;
 
-	  DirectionalLight base_light;
-	  base_light.ambient = glm::vec3(0.01f);
-	  lights.push_back(base_light);
+      DirectionalLight base_light;
+      base_light.ambient = glm::vec3(0.01f);
+      lights.push_back(base_light);
 
       ShadowCasters shadowcasters;
 
@@ -280,6 +369,17 @@ int main(int argc, char **argv) {
 
       FrameProducer frameGenerator =
           [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
+        debug_line_meshes[frameInfo.current_flight_frame_index] =
+            mesh_cache.add(
+                context,
+                TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(
+                    context, physics.debug_line_collecter->debug_lines)});
+
+        WireframeRenderable debug_mesh;
+        debug_mesh.mesh =
+            debug_line_meshes[frameInfo.current_flight_frame_index];
+        renderables.push_back(debug_mesh);
+
         auto *textureptr = renderer.render(
             &context, texture_cache, mesh_cache,
             frameInfo.current_flight_frame_index, frameInfo.total_frame_count,
@@ -291,10 +391,13 @@ int main(int argc, char **argv) {
       };
 
       auto render_time = with_time_measurement(
-          [&]() { presenter.with_presentation(frameGenerator); });
+          [&]() {
+        presenter.with_presentation(frameGenerator); });
 
       framecount++;
     });
+
+    physics.debug_line_collecter->clear();
 
     delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                      duration_delta_time)

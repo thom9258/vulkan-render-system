@@ -10,6 +10,7 @@ class TestVulkanRenderer(ConanFile):
     def requirements(self):
         self.requires("vulkan-renderer/1.5.1")
         self.requires("nlohmann_json/3.12.0")
+        self.requires("bullet3/3.25")
         
     def layout(self):
         cmake_layout(self)

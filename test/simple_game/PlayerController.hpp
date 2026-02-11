@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config_parser.hpp"
 #include "input.hpp"
 #include "interpolation.hpp"
 #include "player.hpp"
@@ -19,6 +20,7 @@ struct PlayerController {
   ControllerButton button_y{SDL_CONTROLLER_BUTTON_Y};
 
   ControllerButton button_l1{SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
+  ControllerButton button_r1{SDL_CONTROLLER_BUTTON_RIGHTSHOULDER};
   ControllerButton left_stick{SDL_CONTROLLER_BUTTON_LEFTSTICK};
   ControllerButton right_stick{SDL_CONTROLLER_BUTTON_RIGHTSTICK};
 
@@ -32,18 +34,49 @@ struct PlayerController {
 
   glm::vec3 last_player_translation{0.0f};
 
+  double max_player_walk_speed = 0.7;
+  double max_player_run_speed = 1.4;
+
+  std::size_t backwalk_animation = 0;
+  std::size_t idle_animation = 0;
+  std::size_t leftstrafe_animation = 0;
+  std::size_t rightstrafe_animation = 0;
+  std::size_t walk_animation = 0;
+
   PlayerController() {
     // TODO::This is crucial because for some reason this is not enabled inside
     // SDL_INIT_EVERYTHING
     if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 1)
       SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
 
-    // SDL_JoystickEventState(SDL_ENABLE);
     m_controller = try_find_controller();
     if (!m_controller) {
       std::println("No controller could be found from beginning!");
     } else {
       std::println("Controller is connected from beginning!");
+    }
+
+    auto config = config::parse_config("../player.config");
+    if (config.has_value()) {
+      max_player_walk_speed =
+          config::assoc("walk_speed", config.value().f32s).value_or(0.7f);
+      max_player_run_speed =
+          config::assoc("run_speed", config.value().f32s).value_or(1.4f);
+      backwalk_animation =
+          config::assoc("backwalk_animation", config.value().i32s).value_or(0);
+      walk_animation =
+          config::assoc("walk_animation", config.value().i32s).value_or(0);
+      idle_animation =
+          config::assoc("idle_animation", config.value().i32s).value_or(0);
+      leftstrafe_animation =
+          config::assoc("leftstrafe_animation", config.value().i32s)
+              .value_or(0);
+      rightstrafe_animation =
+          config::assoc("rightstrafe_animation", config.value().i32s)
+              .value_or(0);
+
+    } else {
+      std::println("Config was not readable: {}", config.error());
     }
   }
 
@@ -87,20 +120,25 @@ struct PlayerController {
     right_stick.update(joystick_events);
 
     button_l1.update(joystick_events);
+    button_r1.update(joystick_events);
     joystick_l2.update(joystick_events);
     joystick_r2.update(joystick_events);
 
     {
+
       glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,
-                                       -joystick_left_y.value());
+                                   -joystick_left_y.value());
 
       if (glm::length(player_translation) < 0.05f) {
-		  player_translation = glm::vec3(0.0f);
+        player_translation = glm::vec3(0.0f);
       } else {
-		  static constexpr double max_player_speed = 0.7;
-		  player_translation *= max_player_speed;
-      }
 
+        if (joystick_l2.value() > 0.5f) {
+          player_translation *= max_player_run_speed;
+        } else {
+          player_translation *= max_player_walk_speed;
+        }
+      }
 
       if (glm::length(player_translation) > 0.01f) {
 
@@ -108,16 +146,32 @@ struct PlayerController {
                          glm::vec3(player.move_speed * delta_time));
       }
 
-      if (last_player_translation == glm::vec3(0.0f) &&
-          player_translation != glm::vec3(0.0f)) {
-          player.play_walk_animation();
-      }
-      else if (last_player_translation != glm::vec3(0.0f) &&
-          player_translation == glm::vec3(0.0f)) {
-          player.play_idle_animation();
+     //if (last_player_translation == glm::vec3(0.0f) &&
+     //    player_translation != glm::vec3(0.0f)) {
+      if (player_translation != glm::vec3(0.0f)) {
+
+        double x_length = glm::length(player_translation.x);
+        double z_length = glm::length(player_translation.z);
+        if (x_length < z_length) {
+          if (player_translation.z > 0.0f) {
+            player.play_animation(walk_animation);
+          } else {
+            player.play_animation(backwalk_animation);
+          }
+        } else {
+          if (player_translation.x > 0.0f) {
+            player.play_animation(leftstrafe_animation);
+          } else {
+            player.play_animation(rightstrafe_animation);
+          }
+        }
+
+      } else if (last_player_translation != glm::vec3(0.0f) &&
+                 player_translation == glm::vec3(0.0f)) {
+        player.play_animation(idle_animation);
       }
 
-	  last_player_translation = player_translation;
+      last_player_translation = player_translation;
     }
 
     {

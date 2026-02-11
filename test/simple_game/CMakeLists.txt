@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(renderer VERSION 0.1.0)
+project(simple_game VERSION 0.1.0)
 
 include(FetchContent)
 
@@ -13,6 +13,8 @@ find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(vulkan-renderer CONFIG REQUIRED)
 find_package(nlohmann_json REQUIRED)
+
+find_package(Bullet CONFIG REQUIRED)
 
 #-------------------------------------------------------------------------
 # Fetch SimpleGeometry
@@ -41,4 +43,5 @@ target_link_libraries(${PROJECT_NAME}
   ${SDL2_LIBRARIES}
   vulkan-renderer::vulkan-renderer
   nlohmann_json::nlohmann_json
+  Bullet::Bullet
 )

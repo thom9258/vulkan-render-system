@@ -58,7 +58,7 @@ public:
     std::expected<LoadedAnimatedModel, std::string> loaded_model =
         load_animated_model(
             context, mesh_cache, texture_cache,
-            "../assets/lowpoly_scifi_girl/lowpoly_scifi_girl.gltf");
+            "../assets/lowpoly_scifi_girl_2/lowpoly_scifi_girl.gltf");
 
     if (loaded_model.has_value()) {
       model = loaded_model.value();
@@ -77,7 +77,7 @@ public:
     };
 
     foreach_node(std::bind_front(insert_animator, &animator), model.renderable);
-    animator.PlayAnimation(&model.animations.at(0));
+    animator.PlayAnimation(&model.animations.at(m_current_animation));
   }
 
   ~Player() = default;
@@ -86,17 +86,10 @@ public:
     m_transform = glm::translate(m_transform, offset);
   }
 
-  void play_walk_animation() {
-    if (m_current_animation != m_walk_animation) {
-      animator.PlayAnimation(&model.animations.at(m_walk_animation));
-	  m_current_animation = m_walk_animation;
-    }
-  }
-
-  void play_idle_animation() {
-    if (m_current_animation != m_idle_animation) {
-      animator.PlayAnimation(&model.animations.at(m_idle_animation));
-	  m_current_animation = m_idle_animation;
+  void play_animation(std::size_t animation) {
+    if (m_current_animation != animation) {
+      animator.PlayAnimation(&model.animations.at(animation));
+	  m_current_animation = animation;
     }
   }
 
@@ -114,7 +107,7 @@ public:
     animator.UpdateAnimation(delta_time);
   }
 
-  std::vector<Renderable> renderables(CameraRig &camera_rig) {
+  std::vector<Renderable> renderables() {
     std::vector<Renderable> renderables;
 
     model.renderable->model_matrix =
@@ -130,13 +123,11 @@ public:
 
   bool is_aiming{false};
 
-  size_t const m_idle_animation = 0;
-  size_t const m_walk_animation = 1;
-  size_t m_current_animation = m_idle_animation;
+  std::size_t m_current_animation = 0;
   glm::mat4 m_camera_current;
 
 private:
-  glm::mat4 m_transform;
+  glm::mat4 m_transform{glm::mat4(1.0f)};
   glm::mat4 m_gun_offset =
       glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 0.8f, 0.3f));
 

@@ -18,10 +18,10 @@ struct Transform {
   glm::vec3 translation;
 
   glm::mat4 as_mat4() {
-	 glm::mat4 mtranslation = glm::translate(glm::mat4(1.0f), translation); 
-	 glm::mat4 mrotation = glm::toMat4(rotation); 
-	 glm::mat4 mscale = glm::scale(glm::mat4(1.0f), scale); 
-	 return mtranslation * mrotation * mscale;
+    glm::mat4 mtranslation = glm::translate(glm::mat4(1.0f), translation);
+    glm::mat4 mrotation = glm::toMat4(rotation);
+    glm::mat4 mscale = glm::scale(glm::mat4(1.0f), scale);
+    return mtranslation * mrotation * mscale;
   }
 };
 
@@ -43,16 +43,10 @@ glm::mat4 interpolate_rotation(glm::mat4 a, glm::mat4 b, float delta) {
   return glm::toMat4(rot);
 }
 
-glm::mat4 interpolate_scale(glm::mat4 a, glm::mat4 b, float delta) {
-// glm::vec3 scale = glm::mix(a[3], b[3], delta);
-// return glm::translate(glm::mat4(1.0f), scale);
-}
-
 glm::mat4 interpolate(glm::mat4 a, glm::mat4 b, float delta) {
   glm::mat4 translation = interpolate_position(a, b, delta);
   glm::mat4 rotation = interpolate_rotation(a, b, delta);
- // glm::mat4 scale = interpolate_scale(a, b, delta);
-  return translation * rotation /** scale*/;
+  return translation * rotation;
 }
 
 } // namespace interpolation
