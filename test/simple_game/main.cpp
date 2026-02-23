@@ -1,4 +1,3 @@
-#include <BulletCollision/CollisionShapes/btCapsuleShape.h>
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -69,71 +68,55 @@ std::chrono::duration<double> with_time_measurement(F &&f, Args &&...args) {
   return end - start;
 }
 
-int main(int argc, char **argv) {
+class StaticBox {
+public:
+  StaticBox(physics::Physics &physics, SimpleMeshRef textured_cube,
+            TextureSamplerRef texture, Transform transform)
+      : textured_cube(textured_cube), texture(texture), _transform(transform) {
 
-  physics::Physics physics;
-  // the ground is a cube of side 100 at position y = -56.
-  // the sphere will hit it at y = -6, with center at -5
-  // btCollisionShape *groundShape =
-  //     new btBoxShape(btVector3(btScalar(50.), btScalar(50.), btScalar(50.)));
-  auto groundShape = std::make_unique<btBoxShape>(
-      btVector3(btScalar(10.), btScalar(0.5f), btScalar(10.)));
-  {
-    btTransform groundTransform;
-    groundTransform.setIdentity();
-    groundTransform.setOrigin(btVector3(0, 0, 0));
+    collider = std::make_unique<btBoxShape>(btVector3(_transform.scale.x / 2,
+                                                      _transform.scale.y / 2,
+                                                      _transform.scale.z / 2));
+    btTransform col_transform;
+    col_transform.setIdentity();
+    col_transform.setRotation(
+        btQuaternion(_transform.rotation.x, _transform.rotation.y,
+                     _transform.rotation.z, _transform.rotation.w));
+
+    col_transform.setOrigin(btVector3(_transform.translation.x,
+                                      _transform.translation.y,
+                                      _transform.translation.z));
 
     btScalar mass(0.);
-
-    // rigidbody is dynamic if and only if mass is non zero, otherwise static
-    bool isDynamic = (mass != 0.f);
-
     btVector3 localInertia(0, 0, 0);
-    if (isDynamic)
-      groundShape->calculateLocalInertia(mass, localInertia);
-
-    // using motionstate is optional, it provides interpolation capabilities,
-    // and only synchronizes 'active' objects
     btDefaultMotionState *myMotionState =
-        new btDefaultMotionState(groundTransform);
+        new btDefaultMotionState(col_transform);
     btRigidBody::btRigidBodyConstructionInfo rbInfo(
-        mass, myMotionState, groundShape.get(), localInertia);
+        mass, myMotionState, collider.get(), localInertia);
     btRigidBody *body = new btRigidBody(rbInfo);
 
     // add the body to the dynamics world
     physics.dynamicsWorld->addRigidBody(body);
   }
 
-  // auto colShape = std::make_unique<btBoxShape>(btVector3(1, 1, 1));
-  auto colShape =
-      std::make_unique<btCapsuleShape>(btScalar(0.5f), btScalar(1.8f));
-  {
-    // create a dynamic rigidbody
-
-    /// Create Dynamic Objects
-    btTransform startTransform;
-    startTransform.setIdentity();
-
-    btScalar mass(1.f);
-
-    // rigidbody is dynamic if and only if mass is non zero, otherwise static
-    bool isDynamic = (mass != 0.f);
-
-    btVector3 localInertia(0, 0, 0);
-    if (isDynamic)
-      colShape->calculateLocalInertia(mass, localInertia);
-
-    startTransform.setOrigin(btVector3(2, 10, 0));
-
-    // using motionstate is recommended, it provides interpolation capabilities,
-    // and only synchronizes 'active' objects
-    btDefaultMotionState *myMotionState =
-        new btDefaultMotionState(startTransform);
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(
-        mass, myMotionState, colShape.get(), localInertia);
-    btRigidBody *body = new btRigidBody(rbInfo);
-    physics.dynamicsWorld->addRigidBody(body);
+  auto renderable() -> MaterialRenderable {
+    MaterialRenderable box;
+    box.mesh = textured_cube;
+    box.diffuse = texture;
+    box.model = _transform.as_mat4();
+    box.has_shadow = true;
+    return box;
   }
+
+  std::optional<SimpleMeshRef> textured_cube;
+  TextureSamplerRef texture;
+  Transform _transform;
+  std::unique_ptr<btBoxShape> collider;
+};
+
+int main(int argc, char **argv) {
+
+  physics::Physics physics;
 
   WindowConfig window_config;
   // RenderConfig render_config;
@@ -222,11 +205,46 @@ int main(int argc, char **argv) {
                 projection);
 
   Player player(context, mesh_cache, texture_cache);
-  player.translate(glm::vec3(-2.0f, 1.0f, 0.0f));
 
   CameraRig camera_rig;
-  PlayerController player_controller;
+  PlayerController player_controller(player, physics,
+                                     glm::vec3(-2.0f, 5.0f, 0.0f));
   CameraPlayerFollow camera_player_follow;
+
+  Transform floor_box_transform = Transform::identity();
+  floor_box_transform.scale = glm::vec3(20.0f, 1.0f, 20.0f);
+  StaticBox floor_box(physics, textured_cube.value(), greybox_texture,
+                      floor_box_transform);
+
+  Transform ramp45_box_transform = Transform::identity();
+  ramp45_box_transform.translation = glm::vec3(-6.0f, 1.0f, 0.0f);
+  ramp45_box_transform.rotation = glm::quat(
+      glm::vec3(glm::radians(45.0f), glm::radians(90.0f), glm::radians(0.0f)));
+  ramp45_box_transform.scale = glm::vec3(5.0f, 1.0f, 10.0f);
+  StaticBox ramp45_box(physics, textured_cube.value(), greybox_texture,
+                     ramp45_box_transform);
+
+  Transform ramp30_box_transform = Transform::identity();
+  ramp30_box_transform.translation = glm::vec3(-6.0f, 1.0f, 5.0f);
+  ramp30_box_transform.rotation = glm::quat(
+      glm::vec3(glm::radians(30.0f), glm::radians(90.0f), glm::radians(0.0f)));
+  ramp30_box_transform.scale = glm::vec3(5.0f, 1.0f, 10.0f);
+  StaticBox ramp30_box(physics, textured_cube.value(), greybox_texture,
+                     ramp30_box_transform);
+
+
+
+  Transform step_box_transform = Transform::identity();
+  step_box_transform.translation = glm::vec3(6.0f, 1.0f, 6.0f);
+  step_box_transform.scale = glm::vec3(5.0f, 1.8f, 5.0f);
+  StaticBox step_box(physics, textured_cube.value(), bluebox_texture,
+                     step_box_transform);
+
+  Transform wall_box_transform = Transform::identity();
+  wall_box_transform.translation = glm::vec3(8.0f, 3.0f, 0.0f);
+  wall_box_transform.scale = glm::vec3(2.0f, 6.0f, 12.0f);
+  StaticBox wall_box(physics, textured_cube.value(), bluebox_texture,
+                     wall_box_transform);
 
   bool reload_scene = false;
   bool exit = false;
@@ -290,7 +308,9 @@ int main(int argc, char **argv) {
        * Physics Update
        */
       // physics.dynamicsWorld->stepSimulation(1.f / 60.f, 10);
-      physics.dynamicsWorld->stepSimulation(delta_time / 1000, 10);
+      physics.dynamicsWorld->stepSimulation(delta_time / 1000, 100);
+	  physics.dynamicsWorld->updateAabbs();
+	  physics.dynamicsWorld->computeOverlappingPairs();
       physics.dynamicsWorld->debugDrawWorld();
 
       for (int j = physics.dynamicsWorld->getNumCollisionObjects() - 1; j >= 0;
@@ -309,7 +329,7 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Update
        */
-      player_controller(player, camera_rig, delta_time / 100, events);
+      player_controller(player, camera_rig, physics, delta_time / 100, events);
       camera_player_follow(camera, player, camera_rig, delta_time / 100);
 
       /** ************************************************************************
@@ -317,19 +337,11 @@ int main(int argc, char **argv) {
        */
       std::vector<Renderable> renderables;
 
-      MaterialRenderable floor;
-      floor.mesh = textured_cube;
-      floor.diffuse = greybox_texture;
-      floor.model = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f)), glm::vec3(10.0f, 0.2f, 10.0f));
-      floor.has_shadow = true;
-      renderables.push_back(floor);
-
-      MaterialRenderable pillar;
-      pillar.mesh = textured_cube;
-      pillar.diffuse = bluebox_texture;
-      pillar.model = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 5.0f, 1.0f));
-      pillar.has_shadow = true;
-      renderables.push_back(pillar);
+      renderables.push_back(floor_box.renderable());
+      renderables.push_back(step_box.renderable());
+      renderables.push_back(ramp45_box.renderable());
+      renderables.push_back(ramp30_box.renderable());
+      renderables.push_back(wall_box.renderable());
 
       player.update(delta_time / 1000);
       for (auto renderable : player.renderables())
@@ -338,7 +350,7 @@ int main(int argc, char **argv) {
       std::vector<Light> lights;
 
       DirectionalLight base_light;
-      base_light.ambient = glm::vec3(0.01f);
+      base_light.ambient = glm::vec3(0.05f);
       lights.push_back(base_light);
 
       ShadowCasters shadowcasters;
@@ -391,8 +403,7 @@ int main(int argc, char **argv) {
       };
 
       auto render_time = with_time_measurement(
-          [&]() {
-        presenter.with_presentation(frameGenerator); });
+          [&]() { presenter.with_presentation(frameGenerator); });
 
       framecount++;
     });

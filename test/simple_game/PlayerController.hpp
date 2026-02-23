@@ -1,15 +1,27 @@
 #pragma once
 
+#include "Physics.hpp"
 #include "config_parser.hpp"
 #include "input.hpp"
 #include "interpolation.hpp"
 #include "player.hpp"
+#include <BulletDynamics/Dynamics/btRigidBody.h>
+#include <LinearMath/btQuaternion.h>
+#include <LinearMath/btVector3.h>
 #include <SDL_events.h>
 #include <SDL_gamecontroller.h>
 
+#include <VulkanRenderer/glm.hpp>
 #include <algorithm>
 #include <ostream>
 #include <ranges>
+
+glm::vec3 rotate(glm::quat quat, glm::vec3 vec) {
+  glm::mat4 rotation = glm::toMat4(quat);
+
+  glm::vec4 rotated_vec = rotation * glm::vec4(vec, 1.0f);
+  return glm::vec3(rotated_vec);
+}
 
 struct PlayerController {
   SDL_GameController *m_controller{nullptr};
@@ -32,10 +44,13 @@ struct PlayerController {
   ControllerJoystickAxis joystick_l2{0, 2};
   ControllerJoystickAxis joystick_r2{0, 5};
 
-  glm::vec3 last_player_translation{0.0f};
-
   double max_player_walk_speed = 0.7;
   double max_player_run_speed = 1.4;
+  double player_rotate_speed = 1.4;
+  double camera_rotate_speed = 1.4;
+
+  double player_model_scale = 1;
+  double player_model_yoffset = 1;
 
   std::size_t backwalk_animation = 0;
   std::size_t idle_animation = 0;
@@ -43,7 +58,13 @@ struct PlayerController {
   std::size_t rightstrafe_animation = 0;
   std::size_t walk_animation = 0;
 
-  PlayerController() {
+  std::unique_ptr<btCapsuleShape> capsule_collider;
+  std::unique_ptr<btRigidBody> rigidbody;
+
+  glm::vec3 last_joystick_translation;
+
+  PlayerController(Player &player, physics::Physics &physics,
+                   glm::vec3 position) {
     // TODO::This is crucial because for some reason this is not enabled inside
     // SDL_INIT_EVERYTHING
     if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 1)
@@ -62,6 +83,20 @@ struct PlayerController {
           config::assoc("walk_speed", config.value().f32s).value_or(0.7f);
       max_player_run_speed =
           config::assoc("run_speed", config.value().f32s).value_or(1.4f);
+      player_rotate_speed =
+          config::assoc("player_rotate_speed", config.value().f32s)
+              .value_or(1.4f);
+      camera_rotate_speed =
+          config::assoc("camera_rotate_speed", config.value().f32s)
+              .value_or(1.4f);
+
+      player_model_scale =
+          config::assoc("player_model_scale", config.value().f32s)
+              .value_or(1.4f);
+      player_model_yoffset =
+          config::assoc("player_model_yoffset", config.value().f32s)
+              .value_or(1.4f);
+
       backwalk_animation =
           config::assoc("backwalk_animation", config.value().i32s).value_or(0);
       walk_animation =
@@ -78,9 +113,39 @@ struct PlayerController {
     } else {
       std::println("Config was not readable: {}", config.error());
     }
+
+    player.play_animation(idle_animation);
+
+    capsule_collider =
+        std::make_unique<btCapsuleShape>(btScalar(0.5f), btScalar(1.5f));
+
+    btTransform startTransform;
+    startTransform.setIdentity();
+    startTransform.setOrigin(btVector3(position.x, position.y, position.z));
+    btScalar mass(1.f);
+    btVector3 localInertia(0, 0, 0);
+    capsule_collider->calculateLocalInertia(mass, localInertia);
+
+    // TODO: does these allocations leak?
+    btDefaultMotionState *myMotionState =
+        new btDefaultMotionState(startTransform);
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(
+        mass, myMotionState, capsule_collider.get(), localInertia);
+
+    rigidbody = std::make_unique<btRigidBody>(rbInfo);
+    rigidbody->setAngularFactor(btVector3(0.0f, 1.0f, 0.0f));
+    rigidbody->setGravity(btVector3(0.0f, 0.0f, 0.0f));
+    rigidbody->setActivationState(DISABLE_DEACTIVATION);
+    physics.dynamicsWorld->addRigidBody(rigidbody.get());
+
+    btVector3 rigidbody_position = rigidbody->getWorldTransform().getOrigin();
+    player.set_translation(glm::vec3(rigidbody_position.x(),
+                                     rigidbody_position.y(),
+                                     rigidbody_position.z()));
   }
 
-  void operator()(Player &player, CameraRig &camera_rig, double delta_time,
+  void operator()(Player &player, CameraRig &camera_rig,
+                  physics::Physics &physics, double delta_time,
                   std::span<SDL_Event> events) {
 
     // TODO: seemingly a controller is found but cant be re-added after it is
@@ -125,70 +190,117 @@ struct PlayerController {
     joystick_r2.update(joystick_events);
 
     {
+      // https://github.com/bulletphysics/bullet3/blob/master/examples/Raycast/RaytestDemo.cpp
+      btVector3 from(0, 0, 0);
+      btVector3 to(0, -1.8, 0);
+      //btVector3 player_position = rigidbody->getCenterOfMassPosition();
+      btVector3 player_position(0,2,0);
 
-      glm::vec3 player_translation(-joystick_left_x.value(), 0.0f,
-                                   -joystick_left_y.value());
+      btVector3 const red(1, 0, 0);
+      btVector3 const blue(0, 0, 1);
 
-      if (glm::length(player_translation) < 0.05f) {
-        player_translation = glm::vec3(0.0f);
+      physics.dynamicsWorld->getDebugDrawer()->drawLine(
+          player_position + from, player_position + to, btVector4(0, 1, 0, 1));
+
+      btCollisionWorld::AllHitsRayResultCallback allResults(from, to);
+      // btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
+      //  closestResults.m_flags |=
+      //  btTriangleRaycastCallback::kF_FilterBackfaces;
+
+      physics.dynamicsWorld->rayTest(from, to, allResults);
+
+      for (int i = 0; i < allResults.m_hitFractions.size(); i++) {
+        btVector3 p = from.lerp(to, allResults.m_hitFractions[i]);
+        std::println("Player Floor Collision [{}] at {} {} {}", i, p.x(), p.y(), p.z());
+        physics.dynamicsWorld->getDebugDrawer()->drawSphere(p, 0.1, blue);
+        physics.dynamicsWorld->getDebugDrawer()->drawLine(
+            p, p + allResults.m_hitNormalWorld[i], blue);
+      }
+    }
+
+    {
+      glm::vec3 joystick_translation(-joystick_left_x.value(), 0.0f,
+                                     -joystick_left_y.value());
+
+      if (glm::length(joystick_translation) < 0.05f) {
+        joystick_translation = glm::vec3(0.0f);
       } else {
 
         if (joystick_l2.value() > 0.5f) {
-          player_translation *= max_player_run_speed;
+          joystick_translation *= max_player_run_speed;
         } else {
-          player_translation *= max_player_walk_speed;
+          joystick_translation *= max_player_walk_speed;
         }
       }
 
-      if (glm::length(player_translation) > 0.01f) {
+      if (glm::length(joystick_translation) > 0.01f) {
 
-        player.translate(player_translation *
-                         glm::vec3(player.move_speed * delta_time));
+        glm::vec3 translation = joystick_translation *
+                                glm::vec3(max_player_walk_speed * delta_time);
+
+        btQuaternion bt_player_rotation = rigidbody->getOrientation();
+        glm::quat player_rotation(
+            bt_player_rotation.w(), bt_player_rotation.x(),
+            bt_player_rotation.y(), bt_player_rotation.z());
+
+        translation = rotate(player_rotation, translation);
+
+        float original_y_velocity = rigidbody->getLinearVelocity().y();
+        rigidbody->setLinearVelocity(
+            btVector3(translation.x, original_y_velocity, translation.z));
+      } else {
+        float original_y_velocity = rigidbody->getLinearVelocity().y();
+        rigidbody->setLinearVelocity(btVector3(0, original_y_velocity, 0));
       }
 
-     //if (last_player_translation == glm::vec3(0.0f) &&
-     //    player_translation != glm::vec3(0.0f)) {
-      if (player_translation != glm::vec3(0.0f)) {
+      if (joystick_translation != glm::vec3(0.0f)) {
 
-        double x_length = glm::length(player_translation.x);
-        double z_length = glm::length(player_translation.z);
+        double x_length = glm::length(joystick_translation.x);
+        double z_length = glm::length(joystick_translation.z);
         if (x_length < z_length) {
-          if (player_translation.z > 0.0f) {
+          if (joystick_translation.z > 0.0f) {
             player.play_animation(walk_animation);
           } else {
             player.play_animation(backwalk_animation);
           }
         } else {
-          if (player_translation.x > 0.0f) {
+          if (joystick_translation.x > 0.0f) {
             player.play_animation(leftstrafe_animation);
           } else {
             player.play_animation(rightstrafe_animation);
           }
         }
 
-      } else if (last_player_translation != glm::vec3(0.0f) &&
-                 player_translation == glm::vec3(0.0f)) {
+      } else if (last_joystick_translation != glm::vec3(0.0f) &&
+                 joystick_translation == glm::vec3(0.0f)) {
         player.play_animation(idle_animation);
       }
 
-      last_player_translation = player_translation;
+      last_joystick_translation = joystick_translation;
     }
 
     {
-      glm::vec3 player_rotation(0.0f, -joystick_right_x.value(), 0.0f);
-      if (glm::length(player_rotation) > 0.01f) {
-        player.rotate(player_rotation *
-                      glm::vec3(player.horizontal_rotate_speed * delta_time));
+      double joystick_rotation = -joystick_right_x.value();
+      if (glm::length(joystick_rotation) > 0.01f) {
+        double player_rotation_velocity =
+            joystick_rotation * player_rotate_speed * delta_time;
+
+        rigidbody->setAngularVelocity(
+            btVector3(0.0f, player_rotation_velocity, 0.0f));
+
+      } else {
+        rigidbody->setAngularVelocity(btVector3(0.0f, 0.0f, 0.0f));
       }
     }
 
     {
       glm::vec3 camera_center_offset_rotation(-joystick_right_y.value(), 0.0f,
                                               0.0f);
+
       if (glm::length(camera_center_offset_rotation) > 0.01f) {
         camera_rig.rotate_camera_center(
             camera_center_offset_rotation *
-            glm::vec3(player.vertical_rotate_speed * delta_time));
+            glm::vec3(camera_rotate_speed * delta_time));
       }
     }
 
@@ -202,6 +314,19 @@ struct PlayerController {
       if (button_l1.is_down() && joystick_r2.value() > 0.5f)
         std::println("Shooting");
     }
+
+    btTransform rigidbody_transform = rigidbody->getWorldTransform();
+    glm::vec3 player_position(rigidbody_transform.getOrigin().x(),
+                              rigidbody_transform.getOrigin().y(),
+                              rigidbody_transform.getOrigin().z());
+
+    glm::quat player_rotation(rigidbody_transform.getRotation().w(),
+                              rigidbody_transform.getRotation().x(),
+                              rigidbody_transform.getRotation().y(),
+                              rigidbody_transform.getRotation().z());
+
+    player.set_translation(player_position);
+    player.set_rotation(player_rotation);
   }
 
 private:

@@ -6,6 +6,7 @@
 #include <VulkanRenderer/Renderable.hpp>
 #include <VulkanRenderer/TextureSamplerCache.hpp>
 #include <VulkanRenderer/VertexBuffer.hpp>
+#include <VulkanRenderer/glm.hpp>
 #include <glm/geometric.hpp>
 
 #include "Camera.hpp"
@@ -53,7 +54,7 @@ class Player {
 public:
   Player(Render::Context &context, MeshCache &mesh_cache,
          TextureSamplerCache &texture_cache)
-      : m_transform(glm::mat4(1.0f)) {
+      : m_transform(Transform::identity()) {
 
     std::expected<LoadedAnimatedModel, std::string> loaded_model =
         load_animated_model(
@@ -82,44 +83,46 @@ public:
 
   ~Player() = default;
 
-  void translate(glm::vec3 offset) {
-    m_transform = glm::translate(m_transform, offset);
-  }
-
   void play_animation(std::size_t animation) {
     if (m_current_animation != animation) {
       animator.PlayAnimation(&model.animations.at(animation));
-	  m_current_animation = animation;
+      m_current_animation = animation;
     }
   }
 
-  glm::vec3 translation() { return m_transform[3]; }
-
-  glm::mat4 origin() { return m_transform; }
-
-  void rotate(glm::vec3 rotation) {
-    glm::mat4 rotation_mat = glm::rotate(glm::mat4(1.0f), glm::length(rotation),
-                                         glm::normalize(rotation));
-    m_transform = m_transform * rotation_mat;
+  void set_translation(glm::vec3 translation) {
+    m_transform.translation = translation;
   }
 
-  void update(double delta_time) {
-    animator.UpdateAnimation(delta_time);
+  void set_rotation(glm::quat rotation) { m_transform.rotation = rotation; }
+
+  glm::vec3 translation() { return m_transform.translation; }
+
+  glm::mat4 origin() { return m_transform.as_mat4(); }
+  glm::mat4 model_matrix() {
+    // TODO: get this from controller somehow
+    double capsule_collider_height = -1.2f;
+    glm::mat4 translation = glm::translate(
+        glm::mat4(1.0f), glm::vec3(0.0f, capsule_collider_height, 0.0f));
+    glm::mat4 rotation = glm::mat4(1.0f);
+    glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.7f));
+    glm::mat4 offset = translation * rotation * scale;
+	return origin() * offset;
   }
+
+  void update(double delta_time) { animator.UpdateAnimation(delta_time); }
 
   std::vector<Renderable> renderables() {
     std::vector<Renderable> renderables;
 
-    model.renderable->model_matrix =
-        glm::scale(glm::translate(m_transform, glm::vec3(0.0f, -1.0f, 0.0f)),
-                   glm::vec3(0.7f));
+    model.renderable->model_matrix = model_matrix();
     renderables.push_back(model.renderable);
 
     return renderables;
   }
-  double move_speed = 0.5f;
-  double horizontal_rotate_speed = 0.7f;
-  double vertical_rotate_speed = horizontal_rotate_speed * 0.6;
+
+  // double horizontal_rotate_speed = 0.7f;
+  // double vertical_rotate_speed = horizontal_rotate_speed * 0.6;
 
   bool is_aiming{false};
 
@@ -127,7 +130,7 @@ public:
   glm::mat4 m_camera_current;
 
 private:
-  glm::mat4 m_transform{glm::mat4(1.0f)};
+  Transform m_transform{Transform::identity()};
   glm::mat4 m_gun_offset =
       glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 0.8f, 0.3f));
 

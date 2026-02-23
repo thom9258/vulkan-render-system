@@ -5,6 +5,9 @@
 #include "LinearMath/btIDebugDraw.h"
 #include "btBulletDynamicsCommon.h"
 
+#include <BulletCollision/CollisionShapes/btCapsuleShape.h>
+//#include <BulletCollision/CollisionDispatch/btRaycastCallback.h>
+
 #include <memory>
 #include <vector>
 #include <print>
@@ -100,7 +103,7 @@ struct Physics {
     debug_line_collecter = std::make_unique<DebugLineCollecter>();
     debug_line_collecter->setDebugMode(btIDebugDraw::DBG_DrawWireframe);
     dynamicsWorld->setDebugDrawer(debug_line_collecter.get());
-    dynamicsWorld->setGravity(btVector3(0, -10, 0));
+    //dynamicsWorld->setGravity(btVector3(0, -10, 0));
   }
 };
 

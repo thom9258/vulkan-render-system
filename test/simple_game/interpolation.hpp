@@ -3,9 +3,16 @@
 #include <VulkanRenderer/glm.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 
-namespace interpolation {
 
 struct Transform {
+  static Transform identity() {
+    Transform transform;
+	transform.translation = glm::vec3(1.0f);    
+	transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+	transform.scale = glm::vec3(1.0f);    
+	return transform;
+  };
+
   Transform() = default;
   Transform(glm::mat4 m) {
     glm::vec3 skew;
@@ -24,6 +31,8 @@ struct Transform {
     return mtranslation * mrotation * mscale;
   }
 };
+
+namespace interpolation {
 
 Transform interpolate(Transform a, Transform b, float delta) {
   Transform out;
