@@ -114,6 +114,27 @@ public:
   std::unique_ptr<btBoxShape> collider;
 };
 
+auto generate_stairs(physics::Physics &physics, SimpleMeshRef textured_cube,
+                     TextureSamplerRef texture, glm::vec3 position,
+                     float step_width, float step_height, float step_depth,
+                     std::size_t step_count) -> std::vector<StaticBox> {
+
+  std::vector<StaticBox> stairs;
+
+  for (std::size_t i = 0; i < step_count; i++) {
+    Transform step_transform = Transform::identity();
+    step_transform.translation = position;
+    step_transform.translation.x += i * step_depth;
+    step_transform.translation.y += i * step_height;
+    step_transform.scale = glm::vec3(step_depth, step_height, step_width);
+    StaticBox step_box(physics, textured_cube, texture, step_transform);
+    stairs.push_back(std::move(step_box));
+	std::println("Added stair {}", i);
+  }
+
+  return stairs;
+};
+
 int main(int argc, char **argv) {
 
   physics::Physics physics;
@@ -222,7 +243,7 @@ int main(int argc, char **argv) {
       glm::vec3(glm::radians(45.0f), glm::radians(90.0f), glm::radians(0.0f)));
   ramp45_box_transform.scale = glm::vec3(5.0f, 1.0f, 10.0f);
   StaticBox ramp45_box(physics, textured_cube.value(), greybox_texture,
-                     ramp45_box_transform);
+                       ramp45_box_transform);
 
   Transform ramp30_box_transform = Transform::identity();
   ramp30_box_transform.translation = glm::vec3(-6.0f, 1.0f, 5.0f);
@@ -230,9 +251,7 @@ int main(int argc, char **argv) {
       glm::vec3(glm::radians(30.0f), glm::radians(90.0f), glm::radians(0.0f)));
   ramp30_box_transform.scale = glm::vec3(5.0f, 1.0f, 10.0f);
   StaticBox ramp30_box(physics, textured_cube.value(), greybox_texture,
-                     ramp30_box_transform);
-
-
+                       ramp30_box_transform);
 
   Transform step_box_transform = Transform::identity();
   step_box_transform.translation = glm::vec3(6.0f, 1.0f, 6.0f);
@@ -240,13 +259,23 @@ int main(int argc, char **argv) {
   StaticBox step_box(physics, textured_cube.value(), bluebox_texture,
                      step_box_transform);
 
+  float step_width = 2.0f;
+  float step_height = 0.3f;
+  float step_depth = 0.4;
+  std::size_t step_count = 30;
+
+  std::vector<StaticBox> stairs =
+      generate_stairs(physics, textured_cube.value(), bluebox_texture,
+                      glm::vec3(0.0f, 1.0f, 0.0f), step_width, step_height,
+                      step_depth, step_count);
+
   Transform wall_box_transform = Transform::identity();
   wall_box_transform.translation = glm::vec3(8.0f, 3.0f, 0.0f);
   wall_box_transform.scale = glm::vec3(2.0f, 6.0f, 12.0f);
   StaticBox wall_box(physics, textured_cube.value(), bluebox_texture,
                      wall_box_transform);
 
-  bool reload_scene = false;
+  bool hide_player_model = false;
   bool exit = false;
   uint64_t framecount = 0;
   double delta_time = 0;
@@ -283,8 +312,8 @@ int main(int argc, char **argv) {
           case SDLK_ESCAPE:
             exit = true;
             break;
-          case SDLK_r:
-            reload_scene = true;
+          case SDLK_h:
+            hide_player_model = !hide_player_model;
             break;
           }
           break;
@@ -308,9 +337,7 @@ int main(int argc, char **argv) {
        * Physics Update
        */
       // physics.dynamicsWorld->stepSimulation(1.f / 60.f, 10);
-      physics.dynamicsWorld->stepSimulation(delta_time / 1000, 100);
-	  physics.dynamicsWorld->updateAabbs();
-	  physics.dynamicsWorld->computeOverlappingPairs();
+      physics.dynamicsWorld->stepSimulation(delta_time / 1000, 10);
       physics.dynamicsWorld->debugDrawWorld();
 
       for (int j = physics.dynamicsWorld->getNumCollisionObjects() - 1; j >= 0;
@@ -339,13 +366,19 @@ int main(int argc, char **argv) {
 
       renderables.push_back(floor_box.renderable());
       renderables.push_back(step_box.renderable());
+
+      for (auto &step : stairs)
+        renderables.push_back(step.renderable());
+
       renderables.push_back(ramp45_box.renderable());
       renderables.push_back(ramp30_box.renderable());
       renderables.push_back(wall_box.renderable());
 
       player.update(delta_time / 1000);
-      for (auto renderable : player.renderables())
-        renderables.push_back(renderable);
+      if (!hide_player_model) {
+        for (auto renderable : player.renderables())
+          renderables.push_back(renderable);
+      }
 
       std::vector<Light> lights;
 

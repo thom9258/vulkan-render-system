@@ -63,6 +63,10 @@ struct PlayerController {
 
   glm::vec3 last_joystick_translation;
 
+  static constexpr float const player_height = 1.6f;
+  static constexpr float const collider_height = player_height * 0.5f;
+  static constexpr float const ray_height = player_height - collider_height;
+
   PlayerController(Player &player, physics::Physics &physics,
                    glm::vec3 position) {
     // TODO::This is crucial because for some reason this is not enabled inside
@@ -116,8 +120,8 @@ struct PlayerController {
 
     player.play_animation(idle_animation);
 
-    capsule_collider =
-        std::make_unique<btCapsuleShape>(btScalar(0.5f), btScalar(1.5f));
+    capsule_collider = std::make_unique<btCapsuleShape>(
+        btScalar(0.5f), btScalar(player_height / 2));
 
     btTransform startTransform;
     startTransform.setIdentity();
@@ -140,7 +144,7 @@ struct PlayerController {
 
     btVector3 rigidbody_position = rigidbody->getWorldTransform().getOrigin();
     player.set_translation(glm::vec3(rigidbody_position.x(),
-                                     rigidbody_position.y(),
+                                     (rigidbody_position.y()),
                                      rigidbody_position.z()));
   }
 
@@ -189,34 +193,72 @@ struct PlayerController {
     joystick_l2.update(joystick_events);
     joystick_r2.update(joystick_events);
 
+    struct GroundInfo {
+      double distance = 0.0;
+      glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f);
+    };
+    std::optional<GroundInfo> ground_info;
+
     {
       // https://github.com/bulletphysics/bullet3/blob/master/examples/Raycast/RaytestDemo.cpp
-      btVector3 from(0, 0, 0);
-      btVector3 to(0, -1.8, 0);
-      //btVector3 player_position = rigidbody->getCenterOfMassPosition();
-      btVector3 player_position(0,2,0);
-
+      btVector3 collider_center = rigidbody->getCenterOfMassPosition();
+      btVector3 from =
+          collider_center - btVector3(0, collider_height, 0);
+      btVector3 to = from - btVector3(0, collider_height + ray_height, 0);
       btVector3 const red(1, 0, 0);
       btVector3 const blue(0, 0, 1);
+      physics.dynamicsWorld->getDebugDrawer()->drawLine(from, to,
+                                                        btVector4(0, 1, 0, 1));
 
-      physics.dynamicsWorld->getDebugDrawer()->drawLine(
-          player_position + from, player_position + to, btVector4(0, 1, 0, 1));
+      btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
+      physics.dynamicsWorld->rayTest(from, to, closestResults);
 
-      btCollisionWorld::AllHitsRayResultCallback allResults(from, to);
-      // btCollisionWorld::ClosestRayResultCallback closestResults(from, to);
-      //  closestResults.m_flags |=
-      //  btTriangleRaycastCallback::kF_FilterBackfaces;
-
-      physics.dynamicsWorld->rayTest(from, to, allResults);
-
-      for (int i = 0; i < allResults.m_hitFractions.size(); i++) {
-        btVector3 p = from.lerp(to, allResults.m_hitFractions[i]);
-        std::println("Player Floor Collision [{}] at {} {} {}", i, p.x(), p.y(), p.z());
-        physics.dynamicsWorld->getDebugDrawer()->drawSphere(p, 0.1, blue);
+      if (closestResults.hasHit()) {
+        btVector3 p = closestResults.m_hitPointWorld;
         physics.dynamicsWorld->getDebugDrawer()->drawLine(
-            p, p + allResults.m_hitNormalWorld[i], blue);
+            p, p + closestResults.m_hitNormalWorld, blue);
+        std::println("Hitting Ground");
+        ground_info.emplace();
+        ground_info.value().distance = closestResults.m_closestHitFraction;
+        ground_info.value().normal =
+            glm::vec3(closestResults.m_hitNormalWorld.x(),
+                      closestResults.m_hitNormalWorld.y(),
+                      closestResults.m_hitNormalWorld.z());
       }
     }
+
+#if 0
+    if (ground_info.has_value()) {
+      std::println("Ground Distance: {}", ground_info.value().distance);
+    } else {
+      std::println("No Ground Detected!");
+    }
+
+    {
+
+      glm::vec3 joystick_translation(-joystick_left_x.value(), 0.0f,
+                                     -joystick_left_y.value());
+      std::println("Is falling {}, original y velocity {}", is_falling,
+                   original_y_velocity);
+      float y_velocity = 0.0f;
+      if (glm::length(joystick_translation) > 0.01f) {
+
+        glm::vec3 translation = joystick_translation *
+                                glm::vec3(max_player_walk_speed * delta_time);
+
+        btQuaternion bt_player_rotation = rigidbody->getOrientation();
+        glm::quat player_rotation(
+            bt_player_rotation.w(), bt_player_rotation.x(),
+            bt_player_rotation.y(), bt_player_rotation.z());
+
+        translation = rotate(player_rotation, translation);
+        rigidbody->setLinearVelocity(
+            btVector3(translation.x, y_velocity, translation.z));
+      } else {
+        rigidbody->setLinearVelocity(btVector3(0, y_velocity, 0));
+      }
+    }
+#endif
 
     {
       glm::vec3 joystick_translation(-joystick_left_x.value(), 0.0f,
@@ -233,6 +275,27 @@ struct PlayerController {
         }
       }
 
+      float y_velocity = 0;
+      if (ground_info.has_value()) {
+        float constexpr ground_pushback_factor = 10.0;
+        float const ground_distance_to_decired =
+             ray_height - ground_info.value().distance;
+
+        y_velocity = ground_distance_to_decired * ground_pushback_factor;
+
+        std::println("player_height {}", player_height);
+        std::println("collider_height {}", collider_height);
+        std::println("ray_height {}", ray_height);
+        std::println("ground_distance {}", ground_info.value().distance);
+        std::println("ground_distance_to_decired {}",
+                     ground_distance_to_decired);
+        std::println("y_velocity {}", y_velocity);
+
+      } else {
+        float constexpr fall_speed = -3.0f;
+        y_velocity = fall_speed;
+      }
+
       if (glm::length(joystick_translation) > 0.01f) {
 
         glm::vec3 translation = joystick_translation *
@@ -245,12 +308,10 @@ struct PlayerController {
 
         translation = rotate(player_rotation, translation);
 
-        float original_y_velocity = rigidbody->getLinearVelocity().y();
         rigidbody->setLinearVelocity(
-            btVector3(translation.x, original_y_velocity, translation.z));
+            btVector3(translation.x, y_velocity, translation.z));
       } else {
-        float original_y_velocity = rigidbody->getLinearVelocity().y();
-        rigidbody->setLinearVelocity(btVector3(0, original_y_velocity, 0));
+        rigidbody->setLinearVelocity(btVector3(0, y_velocity, 0));
       }
 
       if (joystick_translation != glm::vec3(0.0f)) {
@@ -317,7 +378,8 @@ struct PlayerController {
 
     btTransform rigidbody_transform = rigidbody->getWorldTransform();
     glm::vec3 player_position(rigidbody_transform.getOrigin().x(),
-                              rigidbody_transform.getOrigin().y(),
+                              rigidbody_transform.getOrigin().y() -
+                                  collider_height,
                               rigidbody_transform.getOrigin().z());
 
     glm::quat player_rotation(rigidbody_transform.getRotation().w(),
