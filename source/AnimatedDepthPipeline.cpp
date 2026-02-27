@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <ranges>
+#include <print>
 
 AnimatedDepthPipeline &
 AnimatedDepthPipeline::operator=(AnimatedDepthPipeline &&rhs) {
@@ -339,7 +340,13 @@ void AnimatedDepthPipeline::record(Render::Context::Impl *context,
                                    m_layout.get(), camera_uniform_set_index, uniform_sets.size(),
                                    uniform_sets.data(), 0, nullptr);
 
-  for (auto [index, renderable] : std::views::enumerate(renderables)) {
+
+  auto animated_renderables = renderables | std::views::filter([](ShadowRenderable renderable) {
+	  return std::holds_alternative<AnimatedRenderable>(renderable);
+  });
+
+
+  for (auto [index, renderable] : std::views::enumerate(animated_renderables)) {
 
     if (auto *animated = std::get_if<AnimatedRenderable>(&renderable)) {
 
@@ -349,6 +356,11 @@ void AnimatedDepthPipeline::record(Render::Context::Impl *context,
 
       if (!animated->has_shadow) {
         continue;
+      }
+
+      if (index > m_model_info_uniform_pools.size()) {
+		  std::println("Warning exceeded animated model count [{}] with index {}", m_model_info_uniform_pools[0].size(), index);
+		  continue;
       }
 
       // https://docs.vulkan.org/tutorial/latest/16_Multiple_Objects.html
