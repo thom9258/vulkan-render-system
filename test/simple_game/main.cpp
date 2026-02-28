@@ -356,8 +356,13 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Update
        */
-      player_controller(player, camera_rig, physics, delta_time / 100, events);
-      camera_player_follow(camera, player, camera_rig, delta_time / 100);
+      player_controller(player, camera_rig, physics, deltatime_ms, events);
+
+      if (player_controller.get_position().y < -10.0f) {
+        player_controller.respawn();
+      }
+
+      camera_player_follow(camera, player, camera_rig, deltatime_ms);
 
       /** ************************************************************************
        * Render
@@ -394,10 +399,10 @@ int main(int argc, char **argv) {
       sunlight.specular = glm::vec3(0.0f);
       sunlight.ambient = glm::vec3(0.0f);
 
-      const float ortho_size = 15.0f;
+      const float ortho_size = 30.0f;
       const float near_plane = 0.1f;
       const float far_plane = ortho_size * 2;
-      const glm::vec3 position = glm::vec3(0.0f, 10.0f, 0.0f);
+      const glm::vec3 position = glm::vec3(0.0f, 20.0f, 0.0f);
 
       DirectionalShadowCaster sunlight_caster{
           OrthographicProjection{glm::ortho(-ortho_size, ortho_size,
