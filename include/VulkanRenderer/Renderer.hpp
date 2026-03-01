@@ -29,8 +29,11 @@ struct RenderInfo {
   ShadowCasters shadowcasters;
 };
 
-
 struct RenderedFrameStats {
+	std::size_t rendered_static_vertices;
+	std::size_t rendered_animated_vertices;
+	std::size_t rendered_shadow_static_vertices;
+	std::size_t rendered_shadow_animated_vertices;
 };
 
 using RenderInfoCreator = std::function<RenderInfo(CurrentFrameInfo)>;

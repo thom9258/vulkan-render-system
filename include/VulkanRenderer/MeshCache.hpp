@@ -40,12 +40,14 @@ public:
       -> SimpleMeshRef;
 
   TexturedMesh *get(SimpleMeshRef ref);
+  void remove(SimpleMeshRef ref);
 	
   [[nodiscard]]
   auto add(Render::Context &context, AnimatedMesh&& vertex_buffer)
       -> AnimatedMeshRef;
 
   AnimatedMesh *get(AnimatedMeshRef ref);
+  void remove(AnimatedMeshRef ref);
 
 
 private:

@@ -423,6 +423,12 @@ int main(int argc, char **argv) {
 
       RenderInfoCreator render_info_creator =
           [&](CurrentFrameInfo frameInfo) -> RenderInfo {
+        if (debug_line_meshes[frameInfo.current_flight_frame_index]
+                .has_value()) {
+          mesh_cache.remove(
+              debug_line_meshes[frameInfo.current_flight_frame_index].value());
+        }
+
         debug_line_meshes[frameInfo.current_flight_frame_index] =
             mesh_cache.add(
                 context,
@@ -435,12 +441,12 @@ int main(int argc, char **argv) {
         renderables.push_back(debug_mesh);
 
         RenderInfo render_info;
-		render_info.meshcache = &mesh_cache;
-		render_info.texturecache = &texture_cache;
-        render_info.renderables = renderables;            
-		render_info.world = world_info;
-		render_info.lights = lights;
-		render_info.shadowcasters = shadowcasters;
+        render_info.meshcache = &mesh_cache;
+        render_info.texturecache = &texture_cache;
+        render_info.renderables = renderables;
+        render_info.world = world_info;
+        render_info.lights = lights;
+        render_info.shadowcasters = shadowcasters;
         return render_info;
       };
 
