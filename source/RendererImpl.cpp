@@ -506,7 +506,6 @@ auto Renderer::Impl::render(
     ShadowCasters &shadowcasters) -> Texture2D::Impl * {
   return render_geometry_pass(
       context,
-
       geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
       mesh_cache, current_frame_in_flight, presenter.max_frames_in_flight,
       total_frames, context->device.get(),
@@ -519,19 +518,6 @@ RenderedFrameStats
 Renderer::with_render(Render::Context *context,
                       RenderInfoCreator render_info_creator) {
   return impl->with_render(context, render_info_creator);
-}
-
-auto Renderer::render(Render::Context *context,
-                      TextureSamplerCache &texture_cache, MeshCache &mesh_cache,
-                      const uint32_t current_frame_in_flight,
-                      const uint64_t total_frames,
-                      const WorldRenderInfo &world_info,
-                      std::vector<Renderable> &renderables,
-                      std::vector<Light> &lights, ShadowCasters &shadowcasters)
-    -> Texture2D::Impl * {
-  return impl->render(context->impl.get(), texture_cache, mesh_cache,
-                      current_frame_in_flight, total_frames, world_info,
-                      renderables, lights, shadowcasters);
 }
 
 Renderer::Renderer(Render::Context &context, Logger logger,

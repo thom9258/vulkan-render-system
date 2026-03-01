@@ -43,14 +43,7 @@ public:
 
   ~Renderer();
 
-
   RenderedFrameStats with_render(Render::Context *context, RenderInfoCreator render_info_creator);
-
-  auto render(Render::Context *context, TextureSamplerCache &texture_cache,
-              MeshCache &mesh_cache, const uint32_t current_frame_in_flight,
-              const uint64_t total_frames, const WorldRenderInfo &world_info,
-              std::vector<Renderable> &renderables, std::vector<Light> &lights,
-              ShadowCasters &shadowcasters) -> Texture2D::Impl *;
 
   class Impl;
   std::unique_ptr<Impl> impl;
