@@ -34,6 +34,7 @@ using json = nlohmann::json;
 #include "PlayerController.hpp"
 #include "generate_textured_cube.hpp"
 #include "player.hpp"
+#include "sliding_window.hpp"
 
 #include "Physics.hpp"
 
@@ -280,6 +281,7 @@ int main(int argc, char **argv) {
   uint64_t framecount = 0;
   double delta_time = 0;
   double total_time = 0;
+  sliding_window<double> delta_time_average(30);
 
   FlightFramesArray<std::optional<SimpleMeshRef>> debug_line_meshes;
 
@@ -336,8 +338,9 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Physics Update
        */
-      // physics.dynamicsWorld->stepSimulation(1.f / 60.f, 10);
-      physics.dynamicsWorld->stepSimulation(delta_time / 1000, 10);
+
+	  const double physics_deltatime = delta_time / 1000;
+      physics.dynamicsWorld->stepSimulation(physics_deltatime, 10);
       physics.dynamicsWorld->debugDrawWorld();
 
       for (int j = physics.dynamicsWorld->getNumCollisionObjects() - 1; j >= 0;
@@ -356,13 +359,17 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Update
        */
-      player_controller(player, camera_rig, physics, deltatime_ms, events);
+	  const double render_deltatime = delta_time / 100;
+      player_controller(player, camera_rig, physics, render_deltatime, events);
 
       if (player_controller.get_position().y < -10.0f) {
         player_controller.respawn();
       }
 
-      camera_player_follow(camera, player, camera_rig, deltatime_ms);
+      camera_player_follow(camera, player, camera_rig, render_deltatime);
+
+	  const double animation_deltatime = delta_time / 1000;
+      player.update(animation_deltatime);
 
       /** ************************************************************************
        * Render
@@ -379,7 +386,6 @@ int main(int argc, char **argv) {
       renderables.push_back(ramp30_box.renderable());
       renderables.push_back(wall_box.renderable());
 
-      player.update(delta_time / 1000);
       if (!hide_player_model) {
         for (auto renderable : player.renderables())
           renderables.push_back(renderable);
@@ -452,6 +458,8 @@ int main(int argc, char **argv) {
                      duration_delta_time)
                      .count();
 
+	delta_time_average.put(delta_time);
+	std::println("average delta time[30] = {}", delta_time_average.average());
     total_time += delta_time;
   }
 
