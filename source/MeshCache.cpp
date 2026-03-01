@@ -85,5 +85,6 @@ void MeshCache::remove(AnimatedMeshRef ref) {
     std::println("ERROR: deleted non-existing mesh");
     return;
   }
+
   m_animated_mesh_cache.erase(ref);
 }
