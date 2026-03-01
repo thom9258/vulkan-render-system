@@ -12,7 +12,7 @@
 #include "ShaderTexture.hpp"
 
 #include "ContextImpl.hpp"
-#include "PresenterImpl.hpp"
+#include "Presenter.hpp"
 #include "DescriptorPoolImpl.hpp"
 #include "TextureImpl.hpp"
 #include "ShaderTextureImpl.hpp"
@@ -28,7 +28,7 @@ struct AnimatedPipeline
 	AnimatedPipeline() = default;
 	explicit AnimatedPipeline(Logger& logger,
 							  Render::Context::Impl* context,
-							  Presenter::Impl* presenter,
+							  Presenter& presenter,
 							  DescriptorPool::Impl* descriptor_pool,
 							  vk::RenderPass& renderpass,
 							  std::filesystem::path const shader_root_path);

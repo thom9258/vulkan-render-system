@@ -17,7 +17,6 @@
 #include <VulkanRenderer/FlightFrames.hpp>
 #include <VulkanRenderer/Light.hpp>
 #include <VulkanRenderer/ModelLoader.hpp>
-#include <VulkanRenderer/Presenter.hpp>
 #include <VulkanRenderer/Renderable.hpp>
 #include <VulkanRenderer/Renderer.hpp>
 #include <VulkanRenderer/ShaderTexture.hpp>
@@ -130,7 +129,7 @@ auto generate_stairs(physics::Physics &physics, SimpleMeshRef textured_cube,
     step_transform.scale = glm::vec3(step_depth, step_height, step_width);
     StaticBox step_box(physics, textured_cube, texture, step_transform);
     stairs.push_back(std::move(step_box));
-	std::println("Added stair {}", i);
+    std::println("Added stair {}", i);
   }
 
   return stairs;
@@ -189,7 +188,6 @@ int main(int argc, char **argv) {
   };
 
   Render::Context context(window_config, logger);
-  Presenter presenter(&context, logger);
 
   const auto window = context.get_window_extent();
   const auto aspect =
@@ -203,7 +201,7 @@ int main(int argc, char **argv) {
 
   TextureSamplerCache texture_cache;
   MeshCache mesh_cache;
-  Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
+  Renderer renderer(context, logger, descriptor_pool, shaders_root);
 
   std::optional<SimpleMeshRef> textured_cube = mesh_cache.add(
       context, TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(
@@ -339,7 +337,7 @@ int main(int argc, char **argv) {
        * Physics Update
        */
 
-	  const double physics_deltatime = delta_time / 1000;
+      const double physics_deltatime = delta_time / 1000;
       physics.dynamicsWorld->stepSimulation(physics_deltatime, 10);
       physics.dynamicsWorld->debugDrawWorld();
 
@@ -359,7 +357,7 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Update
        */
-	  const double render_deltatime = delta_time / 100;
+      const double render_deltatime = delta_time / 100;
       player_controller(player, camera_rig, physics, render_deltatime, events);
 
       if (player_controller.get_position().y < -10.0f) {
@@ -368,7 +366,7 @@ int main(int argc, char **argv) {
 
       camera_player_follow(camera, player, camera_rig, render_deltatime);
 
-	  const double animation_deltatime = delta_time / 1000;
+      const double animation_deltatime = delta_time / 1000;
       player.update(animation_deltatime);
 
       /** ************************************************************************
@@ -423,8 +421,8 @@ int main(int argc, char **argv) {
       world_info.view = camera.view();
       world_info.projection = camera.projection();
 
-      FrameProducer frameGenerator =
-          [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
+      RenderInfoCreator render_info_creator =
+          [&](CurrentFrameInfo frameInfo) -> RenderInfo {
         debug_line_meshes[frameInfo.current_flight_frame_index] =
             mesh_cache.add(
                 context,
@@ -436,30 +434,28 @@ int main(int argc, char **argv) {
             debug_line_meshes[frameInfo.current_flight_frame_index];
         renderables.push_back(debug_mesh);
 
-        auto *textureptr = renderer.render(
-            &context, texture_cache, mesh_cache,
-            frameInfo.current_flight_frame_index, frameInfo.total_frame_count,
-            world_info, renderables, lights, shadowcasters);
-
-        if (textureptr == nullptr)
-          return std::nullopt;
-        return textureptr;
+        RenderInfo render_info;
+		render_info.meshcache = &mesh_cache;
+		render_info.texturecache = &texture_cache;
+        render_info.renderables = renderables;            
+		render_info.world = world_info;
+		render_info.lights = lights;
+		render_info.shadowcasters = shadowcasters;
+        return render_info;
       };
 
-      auto render_time = with_time_measurement(
-          [&]() { presenter.with_presentation(frameGenerator); });
+      RenderedFrameStats stats =
+          renderer.with_render(&context, render_info_creator);
 
-      framecount++;
+      physics.debug_line_collecter->clear();
     });
-
-    physics.debug_line_collecter->clear();
 
     delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                      duration_delta_time)
                      .count();
 
-	delta_time_average.put(delta_time);
-	std::println("average delta time[30] = {}", delta_time_average.average());
+    delta_time_average.put(delta_time);
+    std::println("average delta time[30] = {}", delta_time_average.average());
     total_time += delta_time;
   }
 

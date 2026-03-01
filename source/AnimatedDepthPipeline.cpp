@@ -32,7 +32,7 @@ AnimatedDepthPipeline::AnimatedDepthPipeline(AnimatedDepthPipeline &&rhs) {
 
 AnimatedDepthPipeline::AnimatedDepthPipeline(
     std::string_view name, Logger &logger, Render::Context::Impl *context,
-    Presenter::Impl *presenter, vk::RenderPass &renderpass,
+    Presenter& presenter, vk::RenderPass &renderpass,
     AnimatedVertexPath vertex_path, AnimatedFragmentPath fragment_path,
     U32Extent extent, const bool debug_print)
     : m_extent{extent}, m_name{std::string(name)} {

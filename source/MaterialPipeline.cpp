@@ -5,7 +5,7 @@
 
 MaterialPipeline::MaterialPipeline(Logger& logger,
 								   Render::Context::Impl* context,
-								   Presenter::Impl* presenter,
+								   Presenter& presenter,
 								   DescriptorPool::Impl* descriptor_pool,
 								   vk::RenderPass& renderpass,
 								   std::filesystem::path const shader_root_path)
@@ -23,7 +23,7 @@ MaterialPipeline::MaterialPipeline(Logger& logger,
 				std::format("  Fragment Shader {}",
 							fragmentshader_name));
 	
-	auto const frames_in_flight = MaxFlightFrames{presenter->max_frames_in_flight};
+	auto const frames_in_flight = MaxFlightFrames{presenter.max_frames_in_flight};
 	vk::Extent2D const render_extent = context->get_window_extent();
 	
 	const auto vertex_path = VertexPath{shader_root_path / vertexshader_name};

@@ -417,65 +417,86 @@ auto render_geometry_pass(
   return &pass.colorbuffers[current_frame_in_flight];
 }
 
-Renderer::Impl::Impl(Render::Context::Impl *context, Presenter::Impl *presenter,
-                     Logger logger, DescriptorPool::Impl *descriptor_pool,
+Renderer::Impl::Impl(Render::Context *context, Logger logger,
+                     DescriptorPool::Impl *descriptor_pool,
                      std::filesystem::path shaders_root)
-    : shaders_root(shaders_root), context(context), presenter(presenter),
-      logger(logger), descriptor_pool(descriptor_pool) {
+    : logger(logger), shaders_root(shaders_root), context(context),
+      presenter(context, logger), descriptor_pool(descriptor_pool) {
 
   U32Extent constexpr shadow_extent{1024, 1024};
   // U32Extent constexpr shadow_extent{256, 256};
 
   // TODO: Allow extent to be set externally
   // TODO: Allow debug print to be set externally
-  vk::Extent2D const render_extent = context->get_window_extent();
+  vk::Extent2D const render_extent = context->impl->get_window_extent();
   bool const debug_print = true;
   shadow_passes.orthographic = OrthographicShadowPass(
-      logger, context, presenter, descriptor_pool, shadow_extent,
+      logger, context->impl.get(), presenter, descriptor_pool, shadow_extent,
       StaticVertexPath{shaders_root / "StaticDepth.vert.spv"},
       StaticFragmentPath{shaders_root / "StaticDepth.frag.spv"},
       AnimatedVertexPath{shaders_root / "AnimatedDepth.vert.spv"},
-      AnimatedFragmentPath{shaders_root / "StaticDepth.frag.spv"},
-      debug_print);
+      AnimatedFragmentPath{shaders_root / "StaticDepth.frag.spv"}, debug_print);
 
   shadow_passes.perspective = PerspectiveShadowPass(
-      logger, context, presenter, descriptor_pool, shadow_extent,
+      logger, context->impl.get(), presenter, descriptor_pool, shadow_extent,
       StaticVertexPath{shaders_root / "StaticDepth.vert.spv"},
       StaticFragmentPath{shaders_root / "StaticDepth.frag.spv"},
       AnimatedVertexPath{shaders_root / "AnimatedDepth.vert.spv"},
-      AnimatedFragmentPath{shaders_root / "StaticDepth.frag.spv"},
-      debug_print);
+      AnimatedFragmentPath{shaders_root / "StaticDepth.frag.spv"}, debug_print);
 
-  geometry_pass = create_geometry_pass(
-      context, render_extent, presenter->max_frames_in_flight, debug_print);
+  geometry_pass =
+      create_geometry_pass(context->impl.get(), render_extent,
+                           presenter.max_frames_in_flight, debug_print);
 
   geometry_pipelines.material =
-      MaterialPipeline(logger, context, presenter, descriptor_pool,
+      MaterialPipeline(logger, context->impl.get(), presenter, descriptor_pool,
                        geometry_pass.renderpass.get(), shaders_root);
-  context->logger.info(std::source_location::current(),
-                       "Created Material Pipeline");
+  context->impl.get()->logger.info(std::source_location::current(),
+                                   "Created Material Pipeline");
 
   geometry_pipelines.animated =
-      AnimatedPipeline(logger, context, presenter, descriptor_pool,
+      AnimatedPipeline(logger, context->impl.get(), presenter, descriptor_pool,
                        geometry_pass.renderpass.get(), shaders_root);
-  context->logger.info(std::source_location::current(),
-                       "Created Animated Material Pipeline");
+  context->impl.get()->logger.info(std::source_location::current(),
+                                   "Created Animated Material Pipeline");
 
   geometry_pipelines.normcolor = create_norm_render_pipeline(
-      context->logger, context->physical_device, context->device.get(),
-      geometry_pass.renderpass.get(), presenter->max_frames_in_flight,
-      render_extent, shaders_root, debug_print);
-  context->logger.info(std::source_location::current(),
-                       "Created NormColor Pipeline");
+      context->impl.get()->logger, context->impl.get()->physical_device,
+      context->impl.get()->device.get(), geometry_pass.renderpass.get(),
+      presenter.max_frames_in_flight, render_extent, shaders_root, debug_print);
+  context->impl.get()->logger.info(std::source_location::current(),
+                                   "Created NormColor Pipeline");
 
   geometry_pipelines.wireframe = create_wireframe_render_pipeline(
-      context->logger, context->device.get(), geometry_pass.renderpass.get(),
-      render_extent, shaders_root, debug_print);
-  context->logger.info(std::source_location::current(),
-                       "Created Wireframe Pipeline");
+      context->impl.get()->logger, context->impl.get()->device.get(),
+      geometry_pass.renderpass.get(), render_extent, shaders_root, debug_print);
+  context->impl.get()->logger.info(std::source_location::current(),
+                                   "Created Wireframe Pipeline");
 }
 
 Renderer::Impl::~Impl() {}
+
+RenderedFrameStats
+Renderer::Impl::with_render(Render::Context *context,
+                            RenderInfoCreator render_info_creator) {
+
+  CurrentFrameInfo current_frame_info{};
+  current_frame_info.total_frame_count = presenter.total_frames;
+  current_frame_info.current_flight_frame_index =
+      presenter.current_frame_in_flight;
+
+  RenderInfo render_info = render_info_creator(current_frame_info);
+
+  Texture2D::Impl *frame = render(
+      context->impl.get(), *render_info.texturecache, *render_info.meshcache,
+      current_frame_info.current_flight_frame_index,
+      current_frame_info.total_frame_count, render_info.world,
+      render_info.renderables, render_info.lights, render_info.shadowcasters);
+  presenter.present(frame);
+
+  RenderedFrameStats stats;
+  return stats;
+}
 
 auto Renderer::Impl::render(
     Render::Context::Impl *context, TextureSamplerCache &texture_cache,
@@ -487,11 +508,17 @@ auto Renderer::Impl::render(
       context,
 
       geometry_pass, shadow_passes, &geometry_pipelines, &logger, texture_cache,
-      mesh_cache, current_frame_in_flight, presenter->max_frames_in_flight,
+      mesh_cache, current_frame_in_flight, presenter.max_frames_in_flight,
       total_frames, context->device.get(),
-      descriptor_pool->descriptor_pool.get(), presenter->command_pool(),
+      descriptor_pool->descriptor_pool.get(), presenter.command_pool(),
       context->graphics_queue(), world_info, renderables, lights,
       shadowcasters);
+}
+
+RenderedFrameStats
+Renderer::with_render(Render::Context *context,
+                      RenderInfoCreator render_info_creator) {
+  return impl->with_render(context, render_info_creator);
 }
 
 auto Renderer::render(Render::Context *context,
@@ -507,11 +534,10 @@ auto Renderer::render(Render::Context *context,
                       renderables, lights, shadowcasters);
 }
 
-Renderer::Renderer(Render::Context &context, Presenter &presenter,
-                   Logger logger, DescriptorPool &descriptor_pool,
+Renderer::Renderer(Render::Context &context, Logger logger,
+                   DescriptorPool &descriptor_pool,
                    const std::filesystem::path shaders_root)
-    : impl(std::make_unique<Impl>(context.impl.get(), presenter.impl.get(),
-                                  logger, descriptor_pool.impl.get(),
+    : impl(std::make_unique<Impl>(&context, logger, descriptor_pool.impl.get(),
                                   shaders_root)) {}
 
 Renderer::~Renderer() {}

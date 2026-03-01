@@ -8,7 +8,7 @@
 #include "FlightFrames.hpp"
 #include "Mesh.hpp"
 #include "PipelineUtils.hpp"
-#include "PresenterImpl.hpp"
+#include "Presenter.hpp"
 #include "ShaderTexture.hpp"
 #include "ShaderTextureImpl.hpp"
 #include "Texture.hpp"
@@ -29,7 +29,7 @@ public:
   AnimatedDepthPipeline(AnimatedDepthPipeline &&rhs);
   AnimatedDepthPipeline(std::string_view name, Logger &logger,
                         Render::Context::Impl *context,
-                        Presenter::Impl *presenter, vk::RenderPass &renderpass,
+                        Presenter& presenter, vk::RenderPass &renderpass,
                         AnimatedVertexPath vertex_path,
                         AnimatedFragmentPath fragment_path, U32Extent extent,
                         const bool debug_print);

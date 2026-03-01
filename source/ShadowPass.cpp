@@ -131,16 +131,16 @@ ShadowPassTexture &ShadowPassTexture::operator=(ShadowPassTexture &&rhs) {
 }
 
 OrthographicShadowPass::OrthographicShadowPass(
-    Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
+    Logger &logger, Render::Context::Impl *context, Presenter &presenter,
     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
     StaticVertexPath static_vertex_path,
     StaticFragmentPath static_fragment_path,
     AnimatedVertexPath animated_vertex_path,
     AnimatedFragmentPath animated_fragment_path, const bool debug_print)
-    : GenericShadowPass("OrthoGraphicShadowPass", context, logger, presenter, descriptor_pool, extent,
-                        static_vertex_path, static_fragment_path,
-                        animated_vertex_path, animated_fragment_path,
-                        debug_print) {}
+    : GenericShadowPass("OrthoGraphicShadowPass", context, logger, presenter,
+                        descriptor_pool, extent, static_vertex_path,
+                        static_fragment_path, animated_vertex_path,
+                        animated_fragment_path, debug_print) {}
 
 void OrthographicShadowPass::record(
     Render::Context::Impl *context, Logger *logger, vk::Device &device,
@@ -159,17 +159,16 @@ auto OrthographicShadowPass::get_shadowtexture(
 }
 
 PerspectiveShadowPass::PerspectiveShadowPass(
-    Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
+    Logger &logger, Render::Context::Impl *context, Presenter &presenter,
     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
     StaticVertexPath static_vertex_path,
     StaticFragmentPath static_fragment_path,
     AnimatedVertexPath animated_vertex_path,
     AnimatedFragmentPath animated_fragment_path, const bool debug_print)
-    : GenericShadowPass("PerspectiveShadowPass", 
-          context, logger, presenter, descriptor_pool, extent,
-          static_vertex_path, static_fragment_path, animated_vertex_path,
-          animated_fragment_path,
-          debug_print) {}
+    : GenericShadowPass("PerspectiveShadowPass", context, logger, presenter,
+                        descriptor_pool, extent, static_vertex_path,
+                        static_fragment_path, animated_vertex_path,
+                        animated_fragment_path, debug_print) {}
 
 void PerspectiveShadowPass::record(Render::Context::Impl *context,
                                    Logger *logger, vk::Device &device,
@@ -199,23 +198,22 @@ GenericShadowPass &GenericShadowPass::operator=(GenericShadowPass &&rhs) {
 }
 
 GenericShadowPass::GenericShadowPass(GenericShadowPass &&rhs) {
-	*this = std::move(rhs);
+  *this = std::move(rhs);
 }
 
-GenericShadowPass::GenericShadowPass(std::string_view name,
-    Render::Context::Impl *context, Logger &logger, Presenter::Impl *presenter,
-    DescriptorPool::Impl *descriptor_pool, U32Extent extent,
-    StaticVertexPath static_vertex_path,
+GenericShadowPass::GenericShadowPass(
+    std::string_view name, Render::Context::Impl *context, Logger &logger,
+    Presenter &presenter, DescriptorPool::Impl *descriptor_pool,
+    U32Extent extent, StaticVertexPath static_vertex_path,
     StaticFragmentPath static_fragment_path,
     AnimatedVertexPath animated_vertex_path,
     AnimatedFragmentPath animated_fragment_path, const bool debug_print)
-    : m_extent{extent}
-    , m_name{std::string(name)} {
+    : m_name{std::string(name)}, m_extent{extent} {
   auto constexpr color_format = vk::Format::eR32Sfloat;
   auto constexpr depth_format = vk::Format::eD32Sfloat;
   auto constexpr colorComponentFlags(vk::ColorComponentFlagBits::eR);
   auto const frames_in_flight =
-      MaxFlightFrames{presenter->max_frames_in_flight};
+      MaxFlightFrames{presenter.max_frames_in_flight};
 
   const auto color_attachment =
       vk::AttachmentDescription{}
@@ -326,13 +324,15 @@ GenericShadowPass::GenericShadowPass(std::string_view name,
   context->logger.info(std::source_location::current(),
                        "Created Shadowpass FramePasses!");
 
-  m_static_pipeline = StaticDepthPipeline(m_name + "::StaticDepthPipeline",
-      logger, context, presenter, m_renderpass.get(), static_vertex_path,
-      static_fragment_path, m_extent, debug_print);
+  m_static_pipeline =
+      StaticDepthPipeline(m_name + "::StaticDepthPipeline", logger, context,
+                          presenter, m_renderpass.get(), static_vertex_path,
+                          static_fragment_path, m_extent, debug_print);
 
-  m_animated_pipeline = AnimatedDepthPipeline(m_name + "::AnimatedDepthPipeline",
-      logger, context, presenter, m_renderpass.get(), animated_vertex_path,
-      animated_fragment_path, m_extent, debug_print);
+  m_animated_pipeline =
+      AnimatedDepthPipeline(m_name + "::AnimatedDepthPipeline", logger, context,
+                            presenter, m_renderpass.get(), animated_vertex_path,
+                            animated_fragment_path, m_extent, debug_print);
 }
 
 void GenericShadowPass::record(Render::Context::Impl *context, Logger *logger,
