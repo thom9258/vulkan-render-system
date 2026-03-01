@@ -1,17 +1,21 @@
 #pragma once
 
-#include <VulkanRenderer/Presenter.hpp>
 #include <VulkanRenderer/Texture.hpp>
 #include "ContextImpl.hpp"
 #include "Utils.hpp"
 
-class Presenter::Impl 
+class Presenter 
 {
 public:
-    explicit Impl(Render::Context::Impl* context, Logger logger);
-    ~Impl();
+	Presenter(Render::Context* context, Logger logger);
+	~Presenter();
 
-	void with_presentation(FrameProducer& f);
+	Presenter(const Presenter&) = delete;
+	Presenter(Presenter&&) = delete;
+	Presenter& operator=(const Presenter&) = delete;
+	Presenter& operator=(Presenter&&) = delete;
+
+	void present(Texture2D::Impl* frame);
 	vk::CommandPool& command_pool();
 
 	Render::Context::Impl* context;

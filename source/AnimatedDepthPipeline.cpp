@@ -3,6 +3,7 @@
 #include "Renderable.hpp"
 
 #include <algorithm>
+#include <print>
 #include <ranges>
 
 AnimatedDepthPipeline &
@@ -31,7 +32,7 @@ AnimatedDepthPipeline::AnimatedDepthPipeline(AnimatedDepthPipeline &&rhs) {
 
 AnimatedDepthPipeline::AnimatedDepthPipeline(
     std::string_view name, Logger &logger, Render::Context::Impl *context,
-    Presenter::Impl *presenter, vk::RenderPass &renderpass,
+    Presenter& presenter, vk::RenderPass &renderpass,
     AnimatedVertexPath vertex_path, AnimatedFragmentPath fragment_path,
     U32Extent extent, const bool debug_print)
     : m_extent{extent}, m_name{std::string(name)} {
@@ -40,16 +41,16 @@ AnimatedDepthPipeline::AnimatedDepthPipeline(
       FragmentPath{fragment_path.get()});
 
   if (!shaderstage_infos) {
-    std::string const msg = std::format(
-        "{} could not load vertex/fragment sources {} / {}", m_name,
-        vertex_path.get().string(), fragment_path.get().string());
+    std::string const msg =
+        std::format("{} could not load vertex/fragment sources {} / {}", m_name,
+                    vertex_path.get().string(), fragment_path.get().string());
     logger.fatal(std::source_location::current(), msg);
     throw std::runtime_error(msg);
   }
 
   logger.info(std::source_location::current(),
-              std::format("[{}] Created ShaderStages from {} {}",
-                          m_name, vertex_path.get().string(),
+              std::format("[{}] Created ShaderStages from {} {}", m_name,
+                          vertex_path.get().string(),
                           fragment_path.get().string()));
 
   std::array<vk::DynamicState, 2> dynamic_states{vk::DynamicState::eViewport,
@@ -213,16 +214,21 @@ AnimatedDepthPipeline::AnimatedDepthPipeline(
   case vk::Result::eSuccess:
     break;
   case vk::Result::ePipelineCompileRequiredEXT:
-    logger.error(std::source_location::current(),
-				 std::format("[{}] Creating pipeline error: PipelineCompileRequiredEXT", m_name));
+    logger.error(
+        std::source_location::current(),
+        std::format("[{}] Creating pipeline error: PipelineCompileRequiredEXT",
+                    m_name));
   default:
-    logger.error(std::source_location::current(),
-				 std::format("[{}] Creating pipeline error: Unknown invalid Result state", m_name));
+    logger.error(
+        std::source_location::current(),
+        std::format(
+            "[{}] Creating pipeline error: Unknown invalid Result state",
+            m_name));
   }
 
   m_pipeline = std::move(result.value);
   logger.info(std::source_location::current(),
-			  std::format("[{}] Created Pipeline", m_name));
+              std::format("[{}] Created Pipeline", m_name));
 
   constexpr std::size_t descriptor_count = 200;
   //(animation::drawable_models_per_frame + 1) * FlightFrames::max.get();
@@ -242,7 +248,7 @@ AnimatedDepthPipeline::AnimatedDepthPipeline(
   m_descriptor_pool =
       context->device.get().createDescriptorPoolUnique(pool_info, nullptr);
   logger.info(std::source_location::current(),
-			  std::format("[{}] Created Descriptor Pool", m_name));
+              std::format("[{}] Created Descriptor Pool", m_name));
 
   for (CameraUniform &camera_uniform : m_camera_uniforms) {
     camera_uniform.uniform = UniformMemoryDirectWrite<CameraUniformData>(
@@ -313,9 +319,8 @@ AnimatedDepthPipeline::AnimatedDepthPipeline(
       context->device.get().updateDescriptorSets(write.size(), write.data(), 0,
                                                  nullptr);
 
-	  logger.info(std::source_location::current(),
-				  std::format("[{}] Created Descriptor Sets", m_name));
-
+      logger.info(std::source_location::current(),
+                  std::format("[{}] Created Descriptor Sets", m_name));
     }
   }
 }
@@ -336,67 +341,80 @@ void AnimatedDepthPipeline::record(Render::Context::Impl *context,
       m_camera_uniforms[*current_flightframe].set.get()};
 
   commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                   m_layout.get(), camera_uniform_set_index, uniform_sets.size(),
-                                   uniform_sets.data(), 0, nullptr);
+                                   m_layout.get(), camera_uniform_set_index,
+                                   uniform_sets.size(), uniform_sets.data(), 0,
+                                   nullptr);
 
-  for (auto [index, renderable] : std::views::enumerate(renderables)) {
+  const auto is_animated_renderable = [](ShadowRenderable renderable) {
+    return std::holds_alternative<AnimatedRenderable>(renderable);
+  };
+  const auto has_mesh = [](ShadowRenderable renderable) {
+    AnimatedRenderable *animated = std::get_if<AnimatedRenderable>(&renderable);
+    return animated->mesh.has_value();
+  };
 
-    if (auto *animated = std::get_if<AnimatedRenderable>(&renderable)) {
+  const auto has_shadow = [](ShadowRenderable renderable) {
+    AnimatedRenderable *animated = std::get_if<AnimatedRenderable>(&renderable);
+    return animated->has_shadow;
+  };
 
-      if (!animated->mesh.has_value()) {
-        continue;
-      }
+  auto to_draw = renderables | std::views::filter(is_animated_renderable) |
+                 std::views::filter(has_mesh) | std::views::filter(has_shadow);
 
-      if (!animated->has_shadow) {
-        continue;
-      }
+  for (auto [index, renderable] : std::views::enumerate(to_draw)) {
 
-      // https://docs.vulkan.org/tutorial/latest/16_Multiple_Objects.html
-      ModelInfoUniformData model_info;
-      model_info.model_matrix = animated->model;
-      if (animated->animator == nullptr) {
-        animation::initialize_bone_matrices(model_info.bone_matrices,
-                                            animation::max_bone_matrices);
-      } else {
-        std::vector<glm::mat4> bone_matrices =
-            animated->animator->GetFinalBoneMatrices();
-        for (size_t i = 0;
-             i < std::min(bone_matrices.size(), animation::max_bone_matrices);
-             i++) {
-          model_info.bone_matrices[i] = bone_matrices[i];
-        }
-      }
+    AnimatedRenderable *animated = std::get_if<AnimatedRenderable>(&renderable);
 
-      m_model_info_uniform_pools[*current_flightframe][index].uniform.write(
-          *context, &model_info);
-
-      std::array<vk::DescriptorSet, 1> model_info_sets{
-          m_model_info_uniform_pools.at(*current_flightframe)
-              .at(index)
-              .set.get()};
-
-      commandbuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                       m_layout.get(), model_info_set_index,
-                                       model_info_sets.size(),
-                                       model_info_sets.data(), 0, nullptr);
-
-      const uint32_t firstBinding = 0;
-      const uint32_t bindingCount = 1;
-      std::array<vk::DeviceSize, bindingCount> offsets = {0};
-
-      AnimatedMesh *mesh = mesh_cache.get(animated->mesh.value());
-      uint32_t vertex_length = mesh->vertexbuffer.impl->length;
-      std::array<vk::Buffer, bindingCount> buffers{
-          mesh->vertexbuffer.impl->buffer.get()};
-
-      commandbuffer.bindVertexBuffers(firstBinding, bindingCount,
-                                      buffers.data(), offsets.data());
-
-      const uint32_t instanceCount = 1;
-      const uint32_t firstVertex = 0;
-      const uint32_t firstInstance = 0;
-      commandbuffer.draw(vertex_length, instanceCount, firstVertex,
-                         firstInstance);
+    if (index > m_model_info_uniform_pools.size()) {
+      std::println("Warning exceeded animated model count [{}] with index {}",
+                   m_model_info_uniform_pools[0].size(), index);
+      continue;
     }
+
+    // https://docs.vulkan.org/tutorial/latest/16_Multiple_Objects.html
+    ModelInfoUniformData model_info;
+    model_info.model_matrix = animated->model;
+    if (animated->animator == nullptr) {
+      animation::initialize_bone_matrices(model_info.bone_matrices,
+                                          animation::max_bone_matrices);
+    } else {
+      std::vector<glm::mat4> bone_matrices =
+          animated->animator->GetFinalBoneMatrices();
+      for (size_t i = 0;
+           i < std::min(bone_matrices.size(), animation::max_bone_matrices);
+           i++) {
+        model_info.bone_matrices[i] = bone_matrices[i];
+      }
+    }
+
+    m_model_info_uniform_pools[*current_flightframe][index].uniform.write(
+        *context, &model_info);
+
+    std::array<vk::DescriptorSet, 1> model_info_sets{
+        m_model_info_uniform_pools.at(*current_flightframe)
+            .at(index)
+            .set.get()};
+
+    commandbuffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics, m_layout.get(), model_info_set_index,
+        model_info_sets.size(), model_info_sets.data(), 0, nullptr);
+
+    const uint32_t firstBinding = 0;
+    const uint32_t bindingCount = 1;
+    std::array<vk::DeviceSize, bindingCount> offsets = {0};
+
+    AnimatedMesh *mesh = mesh_cache.get(animated->mesh.value());
+    uint32_t vertex_length = mesh->vertexbuffer.impl->length;
+    std::array<vk::Buffer, bindingCount> buffers{
+        mesh->vertexbuffer.impl->buffer.get()};
+
+    commandbuffer.bindVertexBuffers(firstBinding, bindingCount, buffers.data(),
+                                    offsets.data());
+
+    const uint32_t instanceCount = 1;
+    const uint32_t firstVertex = 0;
+    const uint32_t firstInstance = 0;
+    commandbuffer.draw(vertex_length, instanceCount, firstVertex,
+                       firstInstance);
   }
 }

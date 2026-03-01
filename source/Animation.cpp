@@ -136,6 +136,7 @@ glm::mat4 Bone::InterpolateScaling(float animationTime) {
   int p1Index = p0Index + 1;
   float scaleFactor = GetScaleFactor(
       m_Scales[p0Index].timeStamp, m_Scales[p1Index].timeStamp, animationTime);
+
   glm::vec3 finalScale =
       glm::mix(m_Scales[p0Index].scale, m_Scales[p1Index].scale, scaleFactor);
   return glm::scale(glm::mat4(1.0f), finalScale);

@@ -14,12 +14,16 @@ Required Features:
 - [X] Animated meshes - limit support to gltf models.
 - [X] Shadows for animated meshes.
 - [ ] Support vertex indices.
+- [ ] allow deletion of meshes and textures from caches.
+- [ ] generate default textures and meshes, and get them by name in pipelines.
 - [ ] Investigate weird singular vertices that has wrong animated transformations (potentially fixed by supporting indices).
 - [ ] Add a gpu physical device selection method.
 - [ ] Changeable Background color.
 - [ ] Windows support.
    
 Less Important Features:
+- [ ] allow updating of mesh vertex data inside caches without destroying the old one.
+- [ ] add a debug line pipeline that draw debug lines on top of existing image, without depth culling.
 - [ ] add a shadow_bakeable boolean to shadow pass and draw them into an "initial" shadow texture for orthographic shadows to be based on.
 - [ ] GUI using ImGui - can maybe be exposed as transitive dependency.
 - [ ] Custom static mesh binary format, something that has a ascii name + version, then a binary blob that is just <TYPE><SIZE><DATA><TYPE><SIZE><DATA> so it is really easy and quick to parse (this must support changing endians aswell). The format should be directly copyable to the gpu. 

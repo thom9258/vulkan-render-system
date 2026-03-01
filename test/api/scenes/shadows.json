@@ -57,9 +57,9 @@
 		},
 		{
 			"name": "chest", 
-			"draw-mode": "wireframe",
+			"draw-mode": "material",
 			"has-shadow": "yes",
-			"position": [-3, 0, 4],
+			"position": [-2, 0, 4],
 			"rotation-quat-wxyz": [0.0, 0.0, 1.0, 0.0],
 			"scale": [0.03, 0.03, 0.03]
 		},

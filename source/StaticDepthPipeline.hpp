@@ -7,7 +7,7 @@
 #include "FlightFrames.hpp"
 #include "Mesh.hpp"
 #include "PipelineUtils.hpp"
-#include "PresenterImpl.hpp"
+#include "Presenter.hpp"
 #include "ShaderTexture.hpp"
 #include "ShaderTextureImpl.hpp"
 #include "Texture.hpp"
@@ -27,7 +27,7 @@ public:
   StaticDepthPipeline() = default;
   StaticDepthPipeline(StaticDepthPipeline &&rhs);
   StaticDepthPipeline(std::string_view name, Logger &logger, Render::Context::Impl *context,
-                      Presenter::Impl *presenter, vk::RenderPass &renderpass,
+                      Presenter& presenter, vk::RenderPass &renderpass,
                       StaticVertexPath vertex_path,
                       StaticFragmentPath fragment_path, U32Extent extent,
                       const bool debug_print);

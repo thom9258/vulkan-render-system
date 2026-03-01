@@ -10,6 +10,8 @@
 #include "Texture.hpp"
 #include "Extent.hpp"
 
+#if 0
+
 struct CurrentFrameInfo
 {
 	uint64_t total_frame_count;
@@ -33,3 +35,5 @@ public:
 	class Impl;
 	std::unique_ptr<Impl> impl;
 };
+
+#endif

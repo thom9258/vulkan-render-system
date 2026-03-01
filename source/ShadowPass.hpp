@@ -8,7 +8,7 @@
 #include "FlightFrames.hpp"
 #include "Mesh.hpp"
 #include "PipelineUtils.hpp"
-#include "PresenterImpl.hpp"
+#include "Presenter.hpp"
 #include "ShaderTexture.hpp"
 #include "ShaderTextureImpl.hpp"
 #include "StaticDepthPipeline.hpp"
@@ -53,7 +53,7 @@ public:
   GenericShadowPass() = default;
   GenericShadowPass(GenericShadowPass &&rhs);
   GenericShadowPass(std::string_view name, Render::Context::Impl *context, Logger &logger,
-                    Presenter::Impl *presenter,
+                    Presenter &presenter,
                     DescriptorPool::Impl *descriptor_pool, U32Extent extent,
                     StaticVertexPath static_vertex_path,
                     StaticFragmentPath static_fragment_path,
@@ -103,7 +103,7 @@ public:
   OrthographicShadowPass(OrthographicShadowPass &&rhs) = default;
 
   OrthographicShadowPass(Logger &logger, Render::Context::Impl *context,
-                         Presenter::Impl *presenter,
+                         Presenter& presenter,
                          DescriptorPool::Impl *descriptor_pool,
                          U32Extent extent, StaticVertexPath static_vertex_path,
                          StaticFragmentPath static_fragment_path,
@@ -129,7 +129,7 @@ public:
   PerspectiveShadowPass() = default;
   PerspectiveShadowPass(PerspectiveShadowPass &&rhs) = default;
   PerspectiveShadowPass(Logger &logger, Render::Context::Impl *context,
-                        Presenter::Impl *presenter,
+                        Presenter& presenter,
                         DescriptorPool::Impl *descriptor_pool, U32Extent extent,
                         StaticVertexPath static_vertex_path,
                         StaticFragmentPath static_fragment_path,

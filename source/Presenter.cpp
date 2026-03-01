@@ -1,14 +1,14 @@
-#include "PresenterImpl.hpp"
+#include "Presenter.hpp"
 #include "TextureImpl.hpp"
 
 #include <iostream>
 
-vk::CommandPool& Presenter::Impl::command_pool()
+vk::CommandPool& Presenter::command_pool()
 {
 	return commandpool.get();
 }
 
-Presenter::Impl::~Impl()
+Presenter::~Presenter()
 {
 	// TODO: Port over the ResourceWrapperRuntime so we can automatically destroy all this stuff..
 	// Note we need to destroy the swapchain manually so it happens before the surface...
@@ -17,10 +17,10 @@ Presenter::Impl::~Impl()
 	swapchain.reset();
 }
 
-Presenter::Impl::Impl(Render::Context::Impl* context, Logger logger)
-	: max_frames_in_flight(2)
-	, context(context)
+Presenter::Presenter(Render::Context* context, Logger logger)
+	 :context(context->impl.get())
 	, logger(logger)
+	, max_frames_in_flight(2)
 {
 	CreateSwapChain();
 	CreateCommandpool();
@@ -29,7 +29,7 @@ Presenter::Impl::Impl(Render::Context::Impl* context, Logger logger)
 	CreateRenderTargets();
 }
 
-void Presenter::Impl::CreateSwapChain()
+void Presenter::CreateSwapChain()
 {
 	const auto surface_capabilities = context->window_surface_capabilities();
 	const auto window_extent = context->get_window_extent();
@@ -196,7 +196,7 @@ void Presenter::Impl::CreateSwapChain()
 				"Created Swapchain for Presenter");
 }
 
-void Presenter::Impl::CreateRenderTargets()
+void Presenter::CreateRenderTargets()
 {
 	for (size_t i = 0; i < swapchain_images.size(); i++) {
 		const auto extent = context->get_window_extent();
@@ -225,7 +225,7 @@ void Presenter::Impl::CreateRenderTargets()
 				"Created Render Targets for Presenter");
 }
 
-void Presenter::Impl::CreateCommandpool()
+void Presenter::CreateCommandpool()
 {
     auto commandPoolCreateInfo = vk::CommandPoolCreateInfo{}
 		.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
@@ -236,7 +236,7 @@ void Presenter::Impl::CreateCommandpool()
 				"Created Command Pool Presenter");
 }
 
-void Presenter::Impl::CreateCommandbuffers()
+void Presenter::CreateCommandbuffers()
 {
 	// allocate a CommandBuffer from the CommandPool
     vk::CommandBufferAllocateInfo commandBufferAllocateInfo{};
@@ -252,7 +252,7 @@ void Presenter::Impl::CreateCommandbuffers()
 							commandbuffers.size()));
 }
 
-void Presenter::Impl::CreateSyncObjects()
+void Presenter::CreateSyncObjects()
 {
 	const auto semaphoreCreateInfo = vk::SemaphoreCreateInfo{};
 	const auto fenceCreateInfo = vk::FenceCreateInfo{}
@@ -274,7 +274,7 @@ void Presenter::Impl::CreateSyncObjects()
 }
 
 void
-Presenter::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& commandbuffer,
+Presenter::RecordBlitTextureToSwapchain(vk::CommandBuffer& commandbuffer,
 											 vk::Image& swapchain_image,
 											 Texture2D::Impl* texture)
 {
@@ -402,10 +402,8 @@ Presenter::Impl::RecordBlitTextureToSwapchain(vk::CommandBuffer& commandbuffer,
 	commandbuffer.end();
 }
 
-
-void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
+void Presenter::present(Texture2D::Impl* frame)
 {
-
 	const auto maxTimeout = std::numeric_limits<unsigned int>::max();
 	auto waitresult = context->device->waitForFences(*(inFlightFences[current_frame_in_flight]),
 													 true,
@@ -435,22 +433,9 @@ void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 				  << std::endl;
 	}
 	
-	CurrentFrameInfo currentFrameInfo;
-	currentFrameInfo.current_flight_frame_index = current_frame_in_flight;
-	currentFrameInfo.total_frame_count = total_frames;
-
-	std::optional<Texture2D::Impl*> frameToPresent = std::invoke(currentFrameGenerator,
-																 currentFrameInfo);
-	if (!frameToPresent.has_value()) {
-		const auto msg = "SwapChain has not implemented a way to present the old"
-								 " swapchain image if generator returns nullopt";
-		logger.error(std::source_location::current(), msg);
-		throw std::runtime_error(msg);
-	}
-	
 	RecordBlitTextureToSwapchain(commandbuffers[current_frame_in_flight].get(),
 								 swapchain_images[swapchain_index],
-								 frameToPresent.value());
+								 frame);
 
 	const std::vector<vk::Semaphore> waitSemaphores{
 		*(imageAvailableSemaphores[current_frame_in_flight]),
@@ -488,18 +473,4 @@ void Presenter::Impl::with_presentation(FrameProducer& currentFrameGenerator)
 
     current_frame_in_flight = (current_frame_in_flight + 1) % max_frames_in_flight;
 	total_frames++;
-}
-
-Presenter::~Presenter()
-{
-}
-
-Presenter::Presenter(Render::Context* context, Logger logger)
-  : impl(std::make_unique<Presenter::Impl>(context->impl.get(), logger))
-{
-}
-
-void Presenter::with_presentation(FrameProducer& next_frame_producer)
-{
-	return impl->with_presentation(next_frame_producer);
 }

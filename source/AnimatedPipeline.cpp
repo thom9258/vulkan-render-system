@@ -7,7 +7,7 @@
 #include <ranges>
 
 AnimatedPipeline::AnimatedPipeline(
-    Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
+    Logger &logger, Render::Context::Impl *context, Presenter& presenter,
     DescriptorPool::Impl *descriptor_pool, vk::RenderPass &renderpass,
     std::filesystem::path const shader_root_path) {
   std::string const pipeline_name = "AnimatedPipeline";
@@ -22,7 +22,7 @@ AnimatedPipeline::AnimatedPipeline(
               std::format("  Fragment Shader {}", fragmentshader_name));
 
   auto const frames_in_flight =
-      MaxFlightFrames{presenter->max_frames_in_flight};
+      MaxFlightFrames{presenter.max_frames_in_flight};
   vk::Extent2D const render_extent = context->get_window_extent();
 
   const auto vertex_path = VertexPath{shader_root_path / vertexshader_name};

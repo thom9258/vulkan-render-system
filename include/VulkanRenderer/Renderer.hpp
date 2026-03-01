@@ -1,47 +1,53 @@
 #pragma once
 
-#include "Renderable.hpp"
-#include "Light.hpp"
-#include "ShadowCaster.hpp"
 #include "Context.hpp"
-#include "Presenter.hpp"
 #include "DescriptorPool.hpp"
+#include "Light.hpp"
+#include "Renderable.hpp"
+#include "ShadowCaster.hpp"
 
 #include <filesystem>
 
-
-
-struct WorldRenderInfo
+struct CurrentFrameInfo
 {
-	glm::mat4 view;
-	glm::mat4 projection;
-	glm::vec3 camera_position;
+	uint64_t total_frame_count;
+	uint64_t current_flight_frame_index;
 };
 
-class Renderer
-{
+struct WorldRenderInfo {
+  glm::mat4 view;
+  glm::mat4 projection;
+  glm::vec3 camera_position;
+};
+
+struct RenderInfo {
+  TextureSamplerCache *texturecache;
+  MeshCache *meshcache;
+  WorldRenderInfo world;
+  std::vector<Renderable> renderables;
+  std::vector<Light> lights;
+  ShadowCasters shadowcasters;
+};
+
+struct RenderedFrameStats {
+	std::size_t rendered_static_vertices;
+	std::size_t rendered_animated_vertices;
+	std::size_t rendered_shadow_static_vertices;
+	std::size_t rendered_shadow_animated_vertices;
+};
+
+using RenderInfoCreator = std::function<RenderInfo(CurrentFrameInfo)>;
+
+class Renderer {
 public:
-	Renderer(Render::Context& context,
-			 Presenter& presenter,
-			 Logger logger,
-			 DescriptorPool& descriptor_pool,
-			 const std::filesystem::path shaders_root);
+  Renderer(Render::Context &context, Logger logger,
+           DescriptorPool &descriptor_pool,
+           const std::filesystem::path shaders_root);
 
-	~Renderer();
+  ~Renderer();
 
-        auto render(
-					  Render::Context* context,
-					  TextureSamplerCache &texture_cache,
-					MeshCache& mesh_cache,
-                    const uint32_t current_frame_in_flight,
-					const uint64_t total_frames,
-					const WorldRenderInfo& world_info,
-					std::vector<Renderable>& renderables,
-					std::vector<Light>& lights,
-					ShadowCasters& shadowcasters)
-			-> Texture2D::Impl*;
+  RenderedFrameStats with_render(Render::Context *context, RenderInfoCreator render_info_creator);
 
-	class Impl;
-	std::unique_ptr<Impl> impl;
-}; 
-
+  class Impl;
+  std::unique_ptr<Impl> impl;
+};

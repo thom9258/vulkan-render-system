@@ -16,7 +16,6 @@
 #include <VulkanRenderer/DescriptorPool.hpp>
 #include <VulkanRenderer/Light.hpp>
 #include <VulkanRenderer/ModelLoader.hpp>
-#include <VulkanRenderer/Presenter.hpp>
 #include <VulkanRenderer/Renderable.hpp>
 #include <VulkanRenderer/Renderer.hpp>
 #include <VulkanRenderer/ShaderTexture.hpp>
@@ -71,10 +70,6 @@ auto rotation_from_direction(glm::vec3 direction) -> glm::mat3 {
                    rotationY.y, rotationZ.y, rotationX.z, rotationY.z,
                    rotationZ.z);
 }
-
-constexpr bool slowframes = false;
-constexpr bool printframerate = false;
-constexpr size_t printframerateinterval = 100;
 
 std::vector<VertexPosNormColorUV> triangle_vertices = {
     {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0, 0}},
@@ -486,7 +481,6 @@ int main(int argc, char **argv) {
   };
 
   Render::Context context(window_config, logger);
-  Presenter presenter(&context, logger);
 
   const auto window = context.get_window_extent();
   const auto aspect =
@@ -520,7 +514,7 @@ int main(int argc, char **argv) {
 
   TextureSamplerCache texture_cache;
   MeshCache mesh_cache;
-  Renderer renderer(context, presenter, logger, descriptor_pool, shaders_root);
+  Renderer renderer(context, logger, descriptor_pool, shaders_root);
   Resources resources{context, mesh_cache, texture_cache, assets_root};
 
   std::cout << "STARTING DRAW LOOP" << std::endl;
@@ -533,10 +527,7 @@ int main(int argc, char **argv) {
                                      mesh_cache, resources);
 
   bool exit = false;
-  uint64_t framecount = 0;
   double delta_time = 0;
-  double total_time = 0;
-
   while (!exit) {
 
     for (std::unique_ptr<Animator> &animator : scene.animators) {
@@ -633,50 +624,33 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Render Loop
        */
-      FrameProducer frameGenerator =
-          [&](CurrentFrameInfo frameInfo) -> std::optional<Texture2D::Impl *> {
-        if (reload_scene) {
-          scene = load_scene_from_path(scene_path, context, texture_cache,
-                                       mesh_cache, resources);
-          reload_scene = false;
-        }
+	  
+	  if (reload_scene) {
+		  scene = load_scene_from_path(scene_path, context, texture_cache,
+									   mesh_cache, resources);
+		  reload_scene = false;
+	  }
+	  
+      RenderInfoCreator render_info_creator =
+          [&](CurrentFrameInfo frameInfo) -> RenderInfo {
 
-        auto *textureptr = renderer.render(&context,
-            texture_cache, mesh_cache, frameInfo.current_flight_frame_index,
-            frameInfo.total_frame_count, world_info, scene.renderables,
-            scene.lights, scene.shadowcasters);
-
-        if (textureptr == nullptr)
-          return std::nullopt;
-        return textureptr;
+        RenderInfo render_info;
+        render_info.meshcache = &mesh_cache;
+        render_info.texturecache = &texture_cache;
+        render_info.renderables = scene.renderables;
+        render_info.world = world_info;
+        render_info.lights = scene.lights;
+        render_info.shadowcasters = scene.shadowcasters;
+        return render_info;
       };
 
-      auto render_time = with_time_measurement(
-          [&]() { presenter.with_presentation(frameGenerator); });
-
-      if (slowframes) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-      }
-      if (printframerate) {
-        if (framecount % printframerateinterval == 0) {
-          const auto frame_time_ms =
-              std::chrono::duration_cast<std::chrono::milliseconds>(
-                  render_time);
-
-          std::cout << "Frame Time [ms]: " << frame_time_ms.count() << "\n"
-                    << "Frame Count:     " << framecount << "\n"
-                    << "=====================================" << std::endl;
-        }
-      }
-
-      framecount++;
+      RenderedFrameStats stats =
+          renderer.with_render(&context, render_info_creator);
     });
 
     delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                      duration_delta_time)
                      .count();
-
-    total_time += delta_time;
   }
 
   context.wait_until_idle();

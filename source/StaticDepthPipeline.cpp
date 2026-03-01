@@ -20,7 +20,7 @@ StaticDepthPipeline::StaticDepthPipeline(StaticDepthPipeline &&rhs) {
 }
 
 StaticDepthPipeline::StaticDepthPipeline(std::string_view name,
-    Logger &logger, Render::Context::Impl *context, Presenter::Impl *presenter,
+    Logger &logger, Render::Context::Impl *context, Presenter& presenter,
     vk::RenderPass &renderpass, StaticVertexPath vertex_path,
     StaticFragmentPath fragment_path, U32Extent extent, const bool debug_print)
     : m_extent{extent}
