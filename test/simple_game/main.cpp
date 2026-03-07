@@ -26,6 +26,8 @@
 #include <VulkanRenderer/Utils.hpp>
 #include <VulkanRenderer/Vertex.hpp>
 
+#include <VulkanRenderer/external/EventSystem.hpp>
+
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
