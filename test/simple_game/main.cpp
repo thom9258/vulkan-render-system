@@ -14,7 +14,6 @@
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/DescriptorPool.hpp>
-#include <VulkanRenderer/Timer.hpp>
 #include <VulkanRenderer/FPSCounter.hpp>
 #include <VulkanRenderer/FlightFrames.hpp>
 #include <VulkanRenderer/Light.hpp>
@@ -24,10 +23,10 @@
 #include <VulkanRenderer/ShaderTexture.hpp>
 #include <VulkanRenderer/ShadowCaster.hpp>
 #include <VulkanRenderer/TextureSamplerCache.hpp>
+#include <VulkanRenderer/Timer.hpp>
 #include <VulkanRenderer/Transform.hpp>
 #include <VulkanRenderer/Utils.hpp>
 #include <VulkanRenderer/Vertex.hpp>
-
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -306,8 +305,10 @@ int main(int argc, char **argv) {
   uint64_t framecount = 0;
 
   std::chrono::duration<double> duration_delta_time;
+  std::chrono::duration<double> player_update_time;
   double delta_time = 0;
   FPSCounter fps_counter;
+  RenderedFrameStats stats;
 
   FlightFramesArray<std::optional<SimpleMeshRef>> debug_line_meshes;
 
@@ -341,8 +342,8 @@ int main(int argc, char **argv) {
             exit = true;
             break;
           case SDLK_h:
-			  render_mode = advance(render_mode);
-			  std::println("Render mode: {}", to_string_view(render_mode));
+            render_mode = advance(render_mode);
+            std::println("Render mode: {}", to_string_view(render_mode));
             break;
           }
           break;
@@ -396,7 +397,9 @@ int main(int argc, char **argv) {
       camera_player_follow(camera, player, camera_rig, render_deltatime);
 
       const double animation_deltatime = delta_time / 1000;
-      player.update(animation_deltatime);
+	  player_update_time = with_time_measurement([&]() {
+		  player.update(animation_deltatime);
+	  });
 
       /** ************************************************************************
        * Render
@@ -464,12 +467,12 @@ int main(int argc, char **argv) {
                 TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(
                     context, physics.debug_line_collecter->debug_lines)});
 
-		if (render_mode != RenderMode::HideDebugLines) {
-			WireframeRenderable debug_mesh;
-			debug_mesh.mesh =
-				debug_line_meshes[frameInfo.current_flight_frame_index];
-			renderables.push_back(debug_mesh);
-		}
+        if (render_mode != RenderMode::HideDebugLines) {
+          WireframeRenderable debug_mesh;
+          debug_mesh.mesh =
+              debug_line_meshes[frameInfo.current_flight_frame_index];
+          renderables.push_back(debug_mesh);
+        }
 
         RenderInfo render_info;
         render_info.meshcache = &mesh_cache;
@@ -481,7 +484,7 @@ int main(int argc, char **argv) {
         return render_info;
       };
 
-      RenderedFrameStats stats =
+      stats =
           renderer.with_render(&context, render_info_creator);
 
       physics.debug_line_collecter->clear();
@@ -492,7 +495,10 @@ int main(int argc, char **argv) {
                      .count();
 
     std::size_t fps = fps_counter.next_frame(duration_delta_time);
-    std::println("fps: {}", fps);
+    std::println("fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
+				 std::chrono::duration_cast<std::chrono::milliseconds>(player_update_time),
+				 std::chrono::duration_cast<std::chrono::milliseconds>(stats.frametime),
+                 std::chrono::duration_cast<std::chrono::milliseconds>(duration_delta_time));
   }
 
   context.wait_until_idle();

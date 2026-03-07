@@ -515,6 +515,8 @@ int main(int argc, char **argv) {
 
   bool exit = false;
   std::chrono::duration<double> duration_deltatime;
+  std::chrono::duration<double> animation_deltatime;
+  RenderedFrameStats stats;
   FPSCounter fps_counter;
 
   while (!exit) {
@@ -522,12 +524,13 @@ int main(int argc, char **argv) {
                             duration_deltatime)
                             .count();
 
-    for (std::unique_ptr<Animator> &animator : scene.animators) {
-
-      animator->UpdateAnimation(delta_time / 1000);
-    }
-
     duration_deltatime = with_time_measurement([&]() {
+      animation_deltatime = with_time_measurement([&]() {
+        for (std::unique_ptr<Animator> &animator : scene.animators) {
+          animator->UpdateAnimation(delta_time / 1000);
+        }
+      });
+
       /** ************************************************************************
        * Handle Inputs
        */
@@ -633,12 +636,16 @@ int main(int argc, char **argv) {
         return render_info;
       };
 
-      RenderedFrameStats stats =
-          renderer.with_render(&context, render_info_creator);
+      stats = renderer.with_render(&context, render_info_creator);
     });
 
     std::size_t fps = fps_counter.next_frame(duration_deltatime);
-    std::println("fps: {}", fps);
+    std::println(
+        "fps: {}, rendertime: {}, animationtime: {}, deltatime: {}", fps,
+        std::chrono::duration_cast<std::chrono::milliseconds>(stats.frametime),
+        std::chrono::duration_cast<std::chrono::milliseconds>(animation_deltatime),
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            duration_deltatime));
   }
 
   context.wait_until_idle();
