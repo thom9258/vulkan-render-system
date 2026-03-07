@@ -14,6 +14,8 @@
 #include <VulkanRenderer/Canvas.hpp>
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/DescriptorPool.hpp>
+#include <VulkanRenderer/Timer.hpp>
+#include <VulkanRenderer/FPSCounter.hpp>
 #include <VulkanRenderer/FlightFrames.hpp>
 #include <VulkanRenderer/Light.hpp>
 #include <VulkanRenderer/ModelLoader.hpp>
@@ -26,7 +28,6 @@
 #include <VulkanRenderer/Utils.hpp>
 #include <VulkanRenderer/Vertex.hpp>
 
-#include <VulkanRenderer/external/EventSystem.hpp>
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -35,9 +36,42 @@ using json = nlohmann::json;
 #include "PlayerController.hpp"
 #include "generate_textured_cube.hpp"
 #include "player.hpp"
-#include "sliding_window.hpp"
 
 #include "Physics.hpp"
+
+enum class RenderMode {
+  Everything,
+  HideDebugLines,
+  HidePlayer,
+};
+
+constexpr auto to_string_view(RenderMode mode) -> std::string_view {
+  switch (mode) {
+    using enum RenderMode;
+  case Everything:
+    return "Everything";
+  case HideDebugLines:
+    return "HideDebugLines";
+  case HidePlayer:
+    return "HidePlayer";
+  }
+
+  std::unreachable();
+}
+
+constexpr auto advance(RenderMode mode) -> RenderMode {
+  switch (mode) {
+    using enum RenderMode;
+  case Everything:
+    return HideDebugLines;
+  case HideDebugLines:
+    return HidePlayer;
+  case HidePlayer:
+    return Everything;
+  }
+
+  std::unreachable();
+}
 
 void insert_animator(Animator *animator, RenderableNodePtr &renderable) {
   for (RenderableNode::Model &model : renderable->models) {
@@ -60,15 +94,6 @@ glm::vec3 constexpr world_forward = glm::vec3(0.0f, 0.0f, 1.0f);
 glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 1.0f, -3.0f);
 glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 1.0f, 0.0f);
 glm::vec3 constexpr camera_init_up = glm::vec3(0.0f, 1.0f, 0.0f);
-
-template <typename F, typename... Args>
-std::chrono::duration<double> with_time_measurement(F &&f, Args &&...args) {
-  using Clock = std::chrono::high_resolution_clock;
-  auto start = Clock::now();
-  std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
-  auto end = Clock::now();
-  return end - start;
-}
 
 class StaticBox {
 public:
@@ -276,12 +301,13 @@ int main(int argc, char **argv) {
   StaticBox wall_box(physics, textured_cube.value(), bluebox_texture,
                      wall_box_transform);
 
-  bool hide_player_model = false;
+  RenderMode render_mode = RenderMode::Everything;
   bool exit = false;
   uint64_t framecount = 0;
+
+  std::chrono::duration<double> duration_delta_time;
   double delta_time = 0;
-  double total_time = 0;
-  sliding_window<double> delta_time_average(30);
+  FPSCounter fps_counter;
 
   FlightFramesArray<std::optional<SimpleMeshRef>> debug_line_meshes;
 
@@ -296,7 +322,7 @@ int main(int argc, char **argv) {
   };
 
   while (!exit) {
-    auto duration_delta_time = with_time_measurement([&]() {
+    duration_delta_time = with_time_measurement([&]() {
       /** ************************************************************************
        * Handle Inputs
        */
@@ -315,7 +341,8 @@ int main(int argc, char **argv) {
             exit = true;
             break;
           case SDLK_h:
-            hide_player_model = !hide_player_model;
+			  render_mode = advance(render_mode);
+			  std::println("Render mode: {}", to_string_view(render_mode));
             break;
           }
           break;
@@ -386,7 +413,7 @@ int main(int argc, char **argv) {
       renderables.push_back(ramp30_box.renderable());
       renderables.push_back(wall_box.renderable());
 
-      if (!hide_player_model) {
+      if (render_mode != RenderMode::HidePlayer) {
         for (auto renderable : player.renderables())
           renderables.push_back(renderable);
       }
@@ -437,10 +464,12 @@ int main(int argc, char **argv) {
                 TexturedMesh{VertexBuffer::create<VertexPosNormColorUV>(
                     context, physics.debug_line_collecter->debug_lines)});
 
-        WireframeRenderable debug_mesh;
-        debug_mesh.mesh =
-            debug_line_meshes[frameInfo.current_flight_frame_index];
-        renderables.push_back(debug_mesh);
+		if (render_mode != RenderMode::HideDebugLines) {
+			WireframeRenderable debug_mesh;
+			debug_mesh.mesh =
+				debug_line_meshes[frameInfo.current_flight_frame_index];
+			renderables.push_back(debug_mesh);
+		}
 
         RenderInfo render_info;
         render_info.meshcache = &mesh_cache;
@@ -462,9 +491,8 @@ int main(int argc, char **argv) {
                      duration_delta_time)
                      .count();
 
-    delta_time_average.put(delta_time);
-    std::println("average delta time[30] = {}", delta_time_average.average());
-    total_time += delta_time;
+    std::size_t fps = fps_counter.next_frame(duration_delta_time);
+    std::println("fps: {}", fps);
   }
 
   context.wait_until_idle();

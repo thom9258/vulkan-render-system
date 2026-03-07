@@ -25,6 +25,9 @@
 #include <VulkanRenderer/Utils.hpp>
 #include <VulkanRenderer/Vertex.hpp>
 
+#include <VulkanRenderer/FPSCounter.hpp>
+#include <VulkanRenderer/Timer.hpp>
+
 #include "LoadResources.hpp"
 
 #include <nlohmann/json.hpp>
@@ -52,15 +55,6 @@ glm::vec3 constexpr camera_init_position = glm::vec3(0.0f, 1.0f, -3.0f);
 glm::vec3 constexpr camera_init_target = glm::vec3(0.0f, 1.0f, 0.0f);
 glm::vec3 constexpr camera_init_up = glm::vec3(0.0f, 1.0f, 0.0f);
 
-template <typename F, typename... Args>
-std::chrono::duration<double> with_time_measurement(F &&f, Args &&...args) {
-  using Clock = std::chrono::high_resolution_clock;
-  auto start = Clock::now();
-  std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
-  auto end = Clock::now();
-  return end - start;
-}
-
 auto rotation_from_direction(glm::vec3 direction) -> glm::mat3 {
   glm::vec3 const rotationZ = direction;
   glm::vec3 const rotationX =
@@ -70,12 +64,6 @@ auto rotation_from_direction(glm::vec3 direction) -> glm::mat3 {
                    rotationY.y, rotationZ.y, rotationX.z, rotationY.z,
                    rotationZ.z);
 }
-
-std::vector<VertexPosNormColorUV> triangle_vertices = {
-    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0, 0}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0, 0}},
-    {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0, 0}},
-};
 
 struct Scene {
   std::vector<Renderable> renderables;
@@ -280,7 +268,7 @@ auto load_scene_from_path(std::filesystem::path const path,
         continue;
       }
 
-      LoadedAsset& asset = found->second;
+      LoadedAsset &asset = found->second;
       if (auto p = std::get_if<RenderableNodePtr>(&asset)) {
         std::println("added loaded static asset");
         (*p)->model_matrix = transform.as_matrix();
@@ -288,13 +276,12 @@ auto load_scene_from_path(std::filesystem::path const path,
       } else if (auto p = std::get_if<LoadedAnimatedModel>(&asset)) {
         std::println("added loaded animated asset");
         p->renderable->model_matrix = transform.as_matrix();
-		auto animator = std::make_unique<Animator>();
-
+        auto animator = std::make_unique<Animator>();
 
         std::size_t animation_index = prefab["animation"];
-		std::println("Creating animated model {}", name);
+        std::println("Creating animated model {}", name);
 
-		animator->PlayAnimation(&p->animations.at(animation_index));
+        animator->PlayAnimation(&p->animations.at(animation_index));
         foreach_node(std::bind_front(insert_animator, animator.get()),
                      p->renderable);
 
@@ -527,14 +514,20 @@ int main(int argc, char **argv) {
                                      mesh_cache, resources);
 
   bool exit = false;
-  double delta_time = 0;
+  std::chrono::duration<double> duration_deltatime;
+  FPSCounter fps_counter;
+
   while (!exit) {
+    double delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            duration_deltatime)
+                            .count();
 
     for (std::unique_ptr<Animator> &animator : scene.animators) {
+
       animator->UpdateAnimation(delta_time / 1000);
     }
 
-    auto duration_delta_time = with_time_measurement([&]() {
+    duration_deltatime = with_time_measurement([&]() {
       /** ************************************************************************
        * Handle Inputs
        */
@@ -556,9 +549,6 @@ int main(int argc, char **argv) {
             exit = true;
             break;
 
-            //			case SDLK_n:
-            //				scene_index++;
-            //				break;
           case SDLK_w:
             camera.position += camera_forward * move_speed;
             break;
@@ -624,16 +614,15 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Render Loop
        */
-	  
-	  if (reload_scene) {
-		  scene = load_scene_from_path(scene_path, context, texture_cache,
-									   mesh_cache, resources);
-		  reload_scene = false;
-	  }
-	  
+
+      if (reload_scene) {
+        scene = load_scene_from_path(scene_path, context, texture_cache,
+                                     mesh_cache, resources);
+        reload_scene = false;
+      }
+
       RenderInfoCreator render_info_creator =
           [&](CurrentFrameInfo frameInfo) -> RenderInfo {
-
         RenderInfo render_info;
         render_info.meshcache = &mesh_cache;
         render_info.texturecache = &texture_cache;
@@ -648,9 +637,8 @@ int main(int argc, char **argv) {
           renderer.with_render(&context, render_info_creator);
     });
 
-    delta_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                     duration_delta_time)
-                     .count();
+    std::size_t fps = fps_counter.next_frame(duration_deltatime);
+    std::println("fps: {}", fps);
   }
 
   context.wait_until_idle();
