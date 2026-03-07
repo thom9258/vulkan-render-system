@@ -1,13 +1,11 @@
 #define MAX_BONES 100
 #define MAX_BONE_INFLUENCES 4
 
-
-//TODO:  i have no idea if it is horrible for performance to pass bone matrices like this...
 vec4 animate_vertex(
 	 vec3 position,
 	 ivec4 bone_ids,
 	 vec4 weights,
-	 mat4 bones[MAX_BONES])
+	 mat4 bones[MAX_BONE_INFLUENCES])
 {
 	vec4 animated_vertex = vec4(0.0f);
     for (int i = 0; i < MAX_BONE_INFLUENCES; i++)
@@ -17,14 +15,8 @@ vec4 animate_vertex(
 			continue;
 		}
 
-        if (bone_ids[i] >= MAX_BONES) 
-        {
-            animated_vertex = vec4(position, 1.0f);
-            break;
-        }
-
         vec4 weighted_position =
-			 bones[bone_ids[i]] * vec4(position, 1.0f);
+			 bones[i] * vec4(position, 1.0f);
 
         animated_vertex += weighted_position * weights[i];
     }

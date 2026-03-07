@@ -52,11 +52,20 @@ uniform ModelInfo
 
 void main()
 {
+	mat4 bone_matrices[MAX_BONE_INFLUENCES];
+	for (int i = 0; i < MAX_BONE_INFLUENCES; i++) {
+		if (vertex_bone_ids[i] == -1) {
+		   continue;
+		}
+
+		bone_matrices[i] = model_info.bone_matrices[vertex_bone_ids[i]];
+	}
+
 	vec4 animated_vertex = animate_vertex(
 		 vertex_position,
 		 vertex_bone_ids,
 		 vertex_weights,
-		 model_info.bone_matrices);
+		 bone_matrices);
 
 	gl_Position = global.proj * global.view * model_info.model * animated_vertex;
     
