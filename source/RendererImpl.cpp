@@ -2,6 +2,7 @@
 
 #include "MaterialPipeline.hpp"
 #include "StaticDepthPipeline.hpp"
+#include <VulkanRenderer/external/Timer.hpp>
 
 auto create_texture_view(vk::Device &device, Texture2D &texture,
                          const vk::ImageAspectFlags aspect)
@@ -480,21 +481,25 @@ RenderedFrameStats
 Renderer::Impl::with_render(Render::Context *context,
                             RenderInfoCreator render_info_creator) {
 
-  CurrentFrameInfo current_frame_info{};
-  current_frame_info.total_frame_count = presenter.total_frames;
-  current_frame_info.current_flight_frame_index =
-      presenter.current_frame_in_flight;
+  std::chrono::duration<double> frametime = with_time_measurement([&]() {
+    CurrentFrameInfo current_frame_info{};
+    current_frame_info.total_frame_count = presenter.total_frames;
+    current_frame_info.current_flight_frame_index =
+        presenter.current_frame_in_flight;
 
-  RenderInfo render_info = render_info_creator(current_frame_info);
+    RenderInfo render_info = render_info_creator(current_frame_info);
 
-  Texture2D::Impl *frame = render(
-      context->impl.get(), *render_info.texturecache, *render_info.meshcache,
-      current_frame_info.current_flight_frame_index,
-      current_frame_info.total_frame_count, render_info.world,
-      render_info.renderables, render_info.lights, render_info.shadowcasters);
+    Texture2D::Impl *frame = render(
+        context->impl.get(), *render_info.texturecache, *render_info.meshcache,
+        current_frame_info.current_flight_frame_index,
+        current_frame_info.total_frame_count, render_info.world,
+        render_info.renderables, render_info.lights, render_info.shadowcasters);
 
-  presenter.present(frame);
+    presenter.present(frame);
+  });
+
   RenderedFrameStats stats;
+  stats.frametime = frametime;
   return stats;
 }
 

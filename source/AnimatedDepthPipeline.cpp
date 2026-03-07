@@ -365,9 +365,9 @@ void AnimatedDepthPipeline::record(Render::Context::Impl *context,
 
     AnimatedRenderable *animated = std::get_if<AnimatedRenderable>(&renderable);
 
-    if (index > m_model_info_uniform_pools.size()) {
-      std::println("Warning exceeded animated model count [{}] with index {}",
-                   m_model_info_uniform_pools[0].size(), index);
+    if (index > m_model_info_uniform_pools[0].size()) {
+      std::println("name {} Warning exceeded animated model count [{}] with index {}",
+                   m_name, m_model_info_uniform_pools[0].size(), index);
       continue;
     }
 

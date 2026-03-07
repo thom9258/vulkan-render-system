@@ -7,6 +7,7 @@
 #include "ShadowCaster.hpp"
 
 #include <filesystem>
+#include <chrono>
 
 struct CurrentFrameInfo
 {
@@ -30,6 +31,7 @@ struct RenderInfo {
 };
 
 struct RenderedFrameStats {
+	std::chrono::duration<double> frametime;
 	std::size_t rendered_static_vertices;
 	std::size_t rendered_animated_vertices;
 	std::size_t rendered_shadow_static_vertices;

@@ -15,5 +15,6 @@ layout( push_constant ) uniform constants
 
 void main() {
     gl_Position = push.modelviewproj * vec4(inPosition, 1.0);
-    fragColor = vec3(push.color);
+    //fragColor = vec3(push.color);
+    fragColor = inColor;
 }
