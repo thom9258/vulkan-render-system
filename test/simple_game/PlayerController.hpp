@@ -71,6 +71,16 @@ struct PlayerController {
   static constexpr float const collider_height = player_height * 0.5f;
   static constexpr float const ray_height = player_height - collider_height;
 
+  struct {
+    Animator idle;
+    struct {
+      Animator forward;
+      Animator back;
+      Animator left;
+      Animator right;
+    } walk;
+  } animators;
+
   auto get_position() const -> glm::vec3 {
     btVector3 pos = rigidbody->getCenterOfMassPosition();
     return glm::vec3(pos.x(), pos.y(), pos.z());
@@ -133,16 +143,22 @@ struct PlayerController {
           config::assoc("rightstrafe_animation", config.value().i32s)
               .value_or(0);
 
-	  ground_pushback_factor = 
-          config::assoc("ground_pushback_factor", config.value().f32s).value_or(5.0f);
-	  gravity =
-          config::assoc("gravity", config.value().f32s).value_or(-8.0f);
+      ground_pushback_factor =
+          config::assoc("ground_pushback_factor", config.value().f32s)
+              .value_or(5.0f);
+      gravity = config::assoc("gravity", config.value().f32s).value_or(-8.0f);
 
     } else {
       std::println("Config was not readable: {}", config.error());
     }
 
-    player.play_animation(idle_animation);
+    animators.idle.PlayAnimation(&player.animations()[idle_animation]);
+    player.set_animation_state(animators.idle.GetFinalBoneMatrices());
+
+    animators.walk.forward.PlayAnimation(&player.animations()[walk_animation]);
+    animators.walk.back.PlayAnimation(&player.animations()[backwalk_animation]);
+    animators.walk.left.PlayAnimation(&player.animations()[leftstrafe_animation]);
+    animators.walk.right.PlayAnimation(&player.animations()[rightstrafe_animation]);
 
     capsule_collider = std::make_unique<btCapsuleShape>(
         btScalar(0.5f), btScalar(player_height / 2));
@@ -248,14 +264,6 @@ struct PlayerController {
                       closestResults.m_hitNormalWorld.z());
       }
     }
-
-#if 0
-    if (ground_info.has_value()) {
-      std::println("Ground Distance: {}", ground_info.value().distance);
-    } else {
-      std::println("No Ground Detected!");
-    }
-#endif
     {
       glm::vec3 joystick_translation(-joystick_left_x.value(), 0.0f,
                                      -joystick_left_y.value());
@@ -277,17 +285,6 @@ struct PlayerController {
             ray_height - ground_info.value().distance;
 
         y_velocity = ground_distance_to_decired * ground_pushback_factor;
-
-#if 0
-        std::println("player_height {}", player_height);
-        std::println("collider_height {}", collider_height);
-        std::println("ray_height {}", ray_height);
-        std::println("ground_distance {}", ground_info.value().distance);
-        std::println("ground_distance_to_decired {}",
-                     ground_distance_to_decired);
-        std::println("y_velocity {}", y_velocity);
-#endif
-
       } else {
         y_velocity = gravity;
       }
@@ -307,37 +304,45 @@ struct PlayerController {
         rigidbody->setLinearVelocity(
             btVector3(translation.x, y_velocity, translation.z));
 
-      btVector3 collider_center = rigidbody->getCenterOfMassPosition();
-      btVector3 from = collider_center;
-      btVector3 to = from + btVector3(translation.x, 0, translation.z) * 0.5f;
-      physics.dynamicsWorld->getDebugDrawer()->drawLine(from, to,
-                                                        btVector4(0, 1, 0, 1));
+        btVector3 collider_center = rigidbody->getCenterOfMassPosition();
+        btVector3 from = collider_center;
+        btVector3 to = from + btVector3(translation.x, 0, translation.z) * 0.5f;
+        physics.dynamicsWorld->getDebugDrawer()->drawLine(
+            from, to, btVector4(0, 1, 0, 1));
 
       } else {
         rigidbody->setLinearVelocity(btVector3(0, y_velocity, 0));
       }
 
+	  double animation_deltatime = delta_time / 10;
       if (joystick_translation != glm::vec3(0.0f)) {
-
         double x_length = glm::length(joystick_translation.x);
         double z_length = glm::length(joystick_translation.z);
         if (x_length < z_length) {
           if (joystick_translation.z > 0.0f) {
-            player.play_animation(walk_animation);
+            animators.walk.forward.UpdateAnimation(animation_deltatime);
+            player.set_animation_state(
+                animators.walk.forward.GetFinalBoneMatrices());
           } else {
-            player.play_animation(backwalk_animation);
+            animators.walk.back.UpdateAnimation(animation_deltatime);
+            player.set_animation_state(
+                animators.walk.back.GetFinalBoneMatrices());
           }
         } else {
           if (joystick_translation.x > 0.0f) {
-            player.play_animation(leftstrafe_animation);
+            animators.walk.left.UpdateAnimation(animation_deltatime);
+            player.set_animation_state(
+                animators.walk.left.GetFinalBoneMatrices());
           } else {
-            player.play_animation(rightstrafe_animation);
+            animators.walk.right.UpdateAnimation(animation_deltatime);
+            player.set_animation_state(
+                animators.walk.right.GetFinalBoneMatrices());
           }
         }
 
-      } else if (last_joystick_translation != glm::vec3(0.0f) &&
-                 joystick_translation == glm::vec3(0.0f)) {
-        player.play_animation(idle_animation);
+      } else {
+        animators.idle.UpdateAnimation(animation_deltatime);
+        player.set_animation_state(animators.idle.GetFinalBoneMatrices());
       }
 
       last_joystick_translation = joystick_translation;

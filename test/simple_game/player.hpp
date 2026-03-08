@@ -1,5 +1,6 @@
 #pragma once
 
+#include <VulkanRenderer/Animator.hpp>
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/MeshCache.hpp>
 #include <VulkanRenderer/ModelLoader.hpp>
@@ -67,27 +68,27 @@ public:
       std::println("Could NOT Load player model, error: {}",
                    loaded_model.error());
     }
-
-    auto insert_animator = [](Animator *animator,
-                              RenderableNodePtr &renderable) {
-      for (RenderableNode::Model &model : renderable->models) {
-        if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
-          p->animator = animator;
-        }
-      }
-    };
-
-    foreach_node(std::bind_front(insert_animator, &animator), model.renderable);
-    animator.PlayAnimation(&model.animations.at(m_current_animation));
   }
 
   ~Player() = default;
 
-  void play_animation(std::size_t animation) {
-    if (m_current_animation != animation) {
-      animator.PlayAnimation(&model.animations.at(animation));
-      m_current_animation = animation;
-    }
+
+  std::span<Animation> animations() {
+	  return model.animations;
+  }
+
+  void set_animation_state(std::span<glm::mat4> animation_state) {
+    auto insert_animation_state = [](std::span<glm::mat4> animation_state,
+                                     RenderableNodePtr &renderable) {
+      for (RenderableNode::Model &model : renderable->models) {
+        if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+          p->animation_state = animation_state;
+        }
+      }
+    };
+
+    foreach_node(std::bind_front(insert_animation_state, animation_state),
+                 model.renderable);
   }
 
   void set_translation(glm::vec3 translation) {
@@ -107,10 +108,8 @@ public:
     glm::mat4 rotation = glm::mat4(1.0f);
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.7f));
     glm::mat4 offset = translation * rotation * scale;
-	return origin() * offset;
+    return origin() * offset;
   }
-
-  void update(double delta_time) { animator.UpdateAnimation(delta_time); }
 
   std::vector<Renderable> renderables() {
     std::vector<Renderable> renderables;
@@ -125,8 +124,6 @@ public:
   // double vertical_rotate_speed = horizontal_rotate_speed * 0.6;
 
   bool is_aiming{false};
-
-  std::size_t m_current_animation = 0;
   glm::mat4 m_camera_current;
 
 private:
@@ -135,7 +132,6 @@ private:
       glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 0.8f, 0.3f));
 
   LoadedAnimatedModel model;
-  Animator animator;
 };
 
 struct CameraPlayerFollow {

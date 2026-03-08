@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Animation.hpp"
 #include "Mesh.hpp"
 #include "MeshCache.hpp"
 #include "TextureSamplerCache.hpp"
@@ -30,7 +29,7 @@ struct MaterialRenderable {
   std::optional<TextureSamplerRef> specular;
   std::optional<TextureSamplerRef> normal;
   glm::mat4 model{glm::mat4(1.0f)};
-    bool has_shadow{false};
+  bool has_shadow{false};
 };
 
 struct AnimatedRenderable {
@@ -40,8 +39,8 @@ struct AnimatedRenderable {
   std::optional<TextureSamplerRef> specular;
   std::optional<TextureSamplerRef> normal;
   glm::mat4 model{glm::mat4(1.0f)};
-    bool has_shadow{false};
-    Animator *animator{nullptr};
+  bool has_shadow{false};
+  std::span<glm::mat4> animation_state;
 };
 
 struct RenderableNode {
@@ -61,7 +60,7 @@ struct RenderableNode {
     std::optional<TextureSamplerRef> specular;
     std::optional<TextureSamplerRef> normal;
     bool has_shadow{false};
-    Animator *animator{nullptr};
+    std::span<glm::mat4> animation_state;
   };
 
   using Model = std::variant<SimpleModel, AnimatedModel>;

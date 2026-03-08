@@ -791,12 +791,11 @@ void AnimatedPipeline::render(
     ModelInfoUniformData model_info;
     model_info.bind_info = glm::ivec4(*current_flightframe, index, 7, 25);
     model_info.model_matrix = renderable.model;
-    if (renderable.animator == nullptr) {
+    if (renderable.animation_state.empty()) {
       animation::initialize_bone_matrices(model_info.bone_matrices, max_bone_matrices);
       std::println("Found animated renderable without an animator!");
     } else {
-      std::vector<glm::mat4> bone_matrices =
-          renderable.animator->GetFinalBoneMatrices();
+      auto bone_matrices = renderable.animation_state;
       for (size_t i = 0; i < std::min(bone_matrices.size(), max_bone_matrices);
            i++) {
         model_info.bone_matrices[i] = bone_matrices[i];

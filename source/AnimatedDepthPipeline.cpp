@@ -374,12 +374,11 @@ void AnimatedDepthPipeline::record(Render::Context::Impl *context,
     // https://docs.vulkan.org/tutorial/latest/16_Multiple_Objects.html
     ModelInfoUniformData model_info;
     model_info.model_matrix = animated->model;
-    if (animated->animator == nullptr) {
+    if (animated->animation_state.empty()) {
       animation::initialize_bone_matrices(model_info.bone_matrices,
                                           animation::max_bone_matrices);
     } else {
-      std::vector<glm::mat4> bone_matrices =
-          animated->animator->GetFinalBoneMatrices();
+      auto bone_matrices = animated->animation_state;
       for (size_t i = 0;
            i < std::min(bone_matrices.size(), animation::max_bone_matrices);
            i++) {

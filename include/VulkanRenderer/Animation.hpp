@@ -21,9 +21,9 @@ public:
 	auto get() -> std::map<std::string, BoneInfo>&;
 
 private:
-	auto counter() -> int&;
+	auto generate_next_id() -> int;
     std::map<std::string, BoneInfo> m_BoneInfoMap;
-    int m_BoneCounter = 0;
+    int m_id_counter = 0;
 };
 
 struct KeyPosition
@@ -100,21 +100,4 @@ public:
     std::vector<Bone> m_Bones;
     AssimpNodeData m_RootNode;
     std::map<std::string, BoneInfo> m_BoneInfoMap;
-};
-
-
-class Animator
-{	
-public:
-    Animator();
-    void UpdateAnimation(float dt);
-    void PlayAnimation(Animation* pAnimation);
-    void CalculateBoneTransform(const AssimpNodeData* node, glm::mat4 parentTransform);
-    std::vector<glm::mat4> GetFinalBoneMatrices();
-		
-private:
-    std::vector<glm::mat4> m_FinalBoneMatrices;
-    Animation* m_CurrentAnimation;
-    float m_CurrentTime;
-    float m_DeltaTime;	
 };

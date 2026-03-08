@@ -7,19 +7,24 @@ auto BoneInfos::get() -> std::map<std::string, BoneInfo> & {
   return m_BoneInfoMap;
 }
 
-auto BoneInfos::counter() -> int & { return m_BoneCounter; }
-
 auto BoneInfos::has_bone(std::string_view name) -> bool {
   return get().find(std::string(name)) != get().end();
+}
+
+
+auto BoneInfos::generate_next_id() -> int
+{
+	int id = m_id_counter;
+	m_id_counter++;
+	return id;
 }
 
 auto BoneInfos::insert_bone(std::string_view name, glm::mat4 offset) -> int {
 
   if (has_bone(name))
     return get().at(std::string(name)).id;
-  int id = counter();
+  int id = generate_next_id();
   get()[std::string(name)] = {id, offset};
-  counter()++;
   return id;
 }
 
@@ -161,49 +166,4 @@ const AssimpNodeData &Animation::GetRootNode() { return m_RootNode; }
 
 const std::map<std::string, BoneInfo> &Animation::GetBoneIDMap() {
   return m_BoneInfoMap;
-}
-
-Animator::Animator() { m_FinalBoneMatrices.resize(100, glm::mat4(1.0f)); }
-
-void Animator::UpdateAnimation(float dt) {
-  m_DeltaTime = dt;
-  if (m_CurrentAnimation) {
-    m_CurrentTime += m_CurrentAnimation->GetTicksPerSecond() * dt;
-    m_CurrentTime = fmod(m_CurrentTime, m_CurrentAnimation->GetDuration());
-    CalculateBoneTransform(&m_CurrentAnimation->GetRootNode(), glm::mat4(1.0f));
-  }
-}
-
-void Animator::PlayAnimation(Animation *pAnimation) {
-  m_CurrentAnimation = pAnimation;
-  m_CurrentTime = 0.0f;
-}
-
-void Animator::CalculateBoneTransform(const AssimpNodeData *node,
-                                      glm::mat4 parentTransform) {
-  std::string nodeName = node->name;
-  glm::mat4 nodeTransform = node->transformation;
-
-  Bone *Bone = m_CurrentAnimation->FindBone(nodeName);
-  if (Bone) {
-    Bone->Update(m_CurrentTime);
-    nodeTransform = Bone->GetLocalTransform();
-  }
-
-  glm::mat4 globalTransformation = parentTransform * nodeTransform;
-  auto boneInfoMap = m_CurrentAnimation->GetBoneIDMap();
-
-  if (boneInfoMap.find(nodeName) != boneInfoMap.end()) {
-    int index = boneInfoMap[nodeName].id;
-    glm::mat4 offset = boneInfoMap[nodeName].offset;
-    m_FinalBoneMatrices[index] = globalTransformation * offset;
-  }
-
-  for (int i = 0; i < node->children.size(); i++)
-    CalculateBoneTransform(&node->children[i], globalTransformation);
-}
-
-//TODO: copy being made here...
-std::vector<glm::mat4> Animator::GetFinalBoneMatrices() {
-  return m_FinalBoneMatrices;
 }

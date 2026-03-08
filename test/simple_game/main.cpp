@@ -72,14 +72,6 @@ constexpr auto advance(RenderMode mode) -> RenderMode {
   std::unreachable();
 }
 
-void insert_animator(Animator *animator, RenderableNodePtr &renderable) {
-  for (RenderableNode::Model &model : renderable->models) {
-    if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
-      p->animator = animator;
-    }
-  }
-}
-
 std::filesystem::path root = "../../../";
 std::filesystem::path shaders_root = root / "compiled_shaders/";
 // std::filesystem::path scenes_root = "../scenes/";
@@ -387,19 +379,19 @@ int main(int argc, char **argv) {
       /** ************************************************************************
        * Update
        */
-      const double render_deltatime = delta_time / 100;
-      player_controller(player, camera_rig, physics, render_deltatime, events);
-
-      if (player_controller.get_position().y < -10.0f) {
-        player_controller.respawn();
-      }
-
-      camera_player_follow(camera, player, camera_rig, render_deltatime);
 
       const double animation_deltatime = delta_time / 1000;
-	  player_update_time = with_time_measurement([&]() {
-		  player.update(animation_deltatime);
-	  });
+      const double render_deltatime = delta_time / 100;
+      player_update_time = with_time_measurement([&]() {
+        player_controller(player, camera_rig, physics, render_deltatime,
+                          events);
+
+        if (player_controller.get_position().y < -10.0f) {
+          player_controller.respawn();
+        }
+      });
+
+      camera_player_follow(camera, player, camera_rig, render_deltatime);
 
       /** ************************************************************************
        * Render
@@ -484,8 +476,7 @@ int main(int argc, char **argv) {
         return render_info;
       };
 
-      stats =
-          renderer.with_render(&context, render_info_creator);
+      stats = renderer.with_render(&context, render_info_creator);
 
       physics.debug_line_collecter->clear();
     });
@@ -495,10 +486,13 @@ int main(int argc, char **argv) {
                      .count();
 
     std::size_t fps = fps_counter.next_frame(duration_delta_time);
-    std::println("fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
-				 std::chrono::duration_cast<std::chrono::milliseconds>(player_update_time),
-				 std::chrono::duration_cast<std::chrono::milliseconds>(stats.frametime),
-                 std::chrono::duration_cast<std::chrono::milliseconds>(duration_delta_time));
+    std::println(
+        "fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            player_update_time),
+        std::chrono::duration_cast<std::chrono::milliseconds>(stats.frametime),
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            duration_delta_time));
   }
 
   context.wait_until_idle();
