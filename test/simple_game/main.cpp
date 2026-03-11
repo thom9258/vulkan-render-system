@@ -486,7 +486,7 @@ int main(int argc, char **argv) {
                      .count();
 
     std::size_t fps = fps_counter.next_frame(duration_delta_time);
-#if 0
+#if 1
     std::println(
         "fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
         std::chrono::duration_cast<std::chrono::milliseconds>(
