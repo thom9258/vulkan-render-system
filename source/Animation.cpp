@@ -167,3 +167,17 @@ const AssimpNodeData &Animation::GetRootNode() { return m_RootNode; }
 const std::map<std::string, BoneInfo> &Animation::GetBoneIDMap() {
   return m_BoneInfoMap;
 }
+
+
+std::vector<std::string> Animation::GetFinalBoneMatrixLocations() {
+
+	AssimpNodeData* root = &m_RootNode;
+	std::vector<std::string> names;
+	names.resize(m_Bones.size());
+
+	for (Bone &bone : m_Bones) {
+		names.at(bone.GetBoneID()) = bone.GetBoneName();
+	}
+
+	return names;
+}    

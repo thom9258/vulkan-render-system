@@ -95,6 +95,7 @@ public:
     float GetDuration(); 
     const AssimpNodeData& GetRootNode();
     const std::map<std::string,BoneInfo>& GetBoneIDMap();
+    std::vector<std::string> GetFinalBoneMatrixLocations();
     float m_Duration;
     int m_TicksPerSecond;
     std::vector<Bone> m_Bones;

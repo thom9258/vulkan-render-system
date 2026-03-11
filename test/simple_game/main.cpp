@@ -486,6 +486,7 @@ int main(int argc, char **argv) {
                      .count();
 
     std::size_t fps = fps_counter.next_frame(duration_delta_time);
+#if 0
     std::println(
         "fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -493,6 +494,7 @@ int main(int argc, char **argv) {
         std::chrono::duration_cast<std::chrono::milliseconds>(stats.frametime),
         std::chrono::duration_cast<std::chrono::milliseconds>(
             duration_delta_time));
+#endif
   }
 
   context.wait_until_idle();

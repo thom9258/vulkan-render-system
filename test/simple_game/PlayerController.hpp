@@ -11,6 +11,7 @@
 #include <SDL_events.h>
 #include <SDL_gamecontroller.h>
 
+#include <VulkanRenderer/Animator.hpp>
 #include <VulkanRenderer/glm.hpp>
 #include <algorithm>
 #include <ostream>
@@ -21,6 +22,17 @@ glm::vec3 rotate(glm::quat quat, glm::vec3 vec) {
 
   glm::vec4 rotated_vec = rotation * glm::vec4(vec, 1.0f);
   return glm::vec3(rotated_vec);
+}
+
+struct Bias2D {
+  animation::Bias x;
+  animation::Bias y;
+};
+
+Bias2D direction_percentage(glm::vec2 v) {
+  double const abs_sum = std::abs(v.x) + std::abs(v.y);
+  return Bias2D{animation::Bias(std::abs(v.x) / abs_sum),
+                animation::Bias(std::abs(v.y) / abs_sum)};
 }
 
 struct PlayerController {
@@ -80,6 +92,8 @@ struct PlayerController {
       Animator right;
     } walk;
   } animators;
+
+  std::vector<glm::mat4> animation_state;
 
   auto get_position() const -> glm::vec3 {
     btVector3 pos = rigidbody->getCenterOfMassPosition();
@@ -157,8 +171,10 @@ struct PlayerController {
 
     animators.walk.forward.PlayAnimation(&player.animations()[walk_animation]);
     animators.walk.back.PlayAnimation(&player.animations()[backwalk_animation]);
-    animators.walk.left.PlayAnimation(&player.animations()[leftstrafe_animation]);
-    animators.walk.right.PlayAnimation(&player.animations()[rightstrafe_animation]);
+    animators.walk.left.PlayAnimation(
+        &player.animations()[leftstrafe_animation]);
+    animators.walk.right.PlayAnimation(
+        &player.animations()[rightstrafe_animation]);
 
     capsule_collider = std::make_unique<btCapsuleShape>(
         btScalar(0.5f), btScalar(player_height / 2));
@@ -314,37 +330,86 @@ struct PlayerController {
         rigidbody->setLinearVelocity(btVector3(0, y_velocity, 0));
       }
 
-	  double animation_deltatime = delta_time / 10;
+      double animation_deltatime = delta_time / 10;
       if (joystick_translation != glm::vec3(0.0f)) {
-        double x_length = glm::length(joystick_translation.x);
-        double z_length = glm::length(joystick_translation.z);
-        if (x_length < z_length) {
-          if (joystick_translation.z > 0.0f) {
-            animators.walk.forward.UpdateAnimation(animation_deltatime);
-            player.set_animation_state(
-                animators.walk.forward.GetFinalBoneMatrices());
-          } else {
-            animators.walk.back.UpdateAnimation(animation_deltatime);
-            player.set_animation_state(
-                animators.walk.back.GetFinalBoneMatrices());
+
+        animators.walk.forward.UpdateAnimation(animation_deltatime);
+        animators.walk.back.UpdateAnimation(animation_deltatime);
+        animators.walk.left.UpdateAnimation(animation_deltatime);
+        animators.walk.right.UpdateAnimation(animation_deltatime);
+
+        double x_length = joystick_translation.x;
+        double z_length = joystick_translation.z;
+        // TODO: we might have to use mix_bias.y for some of these, we can see
+        // that once i fixed the stupid animations to be mixable
+        Bias2D direction_bias =
+            direction_percentage(glm::vec2(x_length, z_length));
+
+        std::vector<animation::Bias> walk_biases;
+        walk_biases.resize(player.anim_matrix_locations.size(),
+                           animation::Bias(0.0f));
+
+        auto insert_walk_bias = [&](std::string_view target,
+                                    animation::Bias bias) {
+          std::optional<std::size_t> location;
+          for (auto [i, name] :
+               std::views::enumerate(player.anim_matrix_locations)) {
+            if (name == target) {
+              location = i;
+              break;
+            }
           }
-        } else {
-          if (joystick_translation.x > 0.0f) {
-            animators.walk.left.UpdateAnimation(animation_deltatime);
-            player.set_animation_state(
-                animators.walk.left.GetFinalBoneMatrices());
-          } else {
-            animators.walk.right.UpdateAnimation(animation_deltatime);
-            player.set_animation_state(
-                animators.walk.right.GetFinalBoneMatrices());
+
+          if (!location) {
+            return;
           }
+
+          walk_biases[*location] = bias;
+        };
+
+        insert_walk_bias("Foot1.L", direction_bias.x);
+        insert_walk_bias("Foot1.R", direction_bias.x);
+        insert_walk_bias("Foot2.L", direction_bias.x);
+        insert_walk_bias("Foot2.R", direction_bias.x);
+        insert_walk_bias("Leg1.L", direction_bias.x);
+        insert_walk_bias("Leg1.R", direction_bias.x);
+        insert_walk_bias("Leg2.L", direction_bias.x);
+        insert_walk_bias("Leg2.R", direction_bias.x);
+        insert_walk_bias("Hip", direction_bias.x);
+        insert_walk_bias("LowerSpine", direction_bias.x);
+
+        //std::println("direction bias x {}, y {}", direction_bias.x.get(), direction_bias.y.get());
+		glm::vec2 norm_direction = glm::normalize(glm::vec2(x_length, z_length));
+
+        std::optional<std::vector<glm::mat4>> mix;
+        if (norm_direction.x >= 0 && norm_direction.y >= 0) {
+          mix = animation::interpolate(
+              animators.walk.forward.GetFinalBoneMatrices(),
+              animators.walk.left.GetFinalBoneMatrices(), walk_biases);
+        } else if (norm_direction.x >= 0 && norm_direction.y <= 0) {
+          mix = animation::interpolate(
+              animators.walk.back.GetFinalBoneMatrices(),
+              animators.walk.left.GetFinalBoneMatrices(), walk_biases);
+        } else if (norm_direction.x <= 0 && norm_direction.y >= 0) {
+          mix = animation::interpolate(
+              animators.walk.forward.GetFinalBoneMatrices(),
+              animators.walk.right.GetFinalBoneMatrices(), walk_biases);
+        } else if (norm_direction.x <= 0 && norm_direction.y <= 0) {
+          mix = animation::interpolate(
+              animators.walk.back.GetFinalBoneMatrices(),
+              animators.walk.right.GetFinalBoneMatrices(), walk_biases);
         }
+
+        if (mix)
+          animation_state = mix.value();
 
       } else {
         animators.idle.UpdateAnimation(animation_deltatime);
-        player.set_animation_state(animators.idle.GetFinalBoneMatrices());
+        animation_state = animators.idle.GetFinalBoneMatrices() |
+                          std::ranges::to<std::vector>();
       }
 
+      player.set_animation_state(animation_state);
       last_joystick_translation = joystick_translation;
     }
 

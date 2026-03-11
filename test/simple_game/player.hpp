@@ -16,6 +16,7 @@
 
 #include <deque>
 #include <print>
+#include <ranges>
 
 class CameraRig {
 public:
@@ -51,6 +52,7 @@ public:
   }
 };
 
+
 class Player {
 public:
   Player(Render::Context &context, MeshCache &mesh_cache,
@@ -64,6 +66,14 @@ public:
 
     if (loaded_model.has_value()) {
       model = loaded_model.value();
+
+      anim_matrix_locations =
+          model.animations.at(0).GetFinalBoneMatrixLocations();
+      std::println("Animation matrix locations:");
+      for (auto [i, name] : std::views::enumerate(anim_matrix_locations)) {
+        std::println("({}) {}", i, name);
+      }
+
     } else {
       std::println("Could NOT Load player model, error: {}",
                    loaded_model.error());
@@ -72,11 +82,7 @@ public:
 
   ~Player() = default;
 
-
-  std::span<Animation> animations() {
-	  return model.animations;
-  }
-
+  std::span<Animation> animations() { return model.animations; }
   void set_animation_state(std::span<glm::mat4> animation_state) {
     auto insert_animation_state = [](std::span<glm::mat4> animation_state,
                                      RenderableNodePtr &renderable) {
@@ -125,6 +131,8 @@ public:
 
   bool is_aiming{false};
   glm::mat4 m_camera_current;
+
+  std::vector<std::string> anim_matrix_locations;
 
 private:
   Transform m_transform{Transform::identity()};
