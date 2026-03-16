@@ -116,7 +116,7 @@ public:
     // TODO: get this from controller somehow
     double capsule_collider_height = -1.2f;
     glm::mat4 translation = glm::translate(
-        glm::mat4(1.0f), glm::vec3(0.0f, capsule_collider_height, 0.0f));
+        glm::mat4(1.0f), glm::vec3(0.0f, 0, 0.0f));
     glm::mat4 rotation = glm::mat4(1.0f);
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.7f));
     glm::mat4 offset = translation * rotation * scale;

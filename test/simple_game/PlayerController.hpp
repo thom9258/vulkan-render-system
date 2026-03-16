@@ -87,7 +87,8 @@ struct PlayerController {
   float ground_pushback_factor = 5.0;
   float gravity = -8.0f;
 
-  double animation_time = 0.0;
+  double idle_animation_time = 0.0;
+  double walk_animation_time = 0.0;
 
   std::size_t backwalk_animation = 0;
   std::size_t idle_animation = 0;
@@ -374,7 +375,18 @@ struct PlayerController {
         rigidbody->setLinearVelocity(btVector3(0, y_velocity, 0));
       }
 
+      double const animation_deltatime = delta_time / 10;
+      animation::Animation &idle_anim = player.animations()[idle_animation];
+      animation::Animation &front_anim = player.animations()[walk_animation];
+      animation::Animation &back_anim = player.animations()[backwalk_animation];
+      animation::Animation &left_anim =
+          player.animations()[leftstrafe_animation];
+      animation::Animation &right_anim =
+          player.animations()[rightstrafe_animation];
+
       if (joystick_translation != glm::vec3(0.0f)) {
+        walk_animation_time += animation_deltatime;
+        idle_animation_time = 0;
 
         double x_length = joystick_translation.x;
         double z_length = joystick_translation.z;
@@ -386,61 +398,108 @@ struct PlayerController {
         glm::vec2 norm_direction =
             glm::normalize(glm::vec2(x_length, z_length));
 
-#if 0
-        std::println("idle anim:");
-		print_skeleton_with_boneids(idle_anim.m_bone_infos, idle_anim.m_initial_pose, 0);
-        std::println("idle anim total ticks {}", idle_anim.total_ticks().get());
-        std::println("idle anim ticks per second {}", idle_anim.ticks_per_second().get());
-        std::println("idle anim bones size {}", idle_anim.m_bones.size());
-        std::println("idle anim boneinfoss size {}",
-                     idle_anim.m_bone_infos.bone_count());
-
-        std::println("animation time {}", animation_time);
-#endif
-#if 0
-        std::optional<std::span<glm::mat4>> mix;
         if (norm_direction.x >= 0 && norm_direction.y >= 0) {
-          mix = animators.walk.forward_left.Update(animation_deltatime,
-                                                    direction_bias.x);
+
+          std::optional<animation::Skeleton> front_skeleton =
+              front_anim.animate(walk_animation_time);
+          std::optional<animation::Skeleton> left_skeleton =
+              left_anim.animate(walk_animation_time);
+
+          if (front_skeleton.has_value() && left_skeleton.has_value()) {
+            std::optional<animation::Skeleton> mix = animation::blend_skeletons(
+                front_skeleton.value(), left_skeleton.value(),
+                direction_bias.x);
+
+            if (mix.has_value()) {
+              auto state = calculate_final_animation_state(
+                  idle_anim.bone_infos(), mix.value());
+              if (state.has_value()) {
+                final_animation_state = std::move(state.value());
+              }
+            }
+          }
+
         } else if (norm_direction.x >= 0 && norm_direction.y <= 0) {
-          mix = animators.walk.backward_left.Update(animation_deltatime,
-                                                     direction_bias.x);
+
+          std::optional<animation::Skeleton> back_skeleton =
+              back_anim.animate(walk_animation_time);
+          std::optional<animation::Skeleton> left_skeleton =
+              left_anim.animate(walk_animation_time);
+
+          if (back_skeleton.has_value() && left_skeleton.has_value()) {
+            std::optional<animation::Skeleton> mix = animation::blend_skeletons(
+                back_skeleton.value(), left_skeleton.value(), direction_bias.x);
+
+            if (mix.has_value()) {
+              auto state = calculate_final_animation_state(
+                  idle_anim.bone_infos(), mix.value());
+              if (state.has_value()) {
+                final_animation_state = std::move(state.value());
+              }
+            }
+          }
+
         } else if (norm_direction.x <= 0 && norm_direction.y >= 0) {
-          mix = animators.walk.forward_right.Update(animation_deltatime,
-                                                     direction_bias.x);
+
+          std::optional<animation::Skeleton> forward_skeleton =
+              front_anim.animate(walk_animation_time);
+          std::optional<animation::Skeleton> right_skeleton =
+              right_anim.animate(walk_animation_time);
+
+          if (forward_skeleton.has_value() && right_skeleton.has_value()) {
+            std::optional<animation::Skeleton> mix = animation::blend_skeletons(
+                forward_skeleton.value(), right_skeleton.value(),
+                direction_bias.x);
+
+            if (mix.has_value()) {
+              auto state = calculate_final_animation_state(
+                  idle_anim.bone_infos(), mix.value());
+              if (state.has_value()) {
+                final_animation_state = std::move(state.value());
+              }
+            }
+          }
+
         } else if (norm_direction.x <= 0 && norm_direction.y <= 0) {
-          mix = animators.walk.backward_right.Update(animation_deltatime,
-                                                      direction_bias.x);
+          std::optional<animation::Skeleton> back_skeleton =
+              back_anim.animate(walk_animation_time);
+          std::optional<animation::Skeleton> right_skeleton =
+              right_anim.animate(walk_animation_time);
+
+          if (back_skeleton.has_value() && right_skeleton.has_value()) {
+            std::optional<animation::Skeleton> mix = animation::blend_skeletons(
+                back_skeleton.value(), right_skeleton.value(),
+                direction_bias.x);
+
+            if (mix.has_value()) {
+              auto state = calculate_final_animation_state(
+                  idle_anim.bone_infos(), mix.value());
+              if (state.has_value()) {
+                final_animation_state = std::move(state.value());
+              }
+            }
+          }
         }
 
-        if (mix)
-          animation_state = mix.value() | std::ranges::to<std::vector>();
+        player.set_animation_state(final_animation_state.matrices());
       } else {
-        animators.idle.UpdateAnimation(animation_deltatime);
-        animation_state = animators.idle.GetFinalBoneMatrices() |
-                          std::ranges::to<std::vector>();
-#endif
-      }
+        idle_animation_time += animation_deltatime;
+        walk_animation_time = 0;
 
-      animation::Animation &idle_anim = player.animations()[walk_animation];
+        std::optional<animation::Skeleton> idle_skeleton =
+            idle_anim.animate(idle_animation_time);
 
-      double animation_deltatime = delta_time / 10;
-      animation_time += animation_deltatime;
+        if (idle_skeleton.has_value()) {
+          auto state = calculate_final_animation_state(idle_anim.bone_infos(),
+                                                       idle_skeleton.value());
 
-
-      std::optional<animation::Skeleton> idle_skeleton =
-          idle_anim.animate(animation_time);
-
-      if (idle_skeleton.has_value()) {
-        auto state = calculate_final_animation_state(idle_anim.bone_infos(),
-                                                     idle_skeleton.value());
-
-        if (state.has_value()) {
-          final_animation_state = std::move(state.value());
+          if (state.has_value()) {
+            final_animation_state = std::move(state.value());
+          }
         }
-      }
 
-      player.set_animation_state(final_animation_state.matrices());
+        player.set_animation_state(final_animation_state.matrices());
+      }
 
       last_joystick_translation = joystick_translation;
     }
