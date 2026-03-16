@@ -11,11 +11,32 @@
 #include <SDL_events.h>
 #include <SDL_gamecontroller.h>
 
-#include <VulkanRenderer/Animator.hpp>
+#include <VulkanRenderer/Animation2.hpp>
 #include <VulkanRenderer/glm.hpp>
 #include <algorithm>
 #include <ostream>
 #include <ranges>
+
+void print_skeleton_with_boneids(animation::BoneInfos &bone_infos,
+                                 animation::Skeleton &skeleton, int depth) {
+  std::string spacer = " ";
+  for (int i = 0; i < depth; i++) {
+    spacer += " ";
+  }
+
+  auto id = bone_infos.find_bone_id(skeleton.name());
+  if (id.has_value()) {
+    std::println("{}{} [id:{}] {}", spacer, skeleton.name(), id.value(),
+                 glm::to_string(skeleton.model_matrix()));
+  } else {
+    std::println("{}{} [id:?] {}", spacer, skeleton.name(),
+                 glm::to_string(skeleton.model_matrix()));
+  }
+
+  for (animation::Skeleton &child : skeleton.children()) {
+    print_skeleton_with_boneids(bone_infos, child, depth + 1);
+  }
+};
 
 glm::vec3 rotate(glm::quat quat, glm::vec3 vec) {
   glm::mat4 rotation = glm::toMat4(quat);
@@ -66,6 +87,8 @@ struct PlayerController {
   float ground_pushback_factor = 5.0;
   float gravity = -8.0f;
 
+  double animation_time = 0.0;
+
   std::size_t backwalk_animation = 0;
   std::size_t idle_animation = 0;
   std::size_t leftstrafe_animation = 0;
@@ -83,6 +106,7 @@ struct PlayerController {
   static constexpr float const collider_height = player_height * 0.5f;
   static constexpr float const ray_height = player_height - collider_height;
 
+#if 0
   struct {
     Animator idle;
     struct {
@@ -93,8 +117,9 @@ struct PlayerController {
     } walk;
 
   } animators;
+#endif
 
-  std::vector<glm::mat4> animation_state;
+  animation::FinalAnimationState final_animation_state{100};
 
   auto get_position() const -> glm::vec3 {
     btVector3 pos = rigidbody->getCenterOfMassPosition();
@@ -167,6 +192,7 @@ struct PlayerController {
       std::println("Config was not readable: {}", config.error());
     }
 
+#if 0    
     animators.idle.PlayAnimation(&player.animations()[idle_animation]);
     player.set_animation_state(animators.idle.GetFinalBoneMatrices());
 
@@ -192,6 +218,7 @@ struct PlayerController {
     animators.walk.backward_left =
         animation::BlendAnimator(&player.animations()[backwalk_animation],
                                  &player.animations()[leftstrafe_animation]);
+#endif
 
     capsule_collider = std::make_unique<btCapsuleShape>(
         btScalar(0.5f), btScalar(player_height / 2));
@@ -347,7 +374,6 @@ struct PlayerController {
         rigidbody->setLinearVelocity(btVector3(0, y_velocity, 0));
       }
 
-      double animation_deltatime = delta_time / 10;
       if (joystick_translation != glm::vec3(0.0f)) {
 
         double x_length = joystick_translation.x;
@@ -360,6 +386,18 @@ struct PlayerController {
         glm::vec2 norm_direction =
             glm::normalize(glm::vec2(x_length, z_length));
 
+#if 0
+        std::println("idle anim:");
+		print_skeleton_with_boneids(idle_anim.m_bone_infos, idle_anim.m_initial_pose, 0);
+        std::println("idle anim total ticks {}", idle_anim.total_ticks().get());
+        std::println("idle anim ticks per second {}", idle_anim.ticks_per_second().get());
+        std::println("idle anim bones size {}", idle_anim.m_bones.size());
+        std::println("idle anim boneinfoss size {}",
+                     idle_anim.m_bone_infos.bone_count());
+
+        std::println("animation time {}", animation_time);
+#endif
+#if 0
         std::optional<std::span<glm::mat4>> mix;
         if (norm_direction.x >= 0 && norm_direction.y >= 0) {
           mix = animators.walk.forward_left.Update(animation_deltatime,
@@ -377,14 +415,33 @@ struct PlayerController {
 
         if (mix)
           animation_state = mix.value() | std::ranges::to<std::vector>();
-
       } else {
         animators.idle.UpdateAnimation(animation_deltatime);
         animation_state = animators.idle.GetFinalBoneMatrices() |
                           std::ranges::to<std::vector>();
+#endif
       }
 
-      player.set_animation_state(animation_state);
+      animation::Animation &idle_anim = player.animations()[walk_animation];
+
+      double animation_deltatime = delta_time / 10;
+      animation_time += animation_deltatime;
+
+
+      std::optional<animation::Skeleton> idle_skeleton =
+          idle_anim.animate(animation_time);
+
+      if (idle_skeleton.has_value()) {
+        auto state = calculate_final_animation_state(idle_anim.bone_infos(),
+                                                     idle_skeleton.value());
+
+        if (state.has_value()) {
+          final_animation_state = std::move(state.value());
+        }
+      }
+
+      player.set_animation_state(final_animation_state.matrices());
+
       last_joystick_translation = joystick_translation;
     }
 

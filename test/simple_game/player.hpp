@@ -1,6 +1,6 @@
 #pragma once
 
-#include <VulkanRenderer/Animator.hpp>
+#include <VulkanRenderer/Animation2.hpp>
 #include <VulkanRenderer/Context.hpp>
 #include <VulkanRenderer/MeshCache.hpp>
 #include <VulkanRenderer/ModelLoader.hpp>
@@ -52,7 +52,6 @@ public:
   }
 };
 
-
 class Player {
 public:
   Player(Render::Context &context, MeshCache &mesh_cache,
@@ -65,24 +64,31 @@ public:
             "../assets/lowpoly_scifi_girl_2/lowpoly_scifi_girl.gltf");
 
     if (loaded_model.has_value()) {
-      model = loaded_model.value();
-
-      anim_matrix_locations =
-          model.animations.at(0).GetFinalBoneMatrixLocations();
-      std::println("Animation matrix locations:");
-      for (auto [i, name] : std::views::enumerate(anim_matrix_locations)) {
-        std::println("({}) {}", i, name);
-      }
-
-    } else {
-      std::println("Could NOT Load player model, error: {}",
-                   loaded_model.error());
+      model = std::move(loaded_model.value());
     }
   }
 
   ~Player() = default;
 
-  std::span<Animation> animations() { return model.animations; }
+  std::span<animation::Animation> animations() { return model.animations; }
+
+#if 0
+  void clear_animation_state() {
+    auto insert_animation_state = [](std::span<glm::mat4> animation_state,
+                                     RenderableNodePtr &renderable) {
+      for (RenderableNode::Model &model : renderable->models) {
+        if (auto *p = std::get_if<RenderableNode::AnimatedModel>(&model)) {
+          p->animation_state = animation_state;
+        }
+      }
+    };
+
+	std::span<glm::mat4> empty_state;
+    foreach_node(std::bind_front(insert_animation_state, empty_state),
+                 model.renderable);
+  }
+#endif
+
   void set_animation_state(std::span<glm::mat4> animation_state) {
     auto insert_animation_state = [](std::span<glm::mat4> animation_state,
                                      RenderableNodePtr &renderable) {
@@ -131,8 +137,6 @@ public:
 
   bool is_aiming{false};
   glm::mat4 m_camera_current;
-
-  std::vector<std::string> anim_matrix_locations;
 
 private:
   Transform m_transform{Transform::identity()};

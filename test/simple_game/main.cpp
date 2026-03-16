@@ -147,7 +147,6 @@ auto generate_stairs(physics::Physics &physics, SimpleMeshRef textured_cube,
     step_transform.scale = glm::vec3(step_depth, step_height, step_width);
     StaticBox step_box(physics, textured_cube, texture, step_transform);
     stairs.push_back(std::move(step_box));
-    std::println("Added stair {}", i);
   }
 
   return stairs;
@@ -486,7 +485,7 @@ int main(int argc, char **argv) {
                      .count();
 
     std::size_t fps = fps_counter.next_frame(duration_delta_time);
-#if 1
+#if 0
     std::println(
         "fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
         std::chrono::duration_cast<std::chrono::milliseconds>(

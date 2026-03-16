@@ -1,4 +1,5 @@
 #pragma once
+#if 0
 
 #include "glm.hpp"
 #include <map>
@@ -19,6 +20,7 @@ public:
 	auto insert_bone(std::string_view name, glm::mat4 offset) -> int;
 	auto find_bone_id(std::string_view name) -> std::optional<int>;
 	auto get() -> std::map<std::string, BoneInfo>&;
+	auto bone_count() const -> std::size_t;
 
 private:
 	auto generate_next_id() -> int;
@@ -94,11 +96,13 @@ public:
     float GetTicksPerSecond();
     float GetDuration(); 
     const AssimpNodeData& GetRootNode();
-    const std::map<std::string,BoneInfo>& GetBoneIDMap();
+    BoneInfos& GetBoneInfos();
     std::vector<std::string> GetFinalBoneMatrixLocations();
     float m_Duration;
     int m_TicksPerSecond;
     std::vector<Bone> m_Bones;
     AssimpNodeData m_RootNode;
-    std::map<std::string, BoneInfo> m_BoneInfoMap;
+	BoneInfos m_BoneInfos;
 };
+
+#endif

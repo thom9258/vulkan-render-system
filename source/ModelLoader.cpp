@@ -1,5 +1,6 @@
 #include <VulkanRenderer/ModelLoader.hpp>
 
+#include "Animation2.hpp"
 #include "AnimationUtils.hpp"
 #include "MeshCache.hpp"
 #include "ShaderTexture.hpp"
@@ -14,19 +15,6 @@
 
 // TODO: this is kinda dirty and a waste of memory, we should add proper support
 //       for indexed vertice buffers instead..
-#if 0
-auto unindex_vertices(std::vector<VertexPosNormColorUV> vertices,
-                      std::vector<std::uint32_t> indices)
-    -> std::vector<VertexPosNormColorUV> {
-  std::vector<VertexPosNormColorUV> unindexed;
-  unindexed.reserve(indices.size());
-
-  for (std::uint32_t index : indices)
-    unindexed.push_back(vertices.at(index));
-  return unindexed;
-}
-#endif
-
 template <typename TVertex>
 auto unindex_vertices(std::span<TVertex> vertices,
                       std::span<std::uint32_t> indices)
@@ -56,19 +44,6 @@ void print_mesh_material_info(std::string_view prefix,
 
     std::filesystem::path path =
         base_directory / std::filesystem::path(pathstring.C_Str());
-
-#if 0
-    if (!std::filesystem::exists(path) ||
-        !std::filesystem::is_regular_file(path)) {
-      std::cout << std::format(
-                       " with diffuse texture count {}, at INVALID path", i)
-                << std::endl;
-    } else {
-      std::cout << std::format(" with diffuse texture {}, at path {}", i,
-                               path.string())
-                << std::endl;
-    }
-#endif
   }
 };
 
@@ -351,17 +326,14 @@ RenderableNodePtr load_model(Render::Context &context, MeshCache &mesh_cache,
   return root;
 }
 
-Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
-  Bone bone(name, ID);
-
-// std::println("'{}' id={} KeyCounts: position={} rotation={} scale={}", name,
-//              ID, channel->mNumPositionKeys, channel->mNumRotationKeys,
-//              channel->mNumScalingKeys);
+animation::Bone create_bone(const std::string &name, int ID,
+                            const aiNodeAnim *channel) {
+  animation::Bone bone(name, ID);
 
   for (int i = 0; i < channel->mNumPositionKeys; ++i) {
     aiVector3D aiPosition = channel->mPositionKeys[i].mValue;
     float timeStamp = channel->mPositionKeys[i].mTime;
-    KeyPosition data;
+    animation::keyframe::Position data;
     data.position = assimp_to_glm::vec3(aiPosition);
     data.timeStamp = timeStamp;
     bone.m_Positions.push_back(data);
@@ -370,7 +342,7 @@ Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
   for (int i = 0; i < channel->mNumRotationKeys; ++i) {
     aiQuaternion aiOrientation = channel->mRotationKeys[i].mValue;
     float timeStamp = channel->mRotationKeys[i].mTime;
-    KeyRotation data;
+    animation::keyframe::Rotation data;
     data.orientation = assimp_to_glm::quat(aiOrientation);
     data.timeStamp = timeStamp;
     bone.m_Rotations.push_back(data);
@@ -379,7 +351,7 @@ Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
   for (int i = 0; i < channel->mNumScalingKeys; ++i) {
     aiVector3D scale = channel->mScalingKeys[i].mValue;
     float timeStamp = channel->mScalingKeys[i].mTime;
-    KeyScale data;
+    animation::keyframe::Scale data;
     data.scale = assimp_to_glm::vec3(scale);
     data.timeStamp = timeStamp;
     bone.m_Scales.push_back(data);
@@ -388,7 +360,8 @@ Bone create_bone(const std::string &name, int ID, const aiNodeAnim *channel) {
   return bone;
 }
 
-void ReadMissingBones(Animation &animation, BoneInfos &bone_infos,
+void ReadMissingBones(animation::Animation &animation,
+                      animation::BoneInfos &bone_infos,
                       const aiAnimation *ai_animation) {
   // reading channels(bones engaged in an ai_animation and their keyframes)
   for (int i = 0; i < ai_animation->mNumChannels; i++) {
@@ -402,62 +375,49 @@ void ReadMissingBones(Animation &animation, BoneInfos &bone_infos,
       bone_infos.insert_bone(boneName, glm::mat4(1.0f));
     }
 
-    Bone bone = create_bone(boneName, bone_infos.find_bone_id(boneName).value(),
-                            channel);
-    animation.m_Bones.push_back(bone);
-  }
+    animation::Bone bone = create_bone(
+        boneName, bone_infos.find_bone_id(boneName).value(), channel);
 
-  animation.m_BoneInfoMap = bone_infos.get();
+    animation.add_bone(bone);
+  }
 }
 
-void ReadHeirarchyData(Animation &animation, AssimpNodeData &dest,
-                       const aiNode *src) {
+animation::Skeleton ReadSkeleton(const aiNode *src) {
   assert(src);
-  dest.name = src->mName.data;
-  dest.transformation = assimp_to_glm::matrix(src->mTransformation);
+  std::string name = src->mName.data;
+  glm::mat4 model_matrix = assimp_to_glm::matrix(src->mTransformation);
+  animation::Skeleton skeleton(name, model_matrix);
 
-  for (int i = 0; i < src->mNumChildren; i++) {
-    AssimpNodeData newData;
-    ReadHeirarchyData(animation, newData, src->mChildren[i]);
-    dest.children.push_back(newData);
+  for (std::size_t i = 0; i < src->mNumChildren; i++) {
+    skeleton.add_child(ReadSkeleton(src->mChildren[i]));
   }
+
+  return skeleton;
 }
 
-void print_heirarchy_data(std::ostream &os, AssimpNodeData &node, int indent) {
-  const std::string indentstring(indent * 2, ' ');
-  std::println(os, "{}{}:", indentstring, node.name);
-
-  for (AssimpNodeData &child : node.children) {
-    print_heirarchy_data(os, child, indent + 1);
-  }
-}
-
-void print_animation(std::ostream &os, Animation &animation,
-                     std::string_view name) {
-  std::println(os, "Animation {}:", name);
-  std::println(os, "  Duration: {}", animation.m_Duration);
-  std::println(os, "  Ticks Per Second: {}", animation.m_TicksPerSecond);
-  std::println(os, "  Node Heirarchy:");
-  print_heirarchy_data(std::cout, animation.m_RootNode, 1);
-}
-
-auto create_animations(const aiScene *scene, BoneInfos &bone_infos)
-    -> std::vector<Animation> {
+auto create_animations(const aiScene *scene, animation::BoneInfos &bone_infos)
+    -> std::vector<animation::Animation> {
 
   if (!scene->HasAnimations()) {
     return {};
   }
 
-  std::vector<Animation> animations;
+  std::vector<animation::Animation> animations;
   for (int i = 0; i < scene->mNumAnimations; i++) {
     auto ai_animation = scene->mAnimations[i];
-    Animation animation;
-    animation.m_Duration = ai_animation->mDuration;
-    animation.m_TicksPerSecond = ai_animation->mTicksPerSecond;
-    ReadHeirarchyData(animation, animation.m_RootNode, scene->mRootNode);
+
+    auto ticks_per_second =
+        animation::TicksPerSecond{ai_animation->mTicksPerSecond};
+    auto total_ticks = animation::TotalTicks{ai_animation->mDuration};
+
+    // TODO: the problem is that the bones that have names and are in the
+    // skeleton sometimes dont have an animation bone index, so these must be
+    // inserted so we can look them up and pretend they exist
+    animation::Animation animation(ReadSkeleton(scene->mRootNode), total_ticks,
+                                   ticks_per_second);
+
     ReadMissingBones(animation, bone_infos, ai_animation);
-    //print_animation(std::cout, animation, std::format("{}", i));
-    animations.push_back(animation);
+    animations.push_back(std::move(animation));
   }
 
   return animations;
@@ -470,7 +430,7 @@ auto process_animated_mesh(Render::Context &context,
                            TextureSamplerCache &texture_cache,
                            MeshCache &mesh_cache,
                            std::filesystem::path const &base_directory,
-                           BoneInfos &bone_infos, aiMesh *mesh,
+                           animation::BoneInfos &bone_infos, aiMesh *mesh,
                            const aiScene *scene)
     -> RenderableNode::AnimatedModel {
   std::vector<VertexAnimatedPosNormColorUV> vertices{};
@@ -509,8 +469,8 @@ auto process_animated_mesh(Render::Context &context,
     if (!bone_infos.has_bone(boneName)) {
       glm::mat4 offset =
           assimp_to_glm::matrix(mesh->mBones[boneIndex]->mOffsetMatrix);
-//     std::println("Found new BoneInfo by name {} with translation {}",
-//                  boneName, glm::to_string(offset[3]));
+      //     std::println("Found new BoneInfo by name {} with translation {}",
+      //                  boneName, glm::to_string(offset[3]));
 
       boneID = bone_infos.insert_bone(
           boneName,
@@ -520,7 +480,8 @@ auto process_animated_mesh(Render::Context &context,
       boneID = bone_infos.find_bone_id(boneName);
     }
 
-    auto set_vertex_bone_data = [&](VertexAnimatedPosNormColorUV &vertex, int boneID, float weight) {
+    auto set_vertex_bone_data = [&](VertexAnimatedPosNormColorUV &vertex,
+                                    int boneID, float weight) {
       for (int i = 0; i < animation::max_bone_weights; i++) {
         if (vertex.bone_ids[i] < 0) {
           vertex.weights[i] = weight;
@@ -538,7 +499,7 @@ auto process_animated_mesh(Render::Context &context,
       int vertexId = weights[weightIndex].mVertexId;
       float weight = weights[weightIndex].mWeight;
       assert(vertexId <= vertices.size());
-	  set_vertex_bone_data(vertices[vertexId], boneID.value(), weight);
+      set_vertex_bone_data(vertices[vertexId], boneID.value(), weight);
     }
   }
 
@@ -556,8 +517,7 @@ auto process_animated_mesh(Render::Context &context,
   RenderableNode::AnimatedModel drawable_mesh;
   drawable_mesh.mesh = mesh_cache.add(
       context, AnimatedMesh{VertexBuffer::create<VertexAnimatedPosNormColorUV>(
-                                context, unindexed),
-                            bone_infos});
+                   context, unindexed)});
 
   drawable_mesh.ambient = std::nullopt;
   drawable_mesh.diffuse = std::nullopt;
@@ -686,7 +646,7 @@ auto process_animated_node(Render::Context &context,
                            TextureSamplerCache &texture_cache,
                            MeshCache &mesh_cache,
                            std::filesystem::path const &base_directory,
-                           BoneInfos &bone_infos, aiNode *node,
+                           animation::BoneInfos &bone_infos, aiNode *node,
                            const aiScene *scene) -> RenderableNodePtr {
   if (!node || !scene)
     return nullptr;
@@ -768,5 +728,10 @@ auto load_animated_model(Render::Context &context, MeshCache &mesh_cache,
 
   loaded_animated_model.animations =
       create_animations(scene, loaded_animated_model.bone_infos);
+
+  for (animation::Animation &anim : loaded_animated_model.animations) {
+    anim.set_bone_infos(loaded_animated_model.bone_infos);
+  }
+
   return loaded_animated_model;
 }

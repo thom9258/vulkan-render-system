@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Renderable.hpp"
-#include "Animation.hpp"
+#include "Animation2.hpp"
 
 #include <filesystem>
 #include <format>
@@ -14,8 +14,8 @@ RenderableNodePtr load_model(Render::Context &context, MeshCache &mesh_cache,
 struct LoadedAnimatedModel
 {
 	RenderableNodePtr renderable;
-	std::vector<Animation> animations;
-	BoneInfos bone_infos;
+	std::vector<animation::Animation> animations;
+	animation::BoneInfos bone_infos;
 	std::filesystem::path base_directory;
 };
 

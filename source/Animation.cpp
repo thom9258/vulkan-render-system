@@ -1,3 +1,5 @@
+#if 0
+
 #include <VulkanRenderer/Animation.hpp>
 
 #include <algorithm>
@@ -32,6 +34,10 @@ auto BoneInfos::find_bone_id(std::string_view name) -> std::optional<int> {
   if (!has_bone(name))
     return std::nullopt;
   return get().at(std::string(name)).id;
+}
+
+auto BoneInfos::bone_count() const -> std::size_t {
+	return m_BoneInfoMap.size();
 }
 
 Bone::Bone(const std::string &name, int ID)
@@ -164,8 +170,8 @@ float Animation::GetDuration() { return m_Duration; }
 
 const AssimpNodeData &Animation::GetRootNode() { return m_RootNode; }
 
-const std::map<std::string, BoneInfo> &Animation::GetBoneIDMap() {
-  return m_BoneInfoMap;
+BoneInfos &Animation::GetBoneInfos() {
+  return m_BoneInfos;
 }
 
 
@@ -181,3 +187,5 @@ std::vector<std::string> Animation::GetFinalBoneMatrixLocations() {
 
 	return names;
 }    
+
+#endif
