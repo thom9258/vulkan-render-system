@@ -90,6 +90,9 @@ struct PlayerController {
   double idle_animation_time = 0.0;
   double walk_animation_time = 0.0;
 
+  double full_idle_to_walk_transition_time = 0.5;
+  std::optional<double> idle_to_walk_transition_time;
+
   std::size_t backwalk_animation = 0;
   std::size_t idle_animation = 0;
   std::size_t leftstrafe_animation = 0;
