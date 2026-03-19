@@ -206,6 +206,10 @@ int main(int argc, char **argv) {
 
   Render::Context context(window_config, logger);
 
+  if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) != 1) {
+      SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+  }
+
   const auto window = context.get_window_extent();
   const auto aspect =
       static_cast<float>(window.width()) / static_cast<float>(window.height());
@@ -244,8 +248,8 @@ int main(int argc, char **argv) {
   Player player(context, mesh_cache, texture_cache);
 
   CameraRig camera_rig;
-  PlayerController player_controller(player, physics,
-                                     glm::vec3(-2.0f, 5.0f, 0.0f));
+  PlayerController player_controller("../player.config", physics, player);
+
   CameraPlayerFollow camera_player_follow;
 
   Transform floor_box_transform = Transform::identity();
@@ -382,12 +386,9 @@ int main(int argc, char **argv) {
       const double animation_deltatime = delta_time / 1000;
       const double render_deltatime = delta_time / 100;
       player_update_time = with_time_measurement([&]() {
-        player_controller(player, camera_rig, physics, render_deltatime,
+        player_controller.update(player, camera_rig, physics, render_deltatime,
                           events);
 
-        if (player_controller.get_position().y < -10.0f) {
-          player_controller.respawn();
-        }
       });
 
       camera_player_follow(camera, player, camera_rig, render_deltatime);
@@ -485,7 +486,7 @@ int main(int argc, char **argv) {
                      .count();
 
     std::size_t fps = fps_counter.next_frame(duration_delta_time);
-#if 0
+#if 1
     std::println(
         "fps: {}, playerupdate: {}, rendertime: {}, deltatime: {}", fps,
         std::chrono::duration_cast<std::chrono::milliseconds>(

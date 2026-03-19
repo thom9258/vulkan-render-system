@@ -299,6 +299,16 @@ std::optional<Skeleton> blend_skeletons(Skeleton &a, Skeleton &b, Bias bias) {
   return blended_skeleton;
 }
 
+auto blend_skeletons(std::optional<Skeleton> &a, std::optional<Skeleton> &b,
+                     Bias bias) -> std::optional<Skeleton> {
+
+  if (!a.has_value() || !b.has_value()) {
+    return std::nullopt;
+  }
+
+  return blend_skeletons(a.value(), b.value(), bias);
+}
+
 FinalAnimationState::FinalAnimationState(std::size_t matrice_count) {
   m_matrices.resize(matrice_count, glm::mat4(1.0f));
 }
@@ -320,7 +330,7 @@ auto insert_final_matrices(FinalAnimationState &final_state,
     // Note here that when we convert from local to global transform, we
     // multiply parent * current * offset
     // but when we propagate to the children, we only pass parent * current
-	// as the parent of the children.
+    // as the parent of the children.
     glm::mat4 offset = info.value().offset;
     current_matrix = parent_matrix * bone.model_matrix();
     final_state.insert(info.value().id, current_matrix * offset);
@@ -337,5 +347,17 @@ auto calculate_final_animation_state(BoneInfos &bone_infos, Skeleton &skeleton)
   insert_final_matrices(final_state, bone_infos, skeleton, glm::mat4(1.0f));
   return final_state;
 }
+
+
+auto calculate_final_animation_state(BoneInfos &bone_infos,
+                                     std::optional<Skeleton> &skeleton)
+    -> std::optional<FinalAnimationState> {
+  if (!skeleton.has_value()) {
+	  return std::nullopt;
+  }
+
+  return calculate_final_animation_state(bone_infos, skeleton.value());
+}    
+
 
 } // namespace animation

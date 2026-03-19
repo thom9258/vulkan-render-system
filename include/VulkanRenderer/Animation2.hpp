@@ -140,6 +140,7 @@ private:
 };
 
 std::optional<Skeleton> blend_skeletons(Skeleton &a, Skeleton &b, Bias bias);
+std::optional<Skeleton> blend_skeletons(std::optional<Skeleton> &a, std::optional<Skeleton> &b, Bias bias);
 
 class FinalAnimationState {
 public:
@@ -161,6 +162,10 @@ auto insert_final_matrices(FinalAnimationState &final_state,
                            Skeleton &bone, glm::mat4 parent_matrix) -> void;
 
 auto calculate_final_animation_state(BoneInfos &bone_infos, Skeleton &skeleton)
+    -> std::optional<FinalAnimationState>;
+
+
+auto calculate_final_animation_state(BoneInfos &bone_infos, std::optional<Skeleton> &skeleton)
     -> std::optional<FinalAnimationState>;
 
 } // namespace animation
